@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import type { GraphNode } from "../../app/canvas/types";
+import { useT } from "../../app/providers/LocaleProvider";
 import type { TerminalView } from "../../app/types";
 import { ActionButton } from "../ui/ActionButton";
 
@@ -30,6 +31,7 @@ export const DeleteAllTerminalsDialog = ({
   onCancel,
   onDeleted,
 }: DeleteAllTerminalsDialogProps) => {
+  const t = useT();
   const [inactiveOnly, setInactiveOnly] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -123,9 +125,9 @@ export const DeleteAllTerminalsDialog = ({
       tabIndex={-1}
     >
       <header className="delete-confirm-header">
-        <h2>Delete Terminals</h2>
+        <h2>{t("web.dialog.deleteAll.title")}</h2>
         <div className="delete-confirm-header-actions">
-          <span className="pill blocked">DESTRUCTIVE</span>
+          <span className="pill blocked">{t("web.dialog.delete.destructive")}</span>
           <ActionButton
             aria-label="Close confirmation"
             className="delete-confirm-close"
@@ -134,31 +136,42 @@ export const DeleteAllTerminalsDialog = ({
             size="dense"
             variant="accent"
           >
-            Close
+            {t("common.close")}
           </ActionButton>
         </div>
       </header>
       <div className="delete-confirm-body">
         <p className="delete-confirm-message">
-          Delete{" "}
+          {t("web.dialog.deleteAll.deleteCount", { count: totalTargetCount })}{" "}
           <strong>
-            {totalTargetCount} {totalTargetCount === 1 ? "session" : "sessions"}
+            {totalTargetCount}{" "}
+            {totalTargetCount === 1
+              ? t("web.dialog.deleteAll.session")
+              : t("web.dialog.deleteAll.sessions")}
           </strong>
-          {inactiveOnly ? " (inactive terminals + past sessions)" : " (all)"}.
+          {inactiveOnly
+            ? t("web.dialog.deleteAll.inactiveMode")
+            : t("web.dialog.deleteAll.allMode")}
+          .
         </p>
-        <p className="delete-confirm-message">
-          Worktree-backed terminals also remove their local worktree directories and branches.
-        </p>
+        <p className="delete-confirm-message">{t("web.dialog.deleteAll.worktreeMessage")}</p>
         {failureMessages.length > 0 && (
           <p className="delete-confirm-message" role="alert">
-            Failed to delete {failureMessages.length}{" "}
-            {failureMessages.length === 1 ? "item" : "items"}:{" "}
-            {failureMessages.slice(0, 3).join("; ")}
+            {t("web.dialog.deleteAll.failedItems", {
+              count: failureMessages.length,
+              items:
+                failureMessages.length === 1
+                  ? t("web.dialog.deleteAll.item")
+                  : t("web.dialog.deleteAll.items"),
+              messages: failureMessages.slice(0, 3).join("; "),
+            })}
           </p>
         )}
         <div className="delete-all-mode-row">
           <span className="delete-all-mode-label">
-            {inactiveOnly ? "Inactive only" : "All terminals"}
+            {inactiveOnly
+              ? t("web.dialog.deleteAll.inactiveOnly")
+              : t("web.dialog.deleteAll.allTerminals")}
           </span>
           <button
             type="button"
@@ -174,21 +187,21 @@ export const DeleteAllTerminalsDialog = ({
         </div>
         <dl className="delete-confirm-details delete-all-details">
           <div>
-            <dt>Inactive</dt>
+            <dt>{t("web.dialog.deleteAll.inactive")}</dt>
             <dd>{inactiveTerminals.length}</dd>
           </div>
           <div>
-            <dt>Past sessions</dt>
+            <dt>{t("web.dialog.deleteAll.pastSessions")}</dt>
             <dd>{inactiveSessionIds.length}</dd>
           </div>
           <div>
-            <dt>Total</dt>
+            <dt>{t("web.dialog.deleteAll.total")}</dt>
             <dd>{columns.length}</dd>
           </div>
         </dl>
         {progress && (
           <div className="delete-all-progress">
-            Deleting... {progress.done}/{progress.total}
+            {t("web.dialog.deleteAll.progress", { current: progress.done, total: progress.total })}
           </div>
         )}
       </div>
@@ -201,7 +214,7 @@ export const DeleteAllTerminalsDialog = ({
           size="dense"
           variant="accent"
         >
-          Cancel
+          {t("common.cancel")}
         </ActionButton>
         <ActionButton
           aria-label="Confirm delete all terminals"
@@ -212,8 +225,11 @@ export const DeleteAllTerminalsDialog = ({
           variant="danger"
         >
           {isDeleting
-            ? `Deleting ${progress?.done ?? 0}/${progress?.total ?? 0}`
-            : `Delete ${totalTargetCount}`}
+            ? t("web.dialog.deleteAll.progress", {
+                current: progress?.done ?? 0,
+                total: progress?.total ?? 0,
+              })
+            : t("web.dialog.deleteAll.deleteCount", { count: totalTargetCount })}
         </ActionButton>
       </div>
     </section>

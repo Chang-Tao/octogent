@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
+import type { Locale } from "@octogent/core";
 import { buildUiStateUrl } from "../../runtime/runtimeEndpoints";
 import type { PrimaryNavIndex } from "../constants";
 import { MIN_SIDEBAR_WIDTH, PRIMARY_NAV_ITEMS, UI_STATE_SAVE_DEBOUNCE_MS } from "../constants";
@@ -17,6 +18,7 @@ type UsePersistedUiStateOptions = {
 };
 
 const DEFAULT_ACTIVE_PRIMARY_NAV: PrimaryNavIndex = 1;
+const DEFAULT_LOCALE: Locale = "en";
 const DEFAULT_IS_AGENTS_SIDEBAR_VISIBLE = true;
 const DEFAULT_IS_ACTIVE_AGENTS_SECTION_EXPANDED = true;
 const DEFAULT_IS_RUNTIME_STATUS_STRIP_VISIBLE = true;
@@ -75,6 +77,7 @@ const buildPersistedUiStateSnapshot = ({
   isClaudeUsageSectionExpanded,
   isCodexUsageSectionExpanded,
   terminalCompletionSound,
+  locale,
   minimizedTerminalIds,
   terminalWidths,
   canvasOpenTerminalIds,
@@ -93,6 +96,7 @@ const buildPersistedUiStateSnapshot = ({
   isClaudeUsageSectionExpanded: boolean;
   isCodexUsageSectionExpanded: boolean;
   terminalCompletionSound: TerminalCompletionSoundId;
+  locale: Locale;
   minimizedTerminalIds: string[];
   terminalWidths: Record<string, number>;
   canvasOpenTerminalIds: string[];
@@ -111,6 +115,7 @@ const buildPersistedUiStateSnapshot = ({
   isClaudeUsageSectionExpanded,
   isCodexUsageSectionExpanded,
   terminalCompletionSound,
+  locale,
   minimizedTerminalIds,
   terminalWidths,
   canvasOpenTerminalIds,
@@ -135,6 +140,7 @@ const areUiStateSnapshotsEqual = (
   left.isClaudeUsageSectionExpanded === right.isClaudeUsageSectionExpanded &&
   left.isCodexUsageSectionExpanded === right.isCodexUsageSectionExpanded &&
   left.terminalCompletionSound === right.terminalCompletionSound &&
+  left.locale === right.locale &&
   areStringArraysEqual(left.minimizedTerminalIds, right.minimizedTerminalIds) &&
   areNumberRecordMapsEqual(left.terminalWidths, right.terminalWidths) &&
   areStringArraysEqual(left.canvasOpenTerminalIds, right.canvasOpenTerminalIds) &&
@@ -169,6 +175,8 @@ type UsePersistedUiStateResult = {
   setIsCodexUsageSectionExpanded: Dispatch<SetStateAction<boolean>>;
   terminalCompletionSound: TerminalCompletionSoundId;
   setTerminalCompletionSound: Dispatch<SetStateAction<TerminalCompletionSoundId>>;
+  locale: Locale;
+  setLocale: Dispatch<SetStateAction<Locale>>;
   minimizedTerminalIds: string[];
   setMinimizedTerminalIds: Dispatch<SetStateAction<string[]>>;
   terminalWidths: Record<string, number>;
@@ -217,6 +225,7 @@ export const usePersistedUiState = ({
   const [terminalCompletionSound, setTerminalCompletionSound] = useState<TerminalCompletionSoundId>(
     DEFAULT_TERMINAL_COMPLETION_SOUND,
   );
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [isUiStateHydrated, setIsUiStateHydrated] = useState(false);
   const [hasHydratedUiStateSnapshot, setHasHydratedUiStateSnapshot] = useState(false);
   const [minimizedTerminalIds, setMinimizedTerminalIds] = useState<string[]>(
@@ -281,6 +290,7 @@ export const usePersistedUiState = ({
           isClaudeUsageSectionExpanded: DEFAULT_IS_CLAUDE_USAGE_SECTION_EXPANDED,
           isCodexUsageSectionExpanded: DEFAULT_IS_CODEX_USAGE_SECTION_EXPANDED,
           terminalCompletionSound: DEFAULT_TERMINAL_COMPLETION_SOUND,
+          locale: DEFAULT_LOCALE,
           minimizedTerminalIds: DEFAULT_MINIMIZED_TERMINAL_IDS,
           terminalWidths: DEFAULT_TERMINAL_WIDTHS,
           canvasOpenTerminalIds: DEFAULT_CANVAS_OPEN_TERMINAL_IDS,
@@ -328,6 +338,7 @@ export const usePersistedUiState = ({
           snapshot.isCodexUsageSectionExpanded ?? DEFAULT_IS_CODEX_USAGE_SECTION_EXPANDED,
         terminalCompletionSound:
           snapshot.terminalCompletionSound ?? DEFAULT_TERMINAL_COMPLETION_SOUND,
+        locale: (snapshot.locale as Locale) ?? DEFAULT_LOCALE,
         minimizedTerminalIds: nextMinimizedTerminalIds,
         terminalWidths: nextTerminalWidths,
         canvasOpenTerminalIds: nextCanvasOpenTerminalIds,
@@ -387,6 +398,10 @@ export const usePersistedUiState = ({
         setTerminalCompletionSound(snapshot.terminalCompletionSound);
       }
 
+      if (snapshot.locale) {
+        setLocale(snapshot.locale as Locale);
+      }
+
       if (snapshot.minimizedTerminalIds) {
         setMinimizedTerminalIds(nextMinimizedTerminalIds);
       }
@@ -437,6 +452,7 @@ export const usePersistedUiState = ({
       isClaudeUsageSectionExpanded,
       isCodexUsageSectionExpanded,
       terminalCompletionSound,
+      locale,
       minimizedTerminalIds,
       terminalWidths,
       canvasOpenTerminalIds,
@@ -489,6 +505,7 @@ export const usePersistedUiState = ({
     minimizedTerminalIds,
     sidebarWidth,
     terminalCompletionSound,
+    locale,
     terminalWidths,
   ]);
 
@@ -520,6 +537,8 @@ export const usePersistedUiState = ({
     setIsCodexUsageSectionExpanded,
     terminalCompletionSound,
     setTerminalCompletionSound,
+    locale,
+    setLocale,
     minimizedTerminalIds,
     setMinimizedTerminalIds,
     terminalWidths,

@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 
 import { formatTimestamp } from "../app/formatTimestamp";
 import { useConversationsRuntime } from "../app/hooks/useConversationsRuntime";
+import { useT } from "../app/providers/LocaleProvider";
 import { ClearAllConversationsDialog } from "./ClearAllConversationsDialog";
 import { SidebarConversationsList } from "./SidebarConversationsList";
 import { ActionButton } from "./ui/ActionButton";
@@ -18,6 +19,7 @@ export const ConversationsPrimaryView = ({
   onSidebarContent,
   onActionPanel,
 }: ConversationsPrimaryViewProps) => {
+  const t = useT();
   const {
     sessions,
     selectedSessionId,
@@ -139,7 +141,7 @@ export const ConversationsPrimaryView = ({
 
       <section className="conversations-transcript" aria-label="Conversation transcript pane">
         {isLoadingSelectedSession ? (
-          <p className="conversations-empty">Loading conversation...</p>
+          <p className="conversations-empty">{t("web.conversations.loading")}</p>
         ) : selectedSession ? (
           <>
             <header className="conversations-transcript-header">
@@ -147,7 +149,7 @@ export const ConversationsPrimaryView = ({
                 <h3>{selectedSession.sessionId}</h3>
                 <div className="conversations-transcript-header-actions">
                   <ActionButton
-                    aria-label="Export conversation as JSON"
+                    aria-label={t("web.conversations.exportJson")}
                     className="conversations-export"
                     disabled={isExporting}
                     onClick={() => {
@@ -156,10 +158,12 @@ export const ConversationsPrimaryView = ({
                     size="dense"
                     variant="info"
                   >
-                    {isExporting ? "Exporting..." : "Export JSON"}
+                    {isExporting
+                      ? t("web.conversations.exporting")
+                      : t("web.conversations.exportJson")}
                   </ActionButton>
                   <ActionButton
-                    aria-label="Export conversation as Markdown"
+                    aria-label={t("web.conversations.exportMarkdown")}
                     className="conversations-export"
                     disabled={isExporting}
                     onClick={() => {
@@ -168,7 +172,9 @@ export const ConversationsPrimaryView = ({
                     size="dense"
                     variant="info"
                   >
-                    {isExporting ? "Exporting..." : "Export Markdown"}
+                    {isExporting
+                      ? t("web.conversations.exporting")
+                      : t("web.conversations.exportMarkdown")}
                   </ActionButton>
                   <button
                     aria-label="Delete this conversation"
@@ -198,15 +204,15 @@ export const ConversationsPrimaryView = ({
               </div>
               <dl>
                 <div>
-                  <dt>Started</dt>
+                  <dt>{t("web.conversations.started")}</dt>
                   <dd>{formatTimestamp(selectedSession.startedAt)}</dd>
                 </div>
                 <div>
-                  <dt>Ended</dt>
+                  <dt>{t("web.conversations.ended")}</dt>
                   <dd>{formatTimestamp(selectedSession.endedAt)}</dd>
                 </div>
                 <div>
-                  <dt>Events</dt>
+                  <dt>{t("web.conversations.events")}</dt>
                   <dd>{selectedSession.eventCount}</dd>
                 </div>
               </dl>
@@ -235,7 +241,7 @@ export const ConversationsPrimaryView = ({
             </ol>
           </>
         ) : (
-          <p className="conversations-empty">Select a conversation from the sidebar.</p>
+          <p className="conversations-empty">{t("web.conversations.empty")}</p>
         )}
       </section>
     </section>

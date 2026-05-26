@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useT } from "../app/providers/LocaleProvider";
 import type { MonitorFeedSnapshot } from "../app/types";
 
 type TelemetryTapeProps = {
@@ -28,16 +29,20 @@ const truncateSnippet = (value: string): string => {
   return `${value.slice(0, MAX_SNIPPET_LENGTH - 1).trimEnd()}…`;
 };
 
-const buildTelemetryItems = (monitorFeed: MonitorFeedSnapshot | null): TelemetryItem[] => {
+const buildTelemetryItems = (
+  monitorFeed: MonitorFeedSnapshot | null,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): TelemetryItem[] => {
   const posts = monitorFeed?.posts ?? [];
   if (posts.length === 0) {
+    const waiting = t("web.telemetry.waiting");
     return [
       {
         key: "monitor-waiting",
         sourceIcon: "𝕏",
         authorLabel: "@monitor",
-        snippet: "Waiting for X resources...",
-        fullText: "Waiting for X resources...",
+        snippet: waiting,
+        fullText: waiting,
         likesLabel: "♥ --",
         permalink: null,
       },
@@ -59,7 +64,8 @@ const buildTelemetryItems = (monitorFeed: MonitorFeedSnapshot | null): Telemetry
 };
 
 export const TelemetryTape = ({ monitorFeed }: TelemetryTapeProps) => {
-  const telemetryItems = useMemo(() => buildTelemetryItems(monitorFeed), [monitorFeed]);
+  const t = useT();
+  const telemetryItems = useMemo(() => buildTelemetryItems(monitorFeed, t), [monitorFeed, t]);
   const scrollDurationSeconds = Math.max(72, telemetryItems.length * 9);
 
   return (

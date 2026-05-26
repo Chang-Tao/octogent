@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { GITHUB_SPARKLINE_HEIGHT, GITHUB_SPARKLINE_WIDTH } from "../app/constants";
 import type { UsageChartData } from "../app/hooks/useUsageHeatmapPolling";
+import { useT } from "../app/providers/LocaleProvider";
 import type { ClaudeUsageSnapshot } from "../app/types";
 import { OctopusGlyph } from "./EmptyOctopus";
 
@@ -40,13 +41,18 @@ const buildUsageBars = (data: UsageChartData): MiniBar[] => {
   });
 };
 
-const pct = (value: number | null | undefined, loading?: boolean): string => {
+const pct = (
+  value: number | null | undefined,
+  loading?: boolean,
+  t?: (key: string, params?: Record<string, string | number>) => string,
+): string => {
   if (loading) return "···";
-  return value == null ? "NA" : `${Math.round(value)}%`;
+  return value == null ? (t ? t("web.status.na") : "NA") : `${Math.round(value)}%`;
 };
 
 const usageState = (
   claudeUsage: ClaudeUsageSnapshot | null,
+  t: (key: string, params?: Record<string, string | number>) => string,
 ): {
   label: string;
   loading: boolean;
@@ -56,14 +62,15 @@ const usageState = (
 } => {
   if (claudeUsage === null) {
     return {
-      label: "Session",
+      label: t("web.status.session"),
       loading: true,
       sessionPercent: 0,
       weekPercent: 0,
     };
   }
 
-  const label = claudeUsage.source === "oauth-api" ? "5h" : "Session";
+  const label =
+    claudeUsage.source === "oauth-api" ? t("web.status.fiveHours") : t("web.status.session");
   if (claudeUsage.status === "ok") {
     return {
       label,
@@ -78,7 +85,7 @@ const usageState = (
     loading: false,
     sessionPercent: null,
     weekPercent: null,
-    message: claudeUsage.message ?? "Claude usage unavailable",
+    message: claudeUsage.message ?? t("web.status.usageUnavailable"),
   };
 };
 
@@ -87,11 +94,13 @@ const UsageRail = ({
   percent,
   loading,
   title,
+  t: tFn,
 }: {
   label: string;
   percent: number | null | undefined;
   loading?: boolean;
   title?: string;
+  t?: (key: string, params?: Record<string, string | number>) => string;
 }) => {
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
 
@@ -117,7 +126,7 @@ const UsageRail = ({
     >
       <span className="console-status-usage-row-meta">
         <span className="console-status-usage-row-label">{label}</span>
-        <span className="console-status-usage-row-value">{pct(percent, loading)}</span>
+        <span className="console-status-usage-row-value">{pct(percent, loading, tFn)}</span>
       </span>
       <span className="console-status-usage-rail">
         <span
@@ -147,8 +156,9 @@ export const RuntimeStatusStrip = ({
   isRefreshingClaudeUsage = false,
   onRefreshClaudeUsage,
 }: RuntimeStatusStripProps) => {
+  const t = useT();
   const usageBars = useMemo(() => (usageData ? buildUsageBars(usageData) : []), [usageData]);
-  const claudeUsageState = usageState(claudeUsage);
+  const claudeUsageState = usageState(claudeUsage, t);
   const [showRefreshSpin, setShowRefreshSpin] = useState(false);
   const refreshStartedAtRef = useRef<number | null>(null);
   const refreshHideTimerRef = useRef<number | null>(null);
@@ -195,7 +205,7 @@ export const RuntimeStatusStrip = ({
           expression="normal"
           scale={2}
         />
-        <span className="console-status-brand">OCTOGENT</span>
+        <span className="console-status-brand">{t("web.status.brand")}</span>
       </div>
       <div className="console-status-charts">
         <div className="console-status-sparkline" aria-label="Commits per day over last 30 days">
@@ -207,7 +217,7 @@ export const RuntimeStatusStrip = ({
               <polyline points={sparklinePoints} />
             </svg>
           </div>
-          <span className="console-status-sparkline-label">COMMITS/DAY · LAST 30 DAYS</span>
+          <span className="console-status-sparkline-label">{t("web.status.commitsPerDay")}</span>
         </div>
         <div className="console-status-usage-mini" aria-label="Claude token usage last 30 days">
           {usageBars.length > 0 ? (
@@ -226,12 +236,12 @@ export const RuntimeStatusStrip = ({
                   ))}
                 </svg>
               </div>
-              <span className="console-status-sparkline-label">
-                CLAUDE TOKENS/DAY · LAST 30 DAYS
-              </span>
+              <span className="console-status-sparkline-label">{t("web.status.tokensPerDay")}</span>
             </>
           ) : (
-            <span className="console-status-sparkline-label">CLAUDE USAGE —</span>
+            <span className="console-status-sparkline-label">
+              {t("web.status.claudeUsageDash")}
+            </span>
           )}
         </div>
       </div>
@@ -241,8 +251,8 @@ export const RuntimeStatusStrip = ({
             type="button"
             className="console-status-claude-usage-refresh"
             onClick={onRefreshClaudeUsage}
-            aria-label="Refresh Claude usage"
-            title="Refresh Claude usage"
+            aria-label={t("web.status.refreshUsage")}
+            title={t("web.status.refreshUsage")}
             data-refreshing={showRefreshSpin ? "true" : "false"}
           >
             ↻
@@ -258,12 +268,14 @@ export const RuntimeStatusStrip = ({
             label={claudeUsageState.label}
             percent={claudeUsageState.sessionPercent}
             loading={claudeUsageState.loading}
+            t={t}
             {...(claudeUsageState.message ? { title: claudeUsageState.message } : {})}
           />
           <UsageRail
-            label="Week (all)"
+            label={t("web.status.weekAll")}
             percent={claudeUsageState.weekPercent}
             loading={claudeUsageState.loading}
+            t={t}
             {...(claudeUsageState.message ? { title: claudeUsageState.message } : {})}
           />
         </div>

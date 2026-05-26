@@ -1,3 +1,4 @@
+import { SUPPORTED_LOCALES } from "@octogent/core";
 import { type PersistedUiState, isTerminalCompletionSoundId } from "../terminalRuntime";
 
 export const parseUiStatePatch = (
@@ -249,6 +250,19 @@ export const parseUiStatePatch = (
       };
     }
     patch.terminalInactivityThresholdMs = record.terminalInactivityThresholdMs;
+  }
+
+  if (record.locale !== undefined) {
+    if (
+      typeof record.locale !== "string" ||
+      !SUPPORTED_LOCALES.includes(record.locale as (typeof SUPPORTED_LOCALES)[number])
+    ) {
+      return {
+        patch: null,
+        error: "locale must be one of: en, zh-CN.",
+      };
+    }
+    patch.locale = record.locale;
   }
 
   return { patch, error: null };

@@ -5,6 +5,7 @@ import type {
   MonitorConfigPatchRequest,
   UseMonitorRuntimeResult,
 } from "../app/hooks/useMonitorRuntime";
+import { useT } from "../app/providers/LocaleProvider";
 import { ActionButton } from "./ui/ActionButton";
 
 type MonitorPrimaryViewProps = {
@@ -23,22 +24,6 @@ type MonitorPrimaryViewProps = {
 type MonitorSubtabId = "resources" | "configure";
 type MonitorProviderId = "x";
 
-const MONITOR_PROVIDER_TABS: Array<{
-  id: MonitorProviderId;
-  label: string;
-  icon: string;
-}> = [{ id: "x", label: "X Monitor", icon: "𝕏" }];
-
-const MONITOR_SUBTABS: Array<{ id: MonitorSubtabId; label: string }> = [
-  { id: "resources", label: "Resources" },
-  { id: "configure", label: "Configure" },
-];
-const MONITOR_SEARCH_WINDOW_OPTIONS: Array<{ value: 7 | 3 | 1; label: string }> = [
-  { value: 7, label: "7D" },
-  { value: 3, label: "3D" },
-  { value: 1, label: "1D" },
-];
-
 const normalizeTerms = (terms: string[]): string[] => {
   const split = terms.map((term) => term.trim()).filter((term) => term.length > 0);
   return [...new Set(split)];
@@ -54,6 +39,24 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
     refreshMonitorFeed,
     patchMonitorConfig,
   } = monitorRuntime;
+
+  const t = useT();
+
+  const MONITOR_PROVIDER_TABS: Array<{
+    id: MonitorProviderId;
+    label: string;
+    icon: string;
+  }> = [{ id: "x", label: t("web.monitor.tab.x"), icon: "𝕏" }];
+
+  const MONITOR_SUBTABS: Array<{ id: MonitorSubtabId; label: string }> = [
+    { id: "resources", label: t("web.monitor.tab.resources") },
+    { id: "configure", label: t("web.monitor.tab.configure") },
+  ];
+  const MONITOR_SEARCH_WINDOW_OPTIONS: Array<{ value: 7 | 3 | 1; label: string }> = [
+    { value: 7, label: t("web.monitor.search.7d") },
+    { value: 3, label: t("web.monitor.search.3d") },
+    { value: 1, label: t("web.monitor.search.1d") },
+  ];
 
   const onRefresh = () => {
     void refreshMonitorFeed(true);
@@ -107,15 +110,15 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
   }, [monitorFeed]);
   const resourceRollItems = useMemo(
     () => [
-      `Last sync ${formatTimestamp(monitorFeed?.lastFetchedAt ?? null)}`,
-      `Stale after ${formatTimestamp(monitorFeed?.staleAfter ?? null)}`,
-      `Usage cap ${usageCapLabel}`,
+      `${t("web.monitor.stats.lastSync")} ${formatTimestamp(monitorFeed?.lastFetchedAt ?? null)}`,
+      `${t("web.monitor.stats.staleAfter")} ${formatTimestamp(monitorFeed?.staleAfter ?? null)}`,
+      `${t("web.monitor.stats.usageCap")} ${usageCapLabel}`,
       `Used ${usageUsedLabel}`,
       `Remaining ${usageRemainingLabel}`,
       `Window ${searchWindowDaysDraft}D`,
       `Resets ${formatTimestamp(monitorFeed?.usage?.resetAt ?? null)}`,
     ],
-    [monitorFeed, searchWindowDaysDraft, usageCapLabel, usageRemainingLabel, usageUsedLabel],
+    [monitorFeed, searchWindowDaysDraft, usageCapLabel, usageRemainingLabel, usageUsedLabel, t],
   );
 
   const credentialsSummary = monitorConfig?.providers.x.credentials;
@@ -224,7 +227,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
               className="console-status-pill"
               data-state={monitorFeed?.isStale ? "stale" : "fresh"}
             >
-              {monitorFeed?.isStale ? "STALE" : "FRESH"}
+              {monitorFeed?.isStale ? t("web.monitor.status.stale") : t("web.monitor.status.fresh")}
             </span>
             <ActionButton
               aria-label="Refresh monitor feed"
@@ -234,7 +237,9 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
               size="dense"
               variant="accent"
             >
-              {isRefreshingMonitorFeed ? "Refreshing..." : "Refresh"}
+              {isRefreshingMonitorFeed
+                ? t("web.monitor.button.refreshing")
+                : t("web.monitor.button.refresh")}
             </ActionButton>
           </div>
         </div>
@@ -259,11 +264,17 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
             className="monitor-panel monitor-panel--configure"
             aria-label="Monitor configuration panel"
           >
-            <h3>Monitor setup</h3>
+            <h3>{t("web.monitor.setup.title")}</h3>
             <div className="monitor-config-summary" aria-label="Monitor setup summary">
-              <span className="monitor-config-chip">{`Terms ${nextTermsForSave.length}`}</span>
-              <span className="monitor-config-chip">{`Window ${searchWindowDaysDraft}D`}</span>
-              <span className="monitor-config-chip">{`Max ${parsedMaxPosts ?? "--"}`}</span>
+              <span className="monitor-config-chip">
+                {t("web.monitor.summary.terms", { count: nextTermsForSave.length })}
+              </span>
+              <span className="monitor-config-chip">
+                {t("web.monitor.summary.window", { days: searchWindowDaysDraft })}
+              </span>
+              <span className="monitor-config-chip">
+                {t("web.monitor.summary.max", { count: parsedMaxPosts ?? 0 })}
+              </span>
             </div>
 
             {monitorError ? <p className="monitor-error">{monitorError}</p> : null}
@@ -274,7 +285,9 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
             <div className="monitor-config-layout">
               <div className="monitor-config-column">
                 <div className="monitor-config-section">
-                  <label htmlFor="monitor-x-bearer-token">X bearer token</label>
+                  <label htmlFor="monitor-x-bearer-token">
+                    {t("web.monitor.setup.bearerToken")}
+                  </label>
                   <input
                     id="monitor-x-bearer-token"
                     autoComplete="off"
@@ -284,8 +297,8 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                     }}
                     placeholder={
                       credentialsSummary?.isConfigured
-                        ? "Token saved. Paste to replace"
-                        : "Paste X bearer token"
+                        ? t("web.monitor.setup.tokenSaved")
+                        : t("web.monitor.setup.tokenPlaceholder")
                     }
                     type="password"
                     value={bearerToken}
@@ -294,17 +307,17 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                     <output className="monitor-credentials-meta" aria-live="polite">
                       {credentialsSummary.isConfigured ? (
                         <span className="monitor-state-badge monitor-state-badge--saved">
-                          Saved
+                          {t("web.monitor.status.saved")}
                         </span>
                       ) : (
-                        <span>Not configured</span>
+                        <span>{t("web.monitor.status.notConfigured")}</span>
                       )}
                     </output>
                   )}
                 </div>
 
                 <div className="monitor-config-section">
-                  <p className="monitor-section-label">Target terms</p>
+                  <p className="monitor-section-label">{t("web.monitor.setup.targetTerms")}</p>
                   <ul className="monitor-query-terms-list" aria-label="Monitor query terms">
                     {queryTermsDraft.map((term) => (
                       <li className="monitor-query-term" key={term}>
@@ -316,12 +329,12 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                           }}
                           type="button"
                         >
-                          Remove
+                          {t("web.monitor.term.remove")}
                         </button>
                       </li>
                     ))}
                     {queryTermsDraft.length === 0 ? (
-                      <p className="monitor-query-empty">Add at least one query term to save.</p>
+                      <p className="monitor-query-empty">{t("web.monitor.empty.needQuery")}</p>
                     ) : null}
                   </ul>
                   <div className="monitor-query-term-form">
@@ -337,7 +350,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                           appendQueryTerm(queryTermInput);
                         }
                       }}
-                      placeholder="Add term and press Enter"
+                      placeholder={t("web.monitor.setup.termPlaceholder")}
                       type="text"
                       value={queryTermInput}
                     />
@@ -350,7 +363,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                       size="dense"
                       variant="info"
                     >
-                      Add
+                      {t("web.monitor.button.add")}
                     </ActionButton>
                   </div>
                 </div>
@@ -358,10 +371,10 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
 
               <div className="monitor-config-column">
                 <div className="monitor-config-section">
-                  <p className="monitor-section-label">Search policy</p>
+                  <p className="monitor-section-label">{t("web.monitor.setup.searchPolicy")}</p>
                   <div className="monitor-policy-grid">
                     <div className="monitor-field">
-                      <label htmlFor="monitor-max-posts">Max returned posts</label>
+                      <label htmlFor="monitor-max-posts">{t("web.monitor.setup.maxPosts")}</label>
                       <input
                         id="monitor-max-posts"
                         className="monitor-input"
@@ -380,7 +393,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                         className="monitor-section-label monitor-field-label"
                         id="monitor-search-window-label"
                       >
-                        Search timeframe
+                        {t("web.monitor.setup.timeframe")}
                       </p>
                       <div
                         aria-labelledby="monitor-search-window-label"
@@ -415,7 +428,9 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                 size="dense"
                 variant="primary"
               >
-                {isSavingMonitorConfig ? "Saving..." : "Save monitor settings"}
+                {isSavingMonitorConfig
+                  ? t("web.monitor.button.saving")
+                  : t("web.monitor.button.save")}
               </ActionButton>
             </div>
           </section>
@@ -424,7 +439,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
         <section className="monitor-resources" aria-label="Monitor resources">
           <section className="monitor-feed" aria-label="Monitor feed results">
             <header>
-              <h3>Top posts by likes</h3>
+              <h3>{t("web.monitor.resources.topPosts")}</h3>
               <span>{`${monitorFeed?.posts.length ?? 0} / ${configuredMaxPosts}`}</span>
             </header>
             {monitorError ? <p className="monitor-error">{monitorError}</p> : null}
@@ -432,17 +447,17 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
               <p className="monitor-error">{monitorFeed.lastError}</p>
             ) : null}
             {monitorFeed && monitorFeed.posts.length === 0 ? (
-              <p className="monitor-empty">No posts available yet.</p>
+              <p className="monitor-empty">{t("web.monitor.empty.noPosts")}</p>
             ) : (
               <div className="monitor-feed-scroll">
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">Likes</th>
-                      <th scope="col">Term</th>
-                      <th scope="col">Author</th>
-                      <th scope="col">Post</th>
-                      <th scope="col">Created</th>
+                      <th scope="col">{t("web.monitor.table.likes")}</th>
+                      <th scope="col">{t("web.monitor.table.term")}</th>
+                      <th scope="col">{t("web.monitor.table.author")}</th>
+                      <th scope="col">{t("web.monitor.table.post")}</th>
+                      <th scope="col">{t("web.monitor.table.created")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -451,7 +466,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                         <td>{Math.round(post.likeCount).toLocaleString("en-US")}</td>
                         <td>
                           <span className="monitor-term-badge">
-                            {post.matchedQueryTerm ?? "Unknown"}
+                            {post.matchedQueryTerm ?? t("web.monitor.table.unknown")}
                           </span>
                         </td>
                         <td>@{post.author}</td>
