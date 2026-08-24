@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CanvasPrimaryView } from "../src/components/CanvasPrimaryView";
+import { renderWithLocale } from "./test-utils/renderWithLocale";
 
 type MockCanvasNode = {
   id: string;
@@ -181,7 +182,7 @@ describe("CanvasPrimaryView", () => {
   });
 
   it("reveals and focuses a newly opened terminal panel when a session node is clicked", async () => {
-    render(<CanvasPrimaryView columns={[]} isUiStateHydrated />);
+    renderWithLocale(<CanvasPrimaryView columns={[]} isUiStateHydrated />);
 
     const [terminalButton] = screen.getAllByRole("button", { name: "terminal-1" });
     expect(terminalButton).toBeDefined();
@@ -198,7 +199,7 @@ describe("CanvasPrimaryView", () => {
 
   it("minimizes a terminal panel separately from closing the terminal session", async () => {
     const onCloseActiveSession = vi.fn();
-    render(
+    renderWithLocale(
       <CanvasPrimaryView
         columns={[
           {
@@ -239,7 +240,7 @@ describe("CanvasPrimaryView", () => {
   });
 
   it("auto-opens a newly created child terminal when its parent panel is already open", async () => {
-    const { rerender } = render(
+    const { rerender } = renderWithLocale(
       <CanvasPrimaryView
         columns={[
           {
@@ -324,7 +325,7 @@ describe("CanvasPrimaryView", () => {
   });
 
   it("updates an open terminal panel label when the terminal is renamed", async () => {
-    const { rerender } = render(
+    const { rerender } = renderWithLocale(
       <CanvasPrimaryView
         columns={[
           {
@@ -378,7 +379,7 @@ describe("CanvasPrimaryView", () => {
   it("shows tentacle maintenance actions in the context menu and passes the tentacle ID", async () => {
     const onTentacleAction = vi.fn().mockResolvedValue(undefined);
 
-    const { container } = render(
+    const { container } = renderWithLocale(
       <CanvasPrimaryView columns={[]} isUiStateHydrated onTentacleAction={onTentacleAction} />,
     );
 
