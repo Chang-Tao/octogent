@@ -28,21 +28,35 @@ const fakePty = {
 };
 
 class FakeGitClient implements GitClient {
-  private readonly worktrees = new Map<string, { branchName: string; baseRef: string; cwd: string }>();
+  private readonly worktrees = new Map<
+    string,
+    { branchName: string; baseRef: string; cwd: string }
+  >();
   private readonly branches = new Set<string>();
 
   assertAvailable(): void {}
-  isRepository(): boolean { return true; }
+  isRepository(): boolean {
+    return true;
+  }
 
-  addWorktree({ cwd, path, branchName, baseRef }: { cwd: string; path: string; branchName: string; baseRef: string }): void {
+  addWorktree({
+    cwd,
+    path,
+    branchName,
+    baseRef,
+  }: { cwd: string; path: string; branchName: string; baseRef: string }): void {
     if (this.worktrees.has(path)) throw new Error(`Worktree already exists: ${path}`);
     mkdirSync(path, { recursive: true });
     this.branches.add(branchName);
     this.worktrees.set(path, { cwd, branchName, baseRef });
   }
 
-  removeWorktree({ path }: { cwd: string; path: string }): void { this.worktrees.delete(path); }
-  removeBranch({ branchName }: { cwd: string; branchName: string }): void { this.branches.delete(branchName); }
+  removeWorktree({ path }: { cwd: string; path: string }): void {
+    this.worktrees.delete(path);
+  }
+  removeBranch({ branchName }: { cwd: string; branchName: string }): void {
+    this.branches.delete(branchName);
+  }
 
   readWorktreeStatus() {
     return {
@@ -62,8 +76,12 @@ class FakeGitClient implements GitClient {
   commitAll(): void {}
   pushCurrentBranch(): void {}
   syncWithBase(): void {}
-  readCurrentBranchPullRequest() { return null; }
-  createPullRequest() { return null; }
+  readCurrentBranchPullRequest() {
+    return null;
+  }
+  createPullRequest() {
+    return null;
+  }
   mergeCurrentBranchPullRequest(): void {}
 }
 
@@ -277,7 +295,9 @@ describe("deck API routes", () => {
       makeTentacle(dir, "vault-test");
       const { baseUrl } = await startServer(dir);
 
-      const res = await fetch(`${baseUrl}/api/deck/tentacles/vault-test/files/todo.md`, { method: "POST" });
+      const res = await fetch(`${baseUrl}/api/deck/tentacles/vault-test/files/todo.md`, {
+        method: "POST",
+      });
       expect(res.status).toBe(405);
     });
   });
@@ -566,7 +586,11 @@ describe("deck API routes", () => {
         body: JSON.stringify({ itemIndex: 0 }),
       });
       expect(res.status).toBe(201);
-      const body = (await res.json()) as { terminalId: string; tentacleId: string; itemIndex: number };
+      const body = (await res.json()) as {
+        terminalId: string;
+        tentacleId: string;
+        itemIndex: number;
+      };
       expect(body.terminalId).toBe("solve-test-todo-0");
       expect(body.tentacleId).toBe("solve-test");
       expect(body.itemIndex).toBe(0);
