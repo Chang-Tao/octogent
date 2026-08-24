@@ -619,9 +619,7 @@ export const createSessionRuntime = ({
       emitStateIfChanged(session, sessionId, session.stateTracker.poll(Date.now()));
     }, 300);
 
-    // session.pty is guaranteed non-null here (just assigned ~80 lines up).
-    // The non-null assertion documents intent for the type checker.
-    const dataDisposable = session.pty!.onData((chunk) => {
+    const dataDisposable = pty.onData((chunk) => {
       if (session.isClosed) {
         return;
       }
@@ -636,7 +634,7 @@ export const createSessionRuntime = ({
       emitStateIfChanged(session, sessionId, nextState);
     });
 
-    const exitDisposable = session.pty!.onExit(({ exitCode, signal }) => {
+    const exitDisposable = pty.onExit(({ exitCode, signal }) => {
       if (session.isClosed) {
         return;
       }
