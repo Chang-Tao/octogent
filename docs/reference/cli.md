@@ -10,6 +10,27 @@ Starts the local API for the current project and opens the UI when bundled web a
 
 If the current directory has not been initialized yet, `octogent` also creates or updates the local `.octogent/` scaffold automatically on first run.
 
+### Environment Variables
+
+- `HOST`: Host address to bind to (default: `127.0.0.1`, or `0.0.0.0` when `OCTOGENT_ALLOW_REMOTE_ACCESS=1`)
+- `OCTOGENT_API_PORT` or `PORT`: Port to listen on (default: `8787`)
+- `OCTOGENT_ALLOW_REMOTE_ACCESS`: Set to `1` to allow access from other machines; this relaxes host/origin checks and, unless `HOST` is set explicitly, binds to `0.0.0.0` instead of `127.0.0.1`
+- `OCTOGENT_WORKSPACE_CWD`: Override the workspace directory
+- `OCTOGENT_PROJECT_STATE_DIR`: Override the project state directory
+- `OCTOGENT_PROMPTS_DIR`: Override the prompts directory
+- `OCTOGENT_WEB_DIST_DIR`: Override the web UI distribution directory
+- `OCTOGENT_LOCALE`: UI/CLI locale (`en` or `zh-CN`)
+- `OCTOGENT_MAX_TERMINAL_SESSIONS`: Cap on concurrently running terminal sessions
+- `OCTOGENT_TERMINAL_STALL_MS`: Milliseconds without transcript activity before a running terminal is marked `stalled` (default: `120000`)
+
+Example for headless servers:
+
+```bash
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
+# or specify a custom host
+HOST=192.168.1.100 octogent
+```
+
 ## Initialize a project
 
 ```bash
