@@ -16,6 +16,21 @@
 
 </div>
 
+## About This Fork
+
+This repository is a fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent). The original project is no longer maintained; this fork continues development independently under the same MIT license.
+
+Many thanks to [@hesamsheikh](https://github.com/hesamsheikh) for creating Octogent, and to the upstream contributors whose pull requests have been merged here:
+
+- [#4](https://github.com/hesamsheikh/octogent/pull/4) type coercion test coverage — @KomalSrinivasan
+- [#5](https://github.com/hesamsheikh/octogent/pull/5) error boundary and UI-state flush (partial port) — @carson24wilson-cmyk
+- [#7](https://github.com/hesamsheikh/octogent/pull/7) remote-access host binding and env var docs (partial port) — @KomalSrinivasan
+- [#14](https://github.com/hesamsheikh/octogent/pull/14) deck route integration tests (test commit) — @directorsambasivagroup
+- [#15](https://github.com/hesamsheikh/octogent/pull/15) PTY leak fix, stalled-agent detection, tentacle sizing cap — @Alecbdc
+- [#17](https://github.com/hesamsheikh/octogent/pull/17) pnpm build-script allowlist (partial) — @TechIntegrationLabs
+- [#22](https://github.com/hesamsheikh/octogent/pull/22) Corepack-compatible build scripts — @kingmarh-hash
+- [#24](https://github.com/hesamsheikh/octogent/pull/24) Windows `pnpm dev` fix — @dcx010591-code
+
 # Octogent
 
 It's really not fun to have **ten Claude Code sessions open at once**, constantly switching between them and trying to remember what each one was supposed to do. *Things get blurry fast* when one agent is doing documentation, another is touching the database, another is changing the API, and another is somewhere in the frontend. **Octogent** tries to fix that by giving each job its own <u>scoped context, notes, and task list</u>, while also making it possible for Claude Code to **spawn other Claude Code agents**, assign them work, and communicate with them.
