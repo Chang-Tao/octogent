@@ -1,18 +1,19 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { RuntimeStatusStrip } from "../src/components/RuntimeStatusStrip";
+import { renderWithLocale } from "./test-utils/renderWithLocale";
 
 describe("RuntimeStatusStrip", () => {
   it("shows loading placeholders before claude usage loads", () => {
-    render(<RuntimeStatusStrip sparklinePoints="" usageData={null} claudeUsage={null} />);
+    renderWithLocale(<RuntimeStatusStrip sparklinePoints="" usageData={null} claudeUsage={null} />);
 
     const usage = screen.getByLabelText("Claude usage limits");
     expect(within(usage).getAllByText("···")).toHaveLength(2);
   });
 
   it("uses a 5h label for oauth-backed usage", () => {
-    render(
+    renderWithLocale(
       <RuntimeStatusStrip
         sparklinePoints=""
         usageData={null}
@@ -33,7 +34,7 @@ describe("RuntimeStatusStrip", () => {
   });
 
   it("shows unavailable values instead of a permanent loading state", () => {
-    render(
+    renderWithLocale(
       <RuntimeStatusStrip
         sparklinePoints=""
         usageData={null}
@@ -52,7 +53,7 @@ describe("RuntimeStatusStrip", () => {
   });
 
   it("marks the refresh button as rotating while Claude usage is refreshing", () => {
-    render(
+    renderWithLocale(
       <RuntimeStatusStrip
         sparklinePoints=""
         usageData={null}
