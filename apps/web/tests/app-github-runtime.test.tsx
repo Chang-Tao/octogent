@@ -117,7 +117,7 @@ describe("App GitHub runtime views", () => {
       within(githubView).getByRole("button", { name: "Refresh GitHub overview data" }),
     ).toBeInTheDocument();
     expect(within(githubView).getByText("Recent commits")).toBeInTheDocument();
-    expect(within(githubView).getByText("Showing last 50")).toBeInTheDocument();
+    expect(within(githubView).getByText("Showing last 50 commits")).toBeInTheDocument();
     expect(within(githubView).getByText("recent commit 1")).toBeInTheDocument();
     expect(within(githubView).getByText("recent commit 50")).toBeInTheDocument();
     expect(within(githubView).getAllByRole("listitem")).toHaveLength(50);
