@@ -434,6 +434,37 @@ export const usePersistedUiState = ({
     setCanvasOpenTentacleIds((current) => retainActiveTerminalIds(current, activeTentacleIds));
   }, [columns]);
 
+  // Flush pending UI state synchronously on tab close so the debounce window
+  // cannot cause state loss when the user navigates away mid-debounce. A
+  // keepalive fetch survives the page unload like a beacon would, but keeps
+  // the PATCH method the /api/ui-state endpoint expects (sendBeacon can only
+  // POST, which that route rejects with 405).
+  const pendingUiStateRef = useRef<FrontendUiStateSnapshot | null>(null);
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const pending = pendingUiStateRef.current;
+      if (!pending) {
+        return;
+      }
+      void fetch(buildUiStateUrl(), {
+        method: "PATCH",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pending),
+        keepalive: true,
+      }).catch(() => {
+        // The page is going away — nothing useful to do with a failure.
+      });
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
   useEffect(() => {
     if (!isUiStateHydrated) {
       return;
@@ -461,8 +492,11 @@ export const usePersistedUiState = ({
     });
 
     if (areUiStateSnapshotsEqual(lastPersistedUiStateRef.current, payload)) {
+      pendingUiStateRef.current = null;
       return;
     }
+
+    pendingUiStateRef.current = payload;
 
     const timerId = window.setTimeout(() => {
       void fetch(buildUiStateUrl(), {
@@ -478,6 +512,7 @@ export const usePersistedUiState = ({
             throw new Error(`Unexpected status ${response.status}`);
           }
           lastPersistedUiStateRef.current = payload;
+          pendingUiStateRef.current = null;
         })
         .catch((error: unknown) => {
           console.warn("[ui-state] Failed to persist UI state:", error);

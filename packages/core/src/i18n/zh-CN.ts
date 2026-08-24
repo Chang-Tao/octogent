@@ -252,6 +252,9 @@ export const zhCN: TranslationMap = {
   "web.dialog.clearConversations.warning": "此操作不可撤销。",
 
   // ── Web: Git Dialog ──────────────────────────────────
+  "web.errorBoundary.crashed": "{label} 已崩溃",
+  "web.errorBoundary.title": "出现问题",
+  "web.errorBoundary.tryAgain": "重试",
   "web.git.title": "Worktree Git 操作",
   "web.git.status.dirty": "已修改",
   "web.git.status.clean": "干净",
