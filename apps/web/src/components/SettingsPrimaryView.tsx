@@ -84,14 +84,14 @@ export const SettingsPrimaryView = ({
           <SettingsToggle
             label={t("web.settings.xMonitorLabel")}
             description={t("web.settings.xMonitorDesc")}
-            ariaLabel={t("web.settings.xMonitorDesc")}
+            ariaLabel={t("web.settings.xMonitorAria")}
             checked={isMonitorVisible}
             onChange={onMonitorVisibilityChange}
           />
           <SettingsToggle
             label={t("web.settings.runtimeStripLabel")}
             description={t("web.settings.runtimeStripDesc")}
-            ariaLabel={t("web.settings.runtimeStripDesc")}
+            ariaLabel={t("web.settings.runtimeStripAria")}
             checked={isRuntimeStatusStripVisible}
             onChange={onRuntimeStatusStripVisibilityChange}
           />
