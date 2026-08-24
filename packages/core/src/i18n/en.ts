@@ -124,6 +124,7 @@ export const en: TranslationMap = {
   "agentState.blocked": "blocked",
   "agentState.review": "review",
   "agentState.stale": "stale",
+  "agentState.stalled": "stalled",
   "agentState.unknown": "unknown",
 
   // ── Web: Navigation ──────────────────────────────────

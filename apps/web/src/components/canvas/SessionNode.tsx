@@ -50,7 +50,10 @@ export const SessionNode = ({ node, isSelected, onPointerDown, onClick }: Sessio
     node.agentRuntimeState === "waiting_for_permission" ||
     node.agentRuntimeState === "waiting_for_user";
   const isLifecycleAttention =
-    node.agentState === "stale" || node.agentState === "exited" || node.agentState === "stopped";
+    node.agentState === "stale" ||
+    node.agentState === "stalled" ||
+    node.agentState === "exited" ||
+    node.agentState === "stopped";
   const color = isActive ? node.color : "#9ca3af";
   const isWorktree = node.workspaceMode === "worktree" && !node.parentTerminalId;
   const isSwarmWorker = !!node.parentTerminalId;
@@ -65,6 +68,9 @@ export const SessionNode = ({ node, isSelected, onPointerDown, onClick }: Sessio
     }
     if (node.agentState === "stale") {
       return "STALE";
+    }
+    if (node.agentState === "stalled") {
+      return "STALLED";
     }
     if (node.agentState === "exited") {
       return "EXITED";

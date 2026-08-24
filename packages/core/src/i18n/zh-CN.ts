@@ -121,6 +121,7 @@ export const zhCN: TranslationMap = {
   "agentState.blocked": "阻塞",
   "agentState.review": "审查",
   "agentState.stale": "残留",
+  "agentState.stalled": "停滞",
   "agentState.unknown": "未知",
 
   // ── Web: Navigation ──────────────────────────────────
