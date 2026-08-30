@@ -114,7 +114,16 @@ octogent terminal archive --all-completed
 octogent terminal prune
 ```
 
-移除生命周期状态为 `stale`、`stopped` 或 `exited` 的终端记录。不会移除活动会话。
+移除生命周期状态为 `stale`、`stopped` 或 `exited` 的终端记录。不会移除活动会话。prune 只清理记录、不触碰磁盘；要回收已合并的 worktree 与分支，请使用 `octogent worktree gc`。
+
+## 回收已合并的 worktree
+
+```bash
+octogent worktree gc
+octogent worktree gc --dry-run
+```
+
+删除所有「已归档且已确证合并」的 worktree 终端对应的 worktree 目录与分支——即记录的生命周期状态为 `completed`，或完成摘要标记了 `merged`。未合并的工作（包括 `awaiting-review`）永不回收；由多条终端记录共享的 worktree，只有在每条记录都满足条件时才会回收。`--dry-run` 仅列出可回收的 worktree，不做任何删除。归档扫描器在归档记录时也会自动回收符合条件的 worktree。无论哪种方式，终端记录本身都保持不变——清理记录是 `octogent terminal prune` 的职责。
 
 ## 发送消息
 

@@ -34,6 +34,7 @@ API 涉及两类不同的状态：
 - `POST /api/tentacles/:tentacleId/git/sync` - 将触手工作树与其基础分支同步
 - `GET /api/tentacles/:tentacleId/git/pr` - 读取触手分支的 Pull Request 信息
 - `POST /api/tentacles/:tentacleId/git/pr/merge` - 合并触手的 Pull Request
+- `POST /api/worktrees/gc` - 回收所有「已归档且已确证合并」（生命周期状态为 `completed`，或完成摘要标记 `merged: true`）的 worktree 终端对应的 worktree 目录与分支；传 `?dryRun=1` 仅列出候选、不做删除。返回 `dryRun`、`candidates`、`reclaimedWorktreeIds` 与 `failedWorktreeIds`。未合并的工作永不回收。
 
 ## Deck 与触手
 

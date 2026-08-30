@@ -33,6 +33,10 @@ export const zhCN: TranslationMap = {
   "cli.empty.archived": "未找到已归档的终端。",
   "cli.empty.messages": "{id} 没有消息。",
   "cli.pruned": "已清理 {count} 个终端。",
+  "cli.empty.reclaimableWorktrees": "没有可回收的已合并已归档 worktree。",
+  "cli.worktreeGc.dryRun": "预演：将回收 {count} 个 worktree：",
+  "cli.worktreeGc.reclaimed": "已回收 {count} 个已合并 worktree。",
+  "cli.worktreeGc.failed": "{count} 个 worktree 回收失败，请查看服务端日志。",
   "cli.empty.projects": "尚未注册任何项目。在项目目录中运行 `octogent` 或 `octogent init`。",
   "cli.usage": `用法：
   octogent                             在当前项目中启动仪表盘
@@ -58,6 +62,8 @@ export const zhCN: TranslationMap = {
   octogent terminal archive <id>       归档一条非运行中的终端记录
   octogent terminal archive --all-completed  归档所有已完成的终端记录
   octogent terminal prune              移除残留、已停止和已退出的终端记录
+  octogent worktree gc                 回收已合并且已归档终端的 worktree 与分支
+    --dry-run                          仅列出可回收的 worktree，不执行删除
   octogent channel send <id> <消息>    发送频道消息
   octogent channel list <id>           列出频道消息`,
 

@@ -66,6 +66,7 @@ import {
   handleTerminalPruneRoute,
   handleTerminalSnapshotsRoute,
   handleTerminalsCollectionRoute,
+  handleWorktreeGcRoute,
 } from "./terminalRoutes";
 import {
   handleClaudeUsageRoute,
@@ -158,6 +159,7 @@ const API_ROUTE_MAP: ReadonlyMap<string, readonly ApiRouteHandler[]> = new Map([
       handleTerminalItemRoute,
     ],
   ],
+  ["worktrees", [handleWorktreeGcRoute]],
   ["tentacles", [handleTentacleGitRoute, handleTentacleGitPullRequestRoute]],
   ["code-intel", [handleCodeIntelEventsRoute]],
 ]);

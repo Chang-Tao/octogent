@@ -33,6 +33,10 @@ export const en: TranslationMap = {
   "cli.empty.archived": "No archived terminals found.",
   "cli.empty.messages": "No messages for {id}.",
   "cli.pruned": "Pruned {count} terminals.",
+  "cli.empty.reclaimableWorktrees": "No merged, archived worktrees to reclaim.",
+  "cli.worktreeGc.dryRun": "Would reclaim {count} worktrees:",
+  "cli.worktreeGc.reclaimed": "Reclaimed {count} merged worktrees.",
+  "cli.worktreeGc.failed": "Failed to reclaim {count} worktrees; check the server logs.",
   "cli.empty.projects":
     "No projects registered yet. Run `octogent` or `octogent init` in a project directory.",
   "cli.usage": `Usage:
@@ -59,6 +63,8 @@ export const en: TranslationMap = {
   octogent terminal archive <id>       Archive a non-running terminal record
   octogent terminal archive --all-completed  Archive every completed terminal record
   octogent terminal prune              Remove stale, stopped, and exited terminal records
+  octogent worktree gc                 Reclaim worktrees and branches of merged, archived terminals
+    --dry-run                          List reclaimable worktrees without removing them
   octogent channel send <id> <msg>     Send a channel message
   octogent channel list <id>           List channel messages`,
 

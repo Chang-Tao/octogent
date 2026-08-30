@@ -9,6 +9,7 @@ import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
 import { buildCompletionSummary } from "./completionSummary";
+import { logVerbose } from "./logging";
 import { resolveTerminalRetentionHours, shouldAutoArchive } from "./terminalRuntime/archivePolicy";
 import { createChannelMessaging } from "./terminalRuntime/channelMessaging";
 import {
@@ -37,7 +38,7 @@ import {
   pruneUiStateTerminalReferences,
 } from "./terminalRuntime/registry";
 import { createSessionRuntime } from "./terminalRuntime/sessionRuntime";
-import { createDefaultGitClient } from "./terminalRuntime/systemClients";
+import { createDefaultGitClient, toErrorMessage } from "./terminalRuntime/systemClients";
 import type { DirectSessionListener } from "./terminalRuntime/types";
 import {
   type CreateTerminalRuntimeOptions,
@@ -52,6 +53,7 @@ import {
   type TerminalSessionEndDetails,
   type TerminalSessionStartDetails,
 } from "./terminalRuntime/types";
+import { shouldReclaimWorktree } from "./terminalRuntime/worktreeGc";
 import { createWorktreeManager } from "./terminalRuntime/worktreeManager";
 
 export type {
@@ -328,6 +330,52 @@ export const createTerminalRuntime = ({
     stallDetectorInterval.unref();
   }
 
+  // Worktree GC. A worktree directory may back several terminal records
+  // (shared worktreeId), so it is only reclaimable when every record pointing
+  // at it independently passes shouldReclaimWorktree — one unmerged sibling
+  // keeps the whole worktree on disk.
+  const listReclaimableWorktreeCandidates = (): Array<{
+    worktreeId: string;
+    terminalIds: string[];
+  }> => {
+    const worktreeGroups = new Map<string, PersistedTerminal[]>();
+    for (const terminal of terminals.values()) {
+      if (terminal.workspaceMode !== "worktree") continue;
+      const worktreeId = terminal.worktreeId ?? terminal.tentacleId;
+      const group = worktreeGroups.get(worktreeId);
+      if (group) {
+        group.push(terminal);
+      } else {
+        worktreeGroups.set(worktreeId, [terminal]);
+      }
+    }
+
+    const candidates: Array<{ worktreeId: string; terminalIds: string[] }> = [];
+    for (const [worktreeId, group] of worktreeGroups) {
+      const isReclaimable = group.every(
+        (terminal) => shouldReclaimWorktree(terminal) && !sessions.has(terminal.terminalId),
+      );
+      if (!isReclaimable || !worktreeManager.hasTentacleWorktree(worktreeId)) continue;
+      candidates.push({
+        worktreeId,
+        terminalIds: group.map((terminal) => terminal.terminalId),
+      });
+    }
+    return candidates;
+  };
+
+  const reclaimWorktree = (worktreeId: string): boolean => {
+    try {
+      worktreeManager.removeTentacleWorktree(worktreeId);
+      return true;
+    } catch (error) {
+      logVerbose(
+        `[worktree-gc] Failed to reclaim worktree ${worktreeId}: ${toErrorMessage(error)}`,
+      );
+      return false;
+    }
+  };
+
   // Archive sweeper: without it, completed/stopped/exited terminal records
   // accumulate forever in long-lived projects. Once the retention window
   // passes, stamp archivedAt so default listings hide the record; transcripts
@@ -359,6 +407,21 @@ export const createTerminalRuntime = ({
         type: "terminal-updated",
         snapshot: toTerminalSnapshot(terminal),
       });
+    }
+
+    // Records that just aged into the archive may leave a merged worktree
+    // behind; reclaim those now. shouldReclaimWorktree upholds the iron rule
+    // (unmerged work is never deleted), and a failure only logs — the next
+    // sweep or an explicit `octogent worktree gc` retries.
+    const archivedWorktreeIds = new Set(
+      archivedTerminals
+        .filter((terminal) => terminal.workspaceMode === "worktree")
+        .map((terminal) => terminal.worktreeId ?? terminal.tentacleId),
+    );
+    for (const candidate of listReclaimableWorktreeCandidates()) {
+      if (archivedWorktreeIds.has(candidate.worktreeId)) {
+        reclaimWorktree(candidate.worktreeId);
+      }
     }
   };
   const archiveSweepInterval = setInterval(archiveExpiredTerminals, 60 * 60 * 1000);
@@ -1012,6 +1075,30 @@ export const createTerminalRuntime = ({
         });
       }
       return prunedTerminalIds;
+    },
+
+    // Reclaims worktrees (directory and branch) whose archived records prove a
+    // merge. Records themselves are untouched — that is what prune is for.
+    gcWorktrees(options?: { dryRun?: boolean }): {
+      dryRun: boolean;
+      candidates: Array<{ worktreeId: string; terminalIds: string[] }>;
+      reclaimedWorktreeIds: string[];
+      failedWorktreeIds: string[];
+    } {
+      const dryRun = options?.dryRun === true;
+      const candidates = listReclaimableWorktreeCandidates();
+      const reclaimedWorktreeIds: string[] = [];
+      const failedWorktreeIds: string[] = [];
+
+      if (!dryRun) {
+        for (const candidate of candidates) {
+          (reclaimWorktree(candidate.worktreeId) ? reclaimedWorktreeIds : failedWorktreeIds).push(
+            candidate.worktreeId,
+          );
+        }
+      }
+
+      return { dryRun, candidates, reclaimedWorktreeIds, failedWorktreeIds };
     },
 
     deleteTerminal(terminalId: string): boolean {

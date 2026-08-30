@@ -600,6 +600,58 @@ const terminalPrune = async () => {
   }
 };
 
+const worktreeGc = async () => {
+  const isDryRun = args.includes("--dry-run");
+  const apiBase = resolveRuntimeApiBase();
+
+  try {
+    const response = await fetch(`${apiBase}/api/worktrees/gc${isDryRun ? "?dryRun=1" : ""}`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+    const data = (await response.json()) as {
+      candidates?: Array<{ worktreeId: string; terminalIds: string[] }>;
+      reclaimedWorktreeIds?: string[];
+      failedWorktreeIds?: string[];
+      error?: unknown;
+    };
+    if (!response.ok) {
+      console.error(`Error: ${data.error ?? "Failed"}`);
+      process.exit(1);
+    }
+
+    const candidates = data.candidates ?? [];
+    if (candidates.length === 0) {
+      console.log(t(locale, "cli.empty.reclaimableWorktrees"));
+      return;
+    }
+
+    if (isDryRun) {
+      console.log(t(locale, "cli.worktreeGc.dryRun", { count: candidates.length }));
+      for (const candidate of candidates) {
+        console.log(`  ${candidate.worktreeId}  (${candidate.terminalIds.join(", ")})`);
+      }
+      return;
+    }
+
+    const reclaimedWorktreeIds = data.reclaimedWorktreeIds ?? [];
+    const failedWorktreeIds = data.failedWorktreeIds ?? [];
+    for (const worktreeId of reclaimedWorktreeIds) {
+      console.log(`  ${worktreeId}  ok`);
+    }
+    for (const worktreeId of failedWorktreeIds) {
+      console.log(`  ${worktreeId}  failed`);
+    }
+    console.log(t(locale, "cli.worktreeGc.reclaimed", { count: reclaimedWorktreeIds.length }));
+    if (failedWorktreeIds.length > 0) {
+      console.error(t(locale, "cli.worktreeGc.failed", { count: failedWorktreeIds.length }));
+      process.exit(1);
+    }
+  } catch {
+    apiError();
+  }
+};
+
 const channelSend = async () => {
   const terminalId = args[2];
   if (!terminalId || terminalId.startsWith("-")) {
@@ -738,6 +790,12 @@ const main = async () => {
     }
   }
 
+  if (command === "worktree" || command === "worktrees") {
+    if (args[1] === "gc") {
+      return worktreeGc();
+    }
+  }
+
   if (command === "channel") {
     if (args[1] === "send") {
       return channelSend();
@@ -771,6 +829,8 @@ const main = async () => {
   octogent terminal archive <id>       Archive a non-running terminal record
   octogent terminal archive --all-completed  Archive every completed terminal record
   octogent terminal prune              Remove stale, stopped, and exited terminal records
+  octogent worktree gc                 Reclaim worktrees and branches of merged, archived terminals
+    --dry-run                          List reclaimable worktrees without removing them
   octogent channel send <id> <msg>     Send a channel message
   octogent channel list <id>           List channel messages`);
   process.exit(1);
