@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Agent lifecycle (this fork's evolution, phase 1)
+
+- Terminals now report `completed` and `awaiting-review` lifecycle states,
+  decided on Claude's Stop hook: a clean worktree with commits beyond the base
+  counts as done, merged into the operator's branch reads completed, unmerged
+  reads awaiting-review; new activity flips a finished terminal back to running.
+- A completion summary (task line, commits, diff stats, branch, merged flag,
+  duration) is stamped on the record and shown in the canvas node tooltip;
+  session nodes carry DONE / REVIEW pills and a Hide Done toolbar toggle.
+- Finished records auto-archive after a retention period
+  (`OCTOGENT_TERMINAL_RETENTION_HOURS`, default 72h); archived worktrees whose
+  work is merged are reclaimed (`octogent worktree gc`), and unmerged work is
+  never deleted by any automated path.
+- Channel delivery reaches a live agent reliably (bracketed paste with delayed
+  Enter, live-transcript guard, backlog handover on session-start), and agent
+  PTYs no longer inherit the operator's Claude session markers.
+- New `GET /api/health`, Claude usage source switch
+  (`OCTOGENT_CLAUDE_USAGE_SOURCE`, OAuth first), and a systemd user-service
+  deployment guide.
+
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull
 requests and sets up the independent-maintenance baseline.
