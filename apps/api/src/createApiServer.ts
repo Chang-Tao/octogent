@@ -15,6 +15,7 @@ import { createApiRequestHandler } from "./createApiServer/requestHandler";
 import type { CreateApiServerOptions } from "./createApiServer/types";
 import { createUpgradeHandler } from "./createApiServer/upgradeHandler";
 import { readGithubRepoSummary as readGithubRepoSummaryDefault } from "./githubRepoSummary";
+import { createHealthSnapshotSource } from "./healthSnapshot";
 import { createMonitorService } from "./monitor";
 import { createTerminalRuntime } from "./terminalRuntime";
 
@@ -113,6 +114,7 @@ export const createApiServer = ({
     ((scope: "all" | "project") => scanClaudeUsageChart(scope, resolvedWorkspaceCwd));
 
   const codeIntelStore = createCodeIntelStore(resolvedStateDir);
+  const healthSnapshotSource = createHealthSnapshotSource();
 
   const requestHandler = createApiRequestHandler({
     runtime,
@@ -132,6 +134,7 @@ export const createApiServer = ({
     monitorService: monitorServiceWithDefault,
     invalidateClaudeUsageCache,
     codeIntelStore,
+    readHealthSnapshot: () => healthSnapshotSource.readHealthSnapshot(runtime.readHealthCounts()),
     allowRemoteAccess,
   });
 
@@ -160,6 +163,7 @@ export const createApiServer = ({
       return { host, port: resolvedPort };
     },
     async stop() {
+      healthSnapshotSource.close();
       await runtime.close();
       await new Promise<void>((resolveStop, rejectStop) => {
         server.close((error) => {

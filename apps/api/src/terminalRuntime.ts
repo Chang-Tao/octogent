@@ -594,6 +594,34 @@ export const createTerminalRuntime = ({
       return snapshots;
     },
 
+    readHealthCounts(): {
+      ptySessions: number;
+      terminals: Record<TerminalLifecycleState, number>;
+      terminalEventClients: number;
+    } {
+      const terminalCounts: Record<TerminalLifecycleState, number> = {
+        registered: 0,
+        running: 0,
+        stopped: 0,
+        exited: 0,
+        stale: 0,
+        stalled: 0,
+      };
+      for (const terminal of terminals.values()) {
+        // Mirror toTerminalSnapshot: a live session always reports as running.
+        const lifecycleState: TerminalLifecycleState = sessions.has(terminal.terminalId)
+          ? "running"
+          : (terminal.lifecycleState ?? "registered");
+        terminalCounts[lifecycleState] += 1;
+      }
+
+      return {
+        ptySessions: sessions.size,
+        terminals: terminalCounts,
+        terminalEventClients: terminalEventClients.size,
+      };
+    },
+
     listConversationSessions() {
       return listConversationSessions(transcriptDirectoryPath);
     },
