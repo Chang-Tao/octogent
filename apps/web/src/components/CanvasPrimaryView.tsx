@@ -57,6 +57,7 @@ type CanvasPrimaryViewProps = {
   runtimeStateStore?: TerminalRuntimeStateStore;
   isUiStateHydrated?: boolean;
   canvasOpenTerminalIds?: string[];
+  deckRevision?: number;
   canvasOpenTentacleIds?: string[];
   canvasTerminalsPanelWidth?: number | null;
   workspaceSetup?: WorkspaceSetupSnapshot | null;
@@ -194,6 +195,7 @@ export const CanvasPrimaryView = ({
   runtimeStateStore: providedRuntimeStateStore,
   isUiStateHydrated,
   canvasOpenTerminalIds,
+  deckRevision,
   canvasOpenTentacleIds,
   canvasTerminalsPanelWidth: persistedTerminalsPanelWidth,
   workspaceSetup = null,
@@ -241,6 +243,7 @@ export const CanvasPrimaryView = ({
   const [hideIdleTerminals, setHideIdleTerminals] = useState(false);
   const [isLaunchingWorkspaceSetupPlanner, setIsLaunchingWorkspaceSetupPlanner] = useState(false);
   const hasHydratedTerminals = useRef(false);
+  const hasRestoredOpenTerminals = useRef(false);
   const hasHydratedTentacles = useRef(false);
   const lastHandledCreatedTerminalIdRef = useRef<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -262,6 +265,15 @@ export const CanvasPrimaryView = ({
     refresh: refreshGraphData,
     refreshDeckTentacles,
   } = useCanvasGraphData({ columns, enabled: true, agentRuntimeStates });
+
+  // The server broadcasts when deck content changed elsewhere; refetch so a
+  // tentacle created from the CLI shows up without a manual reload.
+  const lastDeckRevision = useRef(deckRevision);
+  useEffect(() => {
+    if (lastDeckRevision.current === deckRevision) return;
+    lastDeckRevision.current = deckRevision;
+    void refreshDeckTentacles();
+  }, [deckRevision, refreshDeckTentacles]);
 
   const {
     transform,
@@ -357,6 +369,10 @@ export const CanvasPrimaryView = ({
   useEffect(() => {
     if (isHydratingTerminals) return;
     if (!hasHydratedTerminals.current) return;
+    // Restore runs once. Its guard used to be "nothing is open", which fires
+    // again the moment the operator collapses the last panel — the persisted id
+    // list still names it, so the panel reopened and could not be closed.
+    if (hasRestoredOpenTerminals.current) return;
     if (openTerminalCount > 0) return;
     if (!canvasOpenTerminalIds || canvasOpenTerminalIds.length === 0) return;
 
@@ -368,6 +384,7 @@ export const CanvasPrimaryView = ({
       }
     }
     if (restoredMap.size > 0) {
+      hasRestoredOpenTerminals.current = true;
       setOpenTerminals(restoredMap);
     }
 

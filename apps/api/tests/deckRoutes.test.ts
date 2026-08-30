@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import WebSocket from "ws";
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -779,6 +780,35 @@ describe("deck API routes", () => {
 
       const res = await fetch(`${baseUrl}/api/deck/tentacles/swarm-test/swarm`);
       expect(res.status).toBe(405);
+    });
+  });
+
+  describe("live deck updates", () => {
+    it("tells connected operators to refresh after a tentacle is created", async () => {
+      const { baseUrl } = await startServer();
+      const socket = new WebSocket(`${baseUrl.replace("http://", "ws://")}/api/terminal-events/ws`);
+      const events: string[] = [];
+      socket.on("message", (raw) => {
+        const parsed = JSON.parse(raw.toString()) as { type?: string };
+        if (parsed.type) events.push(parsed.type);
+      });
+      await new Promise((resolve) => socket.on("open", resolve));
+
+      // A tentacle created from the CLI has no browser round trip behind it, so
+      // an open page only learns about it from this event.
+      const res = await fetch(`${baseUrl}/api/deck/tentacles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "live-refresh" }),
+      });
+      expect(res.status).toBe(201);
+
+      for (let attempt = 0; attempt < 100 && !events.includes("deck-changed"); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      socket.close();
+
+      expect(events).toContain("deck-changed");
     });
   });
 });

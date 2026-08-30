@@ -231,6 +231,42 @@ describe("CanvasPrimaryView", () => {
     });
   });
 
+  it("keeps a panel closed after the operator collapses a restored one", async () => {
+    renderWithLocale(
+      <CanvasPrimaryView
+        columns={[
+          {
+            terminalId: "terminal-1",
+            label: "terminal-1",
+            state: "live",
+            tentacleId: "tentacle-a",
+            tentacleName: "terminal one",
+            workspaceMode: "shared",
+            createdAt: "2026-02-24T10:00:00.000Z",
+          },
+        ]}
+        isUiStateHydrated
+        canvasOpenTerminalIds={["a:terminal-1"]}
+      />,
+    );
+
+    // The panel comes back from persisted ui state on load, behind a settling timer.
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("panel-a:terminal-1")).toBeInTheDocument();
+      },
+      { timeout: 4000 },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close terminal panel" }));
+
+    // Restoring must not fight the operator: the persisted id list still names
+    // this panel, so a re-running restore would reopen what was just closed.
+    expect(screen.queryByTestId("panel-a:terminal-1")).not.toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByTestId("panel-a:terminal-1")).not.toBeInTheDocument();
+  });
+
   it("auto-opens a newly created child terminal when its parent panel is already open", async () => {
     const { rerender } = renderWithLocale(
       <CanvasPrimaryView

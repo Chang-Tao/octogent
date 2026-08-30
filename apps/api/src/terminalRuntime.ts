@@ -862,6 +862,13 @@ export const createTerminalRuntime = ({
       return sessionRuntime.resizeSession(terminalId, cols, rows);
     },
 
+    // Deck content changes through routes that never touch a terminal — and a
+    // tentacle created from the CLI has no browser round trip at all — so an
+    // open page needs to be told to refetch.
+    broadcastDeckChanged(): void {
+      broadcastTerminalEvent({ type: "deck-changed" });
+    },
+
     async close() {
       clearInterval(stallDetectorInterval);
       sessionRuntime.close();

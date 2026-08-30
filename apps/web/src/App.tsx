@@ -41,6 +41,9 @@ import {
 
 export const App = () => {
   const [terminals, setTerminals] = useState<TerminalView>([]);
+  // Bumped when the server says deck content changed, so a page that never
+  // made the change (a tentacle created from the CLI) still refetches.
+  const [deckRevision, setDeckRevision] = useState(0);
   const [recentlyCreatedTerminal, setRecentlyCreatedTerminal] = useState<
     TerminalView[number] | null
   >(null);
@@ -249,6 +252,11 @@ export const App = () => {
             state: payload.agentRuntimeState,
             ...(payload.toolName ? { toolName: payload.toolName } : {}),
           });
+          return;
+        }
+
+        if (payload.type === "deck-changed") {
+          setDeckRevision((current) => current + 1);
           return;
         }
 
@@ -475,6 +483,7 @@ export const App = () => {
               <PrimaryViewRouter
                 activePrimaryNav={activePrimaryNav}
                 deckPrimaryViewProps={{
+                  deckRevision,
                   onSidebarContent: setDeckSidebarContent,
                   workspaceSetup,
                   isWorkspaceSetupLoading,
@@ -522,6 +531,7 @@ export const App = () => {
                   onLocaleChange: setLocale,
                 }}
                 canvasPrimaryViewProps={{
+                  deckRevision,
                   columns: terminals,
                   runtimeStateStore,
                   isUiStateHydrated,

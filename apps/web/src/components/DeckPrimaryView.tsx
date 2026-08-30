@@ -53,6 +53,7 @@ type FocusState =
 type EmptyViewMode = "idle" | "adding";
 
 type DeckPrimaryViewProps = {
+  deckRevision?: number;
   onSidebarContent?: ((content: ReactNode) => void) | undefined;
   workspaceSetup: WorkspaceSetupSnapshot | null;
   isWorkspaceSetupLoading: boolean;
@@ -63,6 +64,7 @@ type DeckPrimaryViewProps = {
 };
 
 export const DeckPrimaryView = ({
+  deckRevision,
   onSidebarContent,
   workspaceSetup,
   isWorkspaceSetupLoading,
@@ -114,6 +116,14 @@ export const DeckPrimaryView = ({
   useEffect(() => {
     void fetchTentacles();
   }, [fetchTentacles]);
+
+  // Refetch when the server reports deck content changed outside this page.
+  const lastDeckRevision = useRef(deckRevision);
+  useEffect(() => {
+    if (lastDeckRevision.current === deckRevision) return;
+    lastDeckRevision.current = deckRevision;
+    void fetchTentacles();
+  }, [deckRevision, fetchTentacles]);
 
   useEffect(() => {
     let cancelled = false;
