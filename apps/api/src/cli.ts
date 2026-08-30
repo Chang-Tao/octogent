@@ -441,7 +441,12 @@ const terminalCreate = async () => {
       console.error(`Error: ${data.error ?? "Failed"}`);
       process.exit(1);
     }
-    console.log(t(locale, "cli.created.terminal", { id: String(data.terminalId ?? "") }));
+    console.log(
+      t(locale, "cli.created.terminal", {
+        id: String(data.terminalId ?? ""),
+        tentacleId: String(data.tentacleId ?? tentacleId ?? ""),
+      }),
+    );
   } catch {
     apiError();
   }
