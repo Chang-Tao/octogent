@@ -126,6 +126,8 @@ export const en: TranslationMap = {
   "agentState.review": "review",
   "agentState.stale": "stale",
   "agentState.stalled": "stalled",
+  "agentState.awaiting-review": "awaiting review",
+  "agentState.completed": "completed",
   "agentState.unknown": "unknown",
 
   // ── Web: Navigation ──────────────────────────────────

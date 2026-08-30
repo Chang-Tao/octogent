@@ -11,15 +11,33 @@ export type AgentState =
   // Reliability: agent process is alive but its transcript has emitted no
   // state_change events for `TERMINAL_STALL_THRESHOLD_MS`. Distinguishes
   // "claude is hung at a dialog" from "claude finished its turn cleanly".
-  | "stalled";
+  | "stalled"
+  // Lifecycle: work is done but the branch has not been merged yet.
+  | "awaiting-review"
+  | "completed";
 export type TerminalLifecycleState =
   | "registered"
   | "running"
   | "stopped"
   | "exited"
   | "stale"
-  | "stalled";
+  | "stalled"
+  // Work is done but the branch has not been merged yet.
+  | "awaiting-review"
+  | "completed";
 export type TentacleWorkspaceMode = "shared" | "worktree";
+
+export type TerminalCompletionSummary = {
+  taskLine: string | null;
+  commits: Array<{ hash: string; message: string }>;
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
+  branch: string | null;
+  merged: boolean;
+  durationMs: number | null;
+  workspaceMode: TentacleWorkspaceMode;
+};
 
 export type TerminalSnapshot = {
   terminalId: string;
@@ -40,4 +58,6 @@ export type TerminalSnapshot = {
   endedAt?: string;
   exitCode?: number;
   exitSignal?: number | string;
+  completedAt?: string;
+  completionSummary?: TerminalCompletionSummary;
 };
