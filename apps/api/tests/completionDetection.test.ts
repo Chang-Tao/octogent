@@ -105,6 +105,26 @@ describe("evaluateCompletionOnStop", () => {
     expect(verdict).toEqual({ outcome: "none" });
   });
 
+  it("reads completed for an already-merged branch even with an empty range", () => {
+    // After the reviewer merges, HEAD becomes an ancestor of the base and
+    // `log base..HEAD` is empty. That emptiness is a consequence of the merge,
+    // not evidence of no work — the verdict must still flip to completed.
+    const verdict = evaluateCompletionOnStop({
+      workspaceMode: "worktree",
+      worktreeCwd: "/wt",
+      baseRef: "main",
+      run: scriptedRun({
+        "status --porcelain": "",
+        log: "",
+        diff: "",
+        "rev-parse --abbrev-ref HEAD": "octogent/terminal-9\n",
+        "merge-base --is-ancestor": "",
+      }),
+    });
+
+    expect(verdict.outcome).toBe("completed");
+  });
+
   it("stays undecided when git itself fails", () => {
     const verdict = evaluateCompletionOnStop({
       workspaceMode: "worktree",

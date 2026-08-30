@@ -43,11 +43,23 @@ export const evaluateCompletionOnStop = (input: {
   }
 
   const gitFacts = collectCompletionGitFacts(input.worktreeCwd, input.baseRef, input.run);
-  if (!gitFacts || gitFacts.commits.length === 0) {
+  if (!gitFacts) {
     return { outcome: "none" };
   }
 
-  return { outcome: gitFacts.merged ? "completed" : "awaiting-review", gitFacts };
+  // After the reviewer merges, `log base..HEAD` collapses to nothing because
+  // HEAD became an ancestor of the base — the empty range is a consequence of
+  // the merge, not evidence of no work. Merged therefore wins outright; only
+  // an unmerged branch needs commits to prove the agent actually did anything.
+  if (gitFacts.merged) {
+    return { outcome: "completed", gitFacts };
+  }
+
+  if (gitFacts.commits.length === 0) {
+    return { outcome: "none" };
+  }
+
+  return { outcome: "awaiting-review", gitFacts };
 };
 
 const LIVE_SESSION_EXEMPT_STATES: ReadonlySet<TerminalLifecycleState> = new Set([

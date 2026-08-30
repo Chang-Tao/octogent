@@ -498,13 +498,21 @@ export const createTerminalRuntime = ({
     terminal.lifecycleReason = undefined;
     terminal.lifecycleUpdatedAt = completedAt;
     terminal.completedAt = completedAt;
-    terminal.completionSummary = buildCompletionSummary({
+    const nextSummary = buildCompletionSummary({
       initialPrompt: terminal.initialPrompt ?? null,
       createdAt: terminal.createdAt ?? null,
       completedAt,
       workspaceMode: terminal.workspaceMode === "worktree" ? "worktree" : "shared",
       gitFacts: verdict.gitFacts,
     });
+    // A post-merge re-evaluation sees an empty base..HEAD range; the summary
+    // captured at awaiting-review still holds the real commits and diff stats,
+    // so keep those and only advance the merged flag.
+    const previousSummary = terminal.completionSummary;
+    terminal.completionSummary =
+      nextSummary.commits.length === 0 && previousSummary && previousSummary.commits.length > 0
+        ? { ...previousSummary, merged: nextSummary.merged, durationMs: nextSummary.durationMs }
+        : nextSummary;
     persistRegistry();
     broadcastTerminalEvent({
       type: "terminal-lifecycle-changed",
