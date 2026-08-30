@@ -325,6 +325,17 @@ export const migrateStateToGlobal = (workspaceCwd: string, projectStateDir: stri
   const oldStateDir = join(fallbackProjectDir, "state");
   const newStateDir = join(projectStateDir, "state");
 
+  // A dashboard started before `octogent init` parks its state in the
+  // path-derived ephemeral root; without it as a source, everything created in
+  // that first session (terminals and their worktrees) is orphaned on init.
+  const ephemeralStateDir = join(resolveEphemeralProjectStateDir(workspaceCwd), "state");
+
+  const sourceStateDirs = [
+    oldStateDir,
+    legacyGlobalProjectDir ? join(legacyGlobalProjectDir, "state") : null,
+    ephemeralStateDir,
+  ].filter((dir): dir is string => dir !== null && dir !== newStateDir && existsSync(dir));
+
   mkdirSync(newStateDir, { recursive: true });
 
   const stateFiles = [
@@ -337,6 +348,10 @@ export const migrateStateToGlobal = (workspaceCwd: string, projectStateDir: stri
     "runtime.json",
   ];
 
+  // First source wins, so the list above doubles as the precedence order.
+  const findSource = (relativePath: string) =>
+    sourceStateDirs.map((dir) => join(dir, relativePath)).find((path) => existsSync(path));
+
   let migrated = 0;
   for (const file of stateFiles) {
     const destination = join(newStateDir, file);
@@ -344,36 +359,19 @@ export const migrateStateToGlobal = (workspaceCwd: string, projectStateDir: stri
       continue;
     }
 
-    const localSource = join(oldStateDir, file);
-    if (existsSync(localSource)) {
-      copyFileSync(localSource, destination);
-      migrated += 1;
-      continue;
-    }
-
-    if (!legacyGlobalProjectDir) {
-      continue;
-    }
-
-    const legacySource = join(legacyGlobalProjectDir, "state", file);
-    if (existsSync(legacySource)) {
-      copyFileSync(legacySource, destination);
+    const source = findSource(file);
+    if (source) {
+      copyFileSync(source, destination);
       migrated += 1;
     }
   }
 
   const transcriptDestination = join(newStateDir, "transcripts");
   if (!existsSync(transcriptDestination)) {
-    const localTranscriptSource = join(oldStateDir, "transcripts");
-    if (existsSync(localTranscriptSource)) {
-      cpSync(localTranscriptSource, transcriptDestination, { recursive: true });
+    const transcriptSource = findSource("transcripts");
+    if (transcriptSource) {
+      cpSync(transcriptSource, transcriptDestination, { recursive: true });
       migrated += 1;
-    } else if (legacyGlobalProjectDir) {
-      const legacyTranscriptSource = join(legacyGlobalProjectDir, "state", "transcripts");
-      if (existsSync(legacyTranscriptSource)) {
-        cpSync(legacyTranscriptSource, transcriptDestination, { recursive: true });
-        migrated += 1;
-      }
     }
   }
 

@@ -160,7 +160,7 @@ The registry install flow `npm install -g octogent` will only work after the pac
 
 </details>
 
-On first run, **Octogent** creates the local `.octogent/` scaffold automatically, assigns a stable project ID, picks an available local API port starting at `8787`, and opens the UI unless `OCTOGENT_NO_OPEN=1` is set.
+On first run, **Octogent** picks an available local API port starting at `8787` and opens the UI unless `OCTOGENT_NO_OPEN=1` is set. In a directory that has not been initialized yet it starts against a temporary state root and prompts you to run `octogent init`, which creates the local `.octogent/` scaffold, assigns a stable project ID, and adopts anything created beforehand.
 
 ## Requirements
 
