@@ -143,6 +143,8 @@ describe("GET /api/health", () => {
         exited: 0,
         stale: 0,
         stalled: 0,
+        "awaiting-review": 0,
+        completed: 0,
       },
     });
     expect(payload.uptimeMs).toBeGreaterThanOrEqual(0);
@@ -173,6 +175,8 @@ describe("GET /api/health", () => {
         exited: 0,
         stale: 0,
         stalled: 0,
+        "awaiting-review": 0,
+        completed: 0,
       },
     });
   });

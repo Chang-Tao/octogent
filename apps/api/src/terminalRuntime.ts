@@ -606,6 +606,8 @@ export const createTerminalRuntime = ({
         exited: 0,
         stale: 0,
         stalled: 0,
+        "awaiting-review": 0,
+        completed: 0,
       };
       for (const terminal of terminals.values()) {
         // Mirror toTerminalSnapshot: a live session always reports as running.
