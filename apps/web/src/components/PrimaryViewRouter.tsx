@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import type { PrimaryNavIndex } from "../app/constants";
 import type { UseMonitorRuntimeResult } from "../app/hooks/useMonitorRuntime";
+import { useT } from "../app/providers/LocaleProvider";
 import { ActivityPrimaryView } from "./ActivityPrimaryView";
 import { CanvasPrimaryView } from "./CanvasPrimaryView";
 import { CodeIntelPrimaryView } from "./CodeIntelPrimaryView";
@@ -49,6 +50,7 @@ export const PrimaryViewRouter = ({
   promptsEnabled,
   onPromptsSidebarContent,
 }: PrimaryViewRouterProps) => {
+  const t = useT();
   if (activePrimaryNav === 2) {
     return <DeckPrimaryView {...deckPrimaryViewProps} />;
   }
@@ -68,8 +70,8 @@ export const PrimaryViewRouter = ({
     return (
       <section className="monitor-view" aria-label="Monitor primary view disabled">
         <section className="monitor-panel monitor-panel--configure">
-          <h3>Monitor is disabled</h3>
-          <p>Enable Monitor workspace view in Settings to restore this panel.</p>
+          <h3>{t("web.monitor.disabledTitle")}</h3>
+          <p>{t("web.monitor.disabledDesc")}</p>
         </section>
       </section>
     );

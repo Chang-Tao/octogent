@@ -238,6 +238,51 @@ export const en: TranslationMap = {
   "web.deck.workspaceSetup.done": "Done",
   "web.deck.workspaceSetup.required": "Required",
   "web.deck.workspaceSetup.optional": "Optional",
+  "web.deck.workspaceSetup.step.initialize-workspace.title": "Initialize workspace",
+  "web.deck.workspaceSetup.step.initialize-workspace.desc":
+    "Create Octogent project files and runtime directories.",
+  "web.deck.workspaceSetup.step.initialize-workspace.action": "Initialize workspace",
+  "web.deck.workspaceSetup.step.ensure-gitignore.title": "Ignore .octogent",
+  "web.deck.workspaceSetup.step.ensure-gitignore.desc":
+    "Add .octogent to .gitignore, or create .gitignore when it is missing.",
+  "web.deck.workspaceSetup.step.ensure-gitignore.action": "Update .gitignore",
+  "web.deck.workspaceSetup.step.check-claude.title": "Check Claude Code",
+  "web.deck.workspaceSetup.step.check-claude.desc":
+    "Verify the default Claude Code workflow is available on this machine.",
+  "web.deck.workspaceSetup.step.check-claude.action": "Check Claude Code",
+  "web.deck.workspaceSetup.step.check-git.title": "Check Git",
+  "web.deck.workspaceSetup.step.check-git.desc":
+    "Verify Git is available for worktree-backed tentacles.",
+  "web.deck.workspaceSetup.step.check-git.action": "Check Git",
+  "web.deck.workspaceSetup.step.check-curl.title": "Check curl",
+  "web.deck.workspaceSetup.step.check-curl.desc":
+    "Verify curl is available for Claude hook callbacks.",
+  "web.deck.workspaceSetup.step.check-curl.action": "Check curl",
+  "web.deck.workspaceSetup.step.create-tentacles.title": "Create tentacles",
+  "web.deck.workspaceSetup.step.create-tentacles.desc":
+    "Launch Claude Code so it can plan and create the first tentacles.",
+  "web.deck.actions.createFirst.title": "Create First Tentacle",
+  "web.deck.actions.createFirst.desc": "Start the deck by creating a tentacle for your codebase",
+  "web.deck.actions.openAgent.title": "Open Agent",
+  "web.deck.actions.openAgent.desc":
+    "Launch your coding agent to create tentacles based on your codebase",
+  "web.deck.actions.openAgent.launch": "Launch",
+  "web.deck.actions.addManually.title": "Add Tentacle Manually",
+  "web.deck.actions.addManually.desc": "Create a custom tentacle with your own configuration",
+  "web.deck.fileNotFound": "File not found.",
+  "web.usage.total": "Total",
+  "web.usage.sessions": "Sessions",
+  "web.usage.claudeTokenUsage": "Claude Token Usage",
+  "web.usage.peakDay": "Peak Day",
+  "web.usage.avgPerSession": "Avg / Session",
+  "web.usage.topModel": "Top Model",
+  "web.usage.topProject": "Top Project",
+  "web.usage.bestStreak": "Best Streak",
+  "web.monitor.disabledTitle": "Monitor is disabled",
+  "web.monitor.disabledDesc": "Enable Monitor workspace view in Settings to restore this panel.",
+  "web.codeIntel.noCoupling": "No coupling detected",
+  "web.terminal.minimize": "Minimize terminal panel",
+  "web.terminal.close": "Close terminal session",
 
   // ── Web: Dialogs ─────────────────────────────────────
   "web.dialog.delete.cleanupTitle": "Cleanup Worktree Tentacle",

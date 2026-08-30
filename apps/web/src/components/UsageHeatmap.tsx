@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { UsageChartData, UsageDayEntry } from "../app/hooks/useUsageHeatmapPolling";
+import { useT } from "../app/providers/LocaleProvider";
 import { ActionButton } from "./ui/ActionButton";
 
 type UsageChartSectionProps = {
@@ -92,6 +93,7 @@ const ChartTooltip = ({
   y,
   containerWidth,
 }: { bar: BarData; x: number; y: number; containerWidth: number }) => {
+  const t = useT();
   const isRightHalf = x > containerWidth / 2;
   return (
     <div
@@ -106,7 +108,7 @@ const ChartTooltip = ({
       <p className="usage-heatmap-tooltip-date">{formatDateLabel(bar.date)}</p>
       <dl className="usage-heatmap-tooltip-stats">
         <div>
-          <dt>Total</dt>
+          <dt>{t("web.usage.total")}</dt>
           <dd>{formatTokenCount(bar.totalTokens)}</dd>
         </div>
         {bar.segments.map((seg) => (
@@ -119,7 +121,7 @@ const ChartTooltip = ({
           </div>
         ))}
         <div>
-          <dt>Sessions</dt>
+          <dt>{t("web.usage.sessions")}</dt>
           <dd>{bar.sessions}</dd>
         </div>
       </dl>
@@ -513,6 +515,7 @@ const usePanelSize = () => {
 /* ── Main component ─────────────────────────────────── */
 
 export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionProps) => {
+  const t = useT();
   const [segmentMode, setSegmentMode] = useState<BarSegmentMode>("project");
   const [hoveredBar, setHoveredBar] = useState<BarData | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -576,7 +579,7 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
     <section className="usage-heatmap" aria-label="Claude token usage chart">
       <header className="usage-heatmap-header">
         <div className="usage-heatmap-header-left">
-          <h3>Claude Token Usage</h3>
+          <h3>{t("web.usage.claudeTokenUsage")}</h3>
           <span className="usage-heatmap-summary">
             {formatTokenCount(totalTokens)} tokens across {activeDays} days, {totalSessions}{" "}
             sessions
@@ -660,7 +663,7 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
           {stats && (
             <dl className="usage-chart-stats">
               <div className="usage-chart-stat">
-                <dt>Peak Day</dt>
+                <dt>{t("web.usage.peakDay")}</dt>
                 <dd>
                   {formatDateLabel(stats.peakDay.date)}
                   <span className="usage-chart-stat-sub">
@@ -669,19 +672,19 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
                 </dd>
               </div>
               <div className="usage-chart-stat">
-                <dt>Avg / Session</dt>
+                <dt>{t("web.usage.avgPerSession")}</dt>
                 <dd>{formatTokenCount(stats.avgPerSession)}</dd>
               </div>
               <div className="usage-chart-stat">
-                <dt>Top Model</dt>
+                <dt>{t("web.usage.topModel")}</dt>
                 <dd>{stats.topModel}</dd>
               </div>
               <div className="usage-chart-stat">
-                <dt>Top Project</dt>
+                <dt>{t("web.usage.topProject")}</dt>
                 <dd>{stats.topProject}</dd>
               </div>
               <div className="usage-chart-stat">
-                <dt>Best Streak</dt>
+                <dt>{t("web.usage.bestStreak")}</dt>
                 <dd>{stats.maxStreak}d</dd>
               </div>
             </dl>

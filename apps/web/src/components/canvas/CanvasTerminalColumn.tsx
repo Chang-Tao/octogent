@@ -2,6 +2,7 @@ import { Minus, X } from "lucide-react";
 import { type Ref, useCallback, useState } from "react";
 
 import type { GraphNode } from "../../app/canvas/types";
+import { useT } from "../../app/providers/LocaleProvider";
 import type { TerminalView } from "../../app/types";
 import { type AgentRuntimeState, AgentStateBadge } from "../AgentStateBadge";
 import { Terminal } from "../Terminal";
@@ -31,6 +32,7 @@ export const CanvasTerminalColumn = ({
   onTerminalRenamed,
   onTerminalActivity,
 }: CanvasTerminalColumnProps) => {
+  const t = useT();
   const [agentState, setAgentState] = useState<AgentRuntimeState>("idle");
 
   const terminal = terminals.find((t) => t.terminalId === node.sessionId);
@@ -71,7 +73,7 @@ export const CanvasTerminalColumn = ({
             className="canvas-terminal-column-minimize"
             onClick={onMinimize}
             aria-label="Minimize terminal panel"
-            title="Minimize terminal panel"
+            title={t("web.terminal.minimize")}
           >
             <Minus size={14} />
           </button>
@@ -80,7 +82,7 @@ export const CanvasTerminalColumn = ({
             className="canvas-terminal-column-close"
             onClick={onClose}
             aria-label="Close terminal session"
-            title="Close terminal session"
+            title={t("web.terminal.close")}
           >
             <X size={14} />
           </button>

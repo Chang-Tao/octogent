@@ -1,5 +1,6 @@
 import type { WorkspaceSetupSnapshot, WorkspaceSetupStepId } from "@octogent/core";
 import { useT } from "../../app/providers/LocaleProvider";
+import { resolveSetupStepCopy } from "../../app/workspaceSetupCopy";
 import { OctopusGlyph } from "../EmptyOctopus";
 
 type WorkspaceSetupCardProps = {
@@ -11,14 +12,6 @@ type WorkspaceSetupCardProps = {
   onLaunchClaudeCode: () => void;
   isLaunchingAgent?: boolean;
   isRunningStepId?: WorkspaceSetupStepId | null;
-};
-
-const buildStepSummary = (stepId: WorkspaceSetupStepId, description: string) => {
-  if (stepId === "create-tentacles") {
-    return "Launch Claude Code so it can plan and create the first tentacles.";
-  }
-
-  return description;
 };
 
 export const WorkspaceSetupCard = ({
@@ -58,9 +51,10 @@ export const WorkspaceSetupCard = ({
       <div className="workspace-setup-step-list">
         {(workspaceSetup?.steps ?? []).map((step) => {
           const isCreateTentaclesStep = step.id === "create-tentacles";
+          const copy = resolveSetupStepCopy(step, t);
           const buttonLabel = isCreateTentaclesStep
             ? t("web.deck.workspaceSetup.launch")
-            : step.actionLabel;
+            : copy.actionLabel;
           const isButtonDisabled = isCreateTentaclesStep ? isLaunchingAgent : isLoading;
           const isButtonRunning = isCreateTentaclesStep
             ? isLaunchingAgent
@@ -70,7 +64,7 @@ export const WorkspaceSetupCard = ({
             <article key={step.id} className="workspace-setup-step" data-complete={step.complete}>
               <div className="workspace-setup-step-main">
                 <div className="workspace-setup-step-title-row">
-                  <span className="workspace-setup-step-title">{step.title}</span>
+                  <span className="workspace-setup-step-title">{copy.title}</span>
                   <span className="workspace-setup-step-state">
                     {step.complete
                       ? t("web.deck.workspaceSetup.done")
@@ -79,9 +73,7 @@ export const WorkspaceSetupCard = ({
                         : t("web.deck.workspaceSetup.optional")}
                   </span>
                 </div>
-                <p className="workspace-setup-step-desc">
-                  {buildStepSummary(step.id, step.description)}
-                </p>
+                <p className="workspace-setup-step-desc">{copy.description}</p>
               </div>
               {buttonLabel ? (
                 <button

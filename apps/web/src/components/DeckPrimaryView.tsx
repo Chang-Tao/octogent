@@ -7,6 +7,7 @@ import type {
   WorkspaceSetupStepId,
 } from "@octogent/core";
 import { useClickOutside } from "../app/hooks/useClickOutside";
+import { useT } from "../app/providers/LocaleProvider";
 import type { TerminalAgentProvider } from "../app/types";
 import {
   buildDeckSkillsUrl,
@@ -70,6 +71,7 @@ export const DeckPrimaryView = ({
   onRunWorkspaceSetupStep,
   suppressWorkspaceSetupCard = false,
 }: DeckPrimaryViewProps) => {
+  const t = useT();
   const [tentacles, setTentacles] = useState<DeckTentacleSummary[]>([]);
   const [focus, setFocus] = useState<FocusState | null>(null);
   const [vaultContent, setVaultContent] = useState<string | null>(null);
@@ -589,7 +591,7 @@ export const DeckPrimaryView = ({
               ) : vaultContent !== null ? (
                 <MarkdownContent content={vaultContent} className="deck-detail-markdown" />
               ) : (
-                <span className="deck-detail-loading">File not found.</span>
+                <span className="deck-detail-loading">{t("web.deck.fileNotFound")}</span>
               )}
             </div>
           </>
