@@ -976,10 +976,10 @@ export const CanvasPrimaryView = ({
   }, [onLaunchWorkspaceSetupPlanner]);
 
   return (
-    <section ref={containerRef} className="canvas-view" aria-label="Canvas graph view">
+    <section ref={containerRef} className="canvas-view" aria-label={t("web.a11y.canvasGraphView")}>
       <div className={`canvas-graph-panel${hasPanels ? " canvas-graph-panel--split" : ""}`}>
         <svg
-          aria-label="Canvas graph"
+          aria-label={t("web.a11y.canvasGraph")}
           ref={svgRef}
           className={`canvas-svg${isPanning || dragNodeId ? " canvas-svg--panning" : ""}`}
           onWheel={handleWheel}
@@ -1083,7 +1083,7 @@ export const CanvasPrimaryView = ({
         </svg>
 
         {/* Canvas toolbar — top-left action buttons */}
-        <div className="canvas-toolbar" role="toolbar" aria-label="Canvas actions">
+        <div className="canvas-toolbar" role="toolbar" aria-label={t("web.a11y.canvasActions")}>
           <button
             type="button"
             className="canvas-toolbar-btn"
@@ -1285,7 +1285,7 @@ export const CanvasPrimaryView = ({
       {contextMenu && (
         <>
           <div
-            aria-label="Close canvas context menu"
+            aria-label={t("web.a11y.closeCanvasContextMenu")}
             className="canvas-context-menu-backdrop"
             onClick={() => setContextMenu(null)}
             onContextMenu={(e) => {

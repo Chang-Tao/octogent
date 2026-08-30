@@ -197,6 +197,7 @@ const BarChartView = ({
   hoveredBar: BarData | null;
   setHoveredBar: (bar: BarData | null) => void;
 }) => {
+  const t = useT();
   const chartAreaWidth = containerWidth - Y_AXIS_WIDTH;
   const barCount = bars.length || 1;
   const barSlotWidth = chartAreaWidth / barCount;
@@ -218,7 +219,7 @@ const BarChartView = ({
       className="usage-chart-svg"
       viewBox={`0 0 ${containerWidth} ${svgHeight}`}
       role="img"
-      aria-label="Token usage bar chart"
+      aria-label={t("web.a11y.tokenUsageBarChart")}
     >
       {yTicks.map((tick) => {
         const y =
@@ -416,6 +417,7 @@ const HeatmapView = ({
   hoveredBar: BarData | null;
   setHoveredBar: (bar: BarData | null) => void;
 }) => {
+  const t = useT();
   const cells = useMemo(() => buildHeatmapGrid(bars), [bars]);
   const monthLabels = useMemo(() => buildMonthLabels(cells), [cells]);
 
@@ -442,7 +444,7 @@ const HeatmapView = ({
       width={svgWidth}
       height={svgHeight}
       role="img"
-      aria-label="Token usage heatmap"
+      aria-label={t("web.a11y.tokenUsageHeatmap")}
     >
       {monthLabels.map(({ label, week }) => (
         <text
@@ -576,7 +578,7 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
   }, [days, totalTokens, totalSessions, models, projects]);
 
   return (
-    <section className="usage-heatmap" aria-label="Claude token usage chart">
+    <section className="usage-heatmap" aria-label={t("web.a11y.claudeTokenUsageChart")}>
       <header className="usage-heatmap-header">
         <div className="usage-heatmap-header-left">
           <h3>{t("web.usage.claudeTokenUsage")}</h3>
@@ -587,7 +589,7 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
         </div>
         <div className="usage-heatmap-header-actions">
           <ActionButton
-            aria-label="Refresh usage chart data"
+            aria-label={t("web.a11y.refreshUsageChart")}
             className="usage-heatmap-refresh"
             disabled={isLoading}
             onClick={onRefresh}

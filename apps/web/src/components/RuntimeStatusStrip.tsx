@@ -197,7 +197,7 @@ export const RuntimeStatusStrip = ({
   }, [isRefreshingClaudeUsage]);
 
   return (
-    <section className="console-status-strip" aria-label="Runtime status strip">
+    <section className="console-status-strip" aria-label={t("web.a11y.runtimeStatusStrip")}>
       <div className="console-status-main">
         <OctopusGlyph
           className="console-status-octopus-icon"
@@ -208,7 +208,7 @@ export const RuntimeStatusStrip = ({
         <span className="console-status-brand">{t("web.status.brand")}</span>
       </div>
       <div className="console-status-charts">
-        <div className="console-status-sparkline" aria-label="Commits per day over last 30 days">
+        <div className="console-status-sparkline" aria-label={t("web.a11y.commitsPerDay30d")}>
           <div className="console-status-sparkline-chart">
             <svg
               viewBox={`0 0 ${GITHUB_SPARKLINE_WIDTH} ${GITHUB_SPARKLINE_HEIGHT}`}
@@ -219,7 +219,7 @@ export const RuntimeStatusStrip = ({
           </div>
           <span className="console-status-sparkline-label">{t("web.status.commitsPerDay")}</span>
         </div>
-        <div className="console-status-usage-mini" aria-label="Claude token usage last 30 days">
+        <div className="console-status-usage-mini" aria-label={t("web.a11y.claudeTokenUsage30d")}>
           {usageBars.length > 0 ? (
             <>
               <div className="console-status-usage-mini-chart">
@@ -245,7 +245,7 @@ export const RuntimeStatusStrip = ({
           )}
         </div>
       </div>
-      <div className="console-status-claude-usage" aria-label="Claude usage limits">
+      <div className="console-status-claude-usage" aria-label={t("web.a11y.claudeUsageLimits")}>
         {onRefreshClaudeUsage && (
           <button
             type="button"

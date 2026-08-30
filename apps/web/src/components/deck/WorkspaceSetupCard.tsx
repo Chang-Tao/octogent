@@ -28,7 +28,7 @@ export const WorkspaceSetupCard = ({
   return (
     <section
       className={`workspace-setup-card${compact ? " workspace-setup-card--compact" : ""}`}
-      aria-label="Workspace setup"
+      aria-label={t("web.a11y.workspaceSetup")}
     >
       <header className="workspace-setup-card-header">
         <div className="workspace-setup-card-glyph">

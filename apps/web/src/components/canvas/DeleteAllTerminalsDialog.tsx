@@ -115,7 +115,7 @@ export const DeleteAllTerminalsDialog = ({
 
   return (
     <section
-      aria-label="Delete all terminals"
+      aria-label={t("web.a11y.deleteAllTerminals")}
       className="delete-confirm-dialog"
       onKeyDown={(event) => {
         if (event.key !== "Escape" || isDeleting) return;
@@ -129,7 +129,7 @@ export const DeleteAllTerminalsDialog = ({
         <div className="delete-confirm-header-actions">
           <span className="pill blocked">{t("web.dialog.delete.destructive")}</span>
           <ActionButton
-            aria-label="Close confirmation"
+            aria-label={t("web.a11y.closeConfirmation")}
             className="delete-confirm-close"
             disabled={isDeleting}
             onClick={onCancel}
@@ -178,7 +178,7 @@ export const DeleteAllTerminalsDialog = ({
             className="delete-all-toggle-switch"
             role="switch"
             aria-checked={!inactiveOnly}
-            aria-label="Toggle between inactive only and all terminals"
+            aria-label={t("web.a11y.toggleInactiveAllTerminals")}
             disabled={isDeleting}
             onClick={() => setInactiveOnly((prev) => !prev)}
           >
@@ -207,7 +207,7 @@ export const DeleteAllTerminalsDialog = ({
       </div>
       <div className="delete-confirm-actions">
         <ActionButton
-          aria-label="Cancel delete all"
+          aria-label={t("web.a11y.cancelDeleteAll")}
           className="delete-confirm-cancel"
           disabled={isDeleting}
           onClick={onCancel}
@@ -217,7 +217,7 @@ export const DeleteAllTerminalsDialog = ({
           {t("common.cancel")}
         </ActionButton>
         <ActionButton
-          aria-label="Confirm delete all terminals"
+          aria-label={t("web.a11y.confirmDeleteAllTerminals")}
           className="delete-confirm-submit"
           disabled={isDeleting || totalTargetCount === 0}
           onClick={() => void handleConfirm()}

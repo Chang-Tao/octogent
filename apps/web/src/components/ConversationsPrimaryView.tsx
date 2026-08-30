@@ -136,10 +136,13 @@ export const ConversationsPrimaryView = ({
   }, [highlightedTurnId]);
 
   return (
-    <section className="conversations-view" aria-label="Conversations primary view">
+    <section className="conversations-view" aria-label={t("web.a11y.conversationsView")}>
       {errorMessage ? <p className="conversations-error">{errorMessage}</p> : null}
 
-      <section className="conversations-transcript" aria-label="Conversation transcript pane">
+      <section
+        className="conversations-transcript"
+        aria-label={t("web.a11y.conversationTranscriptPane")}
+      >
         {isLoadingSelectedSession ? (
           <p className="conversations-empty">{t("web.conversations.loading")}</p>
         ) : selectedSession ? (
@@ -177,7 +180,7 @@ export const ConversationsPrimaryView = ({
                       : t("web.conversations.exportMarkdown")}
                   </ActionButton>
                   <button
-                    aria-label="Delete this conversation"
+                    aria-label={t("web.a11y.deleteThisConversation")}
                     className="conversations-delete-btn"
                     disabled={isDeletingSession}
                     onClick={onDeleteSession}

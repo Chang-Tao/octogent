@@ -42,7 +42,7 @@ export const SidebarPromptsList = ({
           className="sidebar-prompts-refresh-btn"
           onClick={onRefresh}
           disabled={isLoadingPrompts}
-          aria-label="Refresh prompts"
+          aria-label={t("web.a11y.refreshPrompts")}
         >
           ↻
         </button>
@@ -110,7 +110,7 @@ export const SidebarPromptsList = ({
             type="button"
             className="sidebar-prompts-minimized-terminal-close"
             onClick={onCloseTerminal}
-            aria-label="Close terminal"
+            aria-label={t("web.a11y.closeTerminal")}
           >
             ✕
           </button>

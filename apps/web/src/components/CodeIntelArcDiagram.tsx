@@ -101,7 +101,7 @@ export const CodeIntelArcDiagram = ({ data }: CodeIntelArcDiagramProps) => {
         height={Math.max(svgHeight, size.height)}
         viewBox={`0 0 ${size.width} ${Math.max(svgHeight, size.height)}`}
         role="img"
-        aria-label="File coupling arc diagram"
+        aria-label={t("web.a11y.fileCouplingArcDiagram")}
       >
         {/* Arcs — curve to the right */}
         {pairs.map((pair) => {

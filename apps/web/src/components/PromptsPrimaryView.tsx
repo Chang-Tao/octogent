@@ -147,7 +147,7 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
   const showPromptDetail = !showTerminal || !newPromptMode;
 
   return (
-    <section className="prompts-view" aria-label="Prompts primary view">
+    <section className="prompts-view" aria-label={t("web.a11y.promptsView")}>
       {/* Terminal — kept mounted when active, hidden via CSS when viewing a prompt */}
       {newPromptMode && (
         <div

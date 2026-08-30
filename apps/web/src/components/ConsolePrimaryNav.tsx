@@ -13,7 +13,7 @@ export const ConsolePrimaryNav = ({
   const t = useT();
 
   return (
-    <nav className="console-primary-nav" aria-label="Primary navigation">
+    <nav className="console-primary-nav" aria-label={t("web.a11y.primaryNavigation")}>
       <div className="console-primary-nav-tabs">
         {PRIMARY_NAV_ITEMS.map((item) => (
           <button

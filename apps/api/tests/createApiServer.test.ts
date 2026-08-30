@@ -407,6 +407,8 @@ describe("createApiServer", () => {
     temporaryDirectories.length = 0;
   });
 
+  const REGISTRY_PERSIST_BUDGET_MS = 8_000;
+
   const startServer = async (options: Partial<Parameters<typeof createApiServer>[0]> = {}) => {
     const workspaceCwd =
       options.workspaceCwd ??
@@ -435,11 +437,15 @@ describe("createApiServer", () => {
     predicate: (document: TDocument) => boolean,
   ): Promise<TDocument> => {
     const registryPath = join(workspaceCwd, ".octogent", "state", "tentacles.json");
-    const timeoutAt = Date.now() + 2_000;
+    // Persistence lands in ~100ms idle; the budget absorbs IO stalls when the
+    // whole monorepo suite runs in parallel, and only slows a genuine failure.
+    const timeoutAt = Date.now() + REGISTRY_PERSIST_BUDGET_MS;
+    let lastSeen: string | null = null;
 
     while (Date.now() < timeoutAt) {
       if (existsSync(registryPath)) {
-        const document = JSON.parse(readFileSync(registryPath, "utf8")) as TDocument;
+        lastSeen = readFileSync(registryPath, "utf8");
+        const document = JSON.parse(lastSeen) as TDocument;
         if (predicate(document)) {
           return document;
         }
@@ -448,7 +454,11 @@ describe("createApiServer", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
 
-    throw new Error(`Timed out waiting for registry persistence at ${registryPath}`);
+    // Report what the registry actually held so a rare timeout is diagnosable
+    // from CI output alone.
+    throw new Error(
+      `Timed out after ${REGISTRY_PERSIST_BUDGET_MS}ms waiting for registry persistence at ${registryPath}. Last contents: ${lastSeen ?? "<file never appeared>"}`,
+    );
   };
 
   const writeConversationTranscript = (

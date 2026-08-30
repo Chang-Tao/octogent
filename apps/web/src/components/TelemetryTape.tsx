@@ -69,7 +69,7 @@ export const TelemetryTape = ({ monitorFeed }: TelemetryTapeProps) => {
   const scrollDurationSeconds = Math.max(72, telemetryItems.length * 9);
 
   return (
-    <section className="console-telemetry-tape" aria-label="Telemetry ticker tape">
+    <section className="console-telemetry-tape" aria-label={t("web.a11y.telemetryTickerTape")}>
       <div
         className="console-telemetry-track"
         style={{ animationDuration: `${scrollDurationSeconds}s` }}

@@ -183,11 +183,11 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
   };
 
   return (
-    <section className="monitor-view" aria-label="Monitor primary view">
+    <section className="monitor-view" aria-label={t("web.a11y.monitorView")}>
       <header className="monitor-header">
         <div className="monitor-header-top">
           <div className="monitor-header-main">
-            <nav className="monitor-provider-tabs" aria-label="Monitor providers">
+            <nav className="monitor-provider-tabs" aria-label={t("web.a11y.monitorProviders")}>
               {MONITOR_PROVIDER_TABS.map((provider) => (
                 <button
                   aria-current={activeProviderId === provider.id ? "page" : undefined}
@@ -204,7 +204,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
               ))}
             </nav>
 
-            <nav className="monitor-subtabs" aria-label="Monitor subtabs">
+            <nav className="monitor-subtabs" aria-label={t("web.a11y.monitorSubtabs")}>
               {MONITOR_SUBTABS.map((subtab) => (
                 <button
                   aria-current={activeSubtab === subtab.id ? "page" : undefined}
@@ -230,7 +230,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
               {monitorFeed?.isStale ? t("web.monitor.status.stale") : t("web.monitor.status.fresh")}
             </span>
             <ActionButton
-              aria-label="Refresh monitor feed"
+              aria-label={t("web.a11y.refreshMonitorFeed")}
               className="monitor-refresh"
               disabled={isRefreshingMonitorFeed}
               onClick={onRefresh}
@@ -245,7 +245,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
         </div>
 
         {activeSubtab === "resources" && (
-          <div className="monitor-header-roll" aria-label="Monitor rolling stats">
+          <div className="monitor-header-roll" aria-label={t("web.a11y.monitorRollingStats")}>
             <div className="monitor-header-roll-track">
               {resourceRollItems.map((item) => (
                 <span key={`primary-${item}`}>{item}</span>
@@ -259,13 +259,13 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
       </header>
 
       {activeSubtab === "configure" ? (
-        <section className="monitor-configure" aria-label="Monitor configuration">
+        <section className="monitor-configure" aria-label={t("web.a11y.monitorConfiguration")}>
           <section
             className="monitor-panel monitor-panel--configure"
-            aria-label="Monitor configuration panel"
+            aria-label={t("web.a11y.monitorConfigurationPanel")}
           >
             <h3>{t("web.monitor.setup.title")}</h3>
-            <div className="monitor-config-summary" aria-label="Monitor setup summary">
+            <div className="monitor-config-summary" aria-label={t("web.a11y.monitorSetupSummary")}>
               <span className="monitor-config-chip">
                 {t("web.monitor.summary.terms", { count: nextTermsForSave.length })}
               </span>
@@ -318,7 +318,10 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
 
                 <div className="monitor-config-section">
                   <p className="monitor-section-label">{t("web.monitor.setup.targetTerms")}</p>
-                  <ul className="monitor-query-terms-list" aria-label="Monitor query terms">
+                  <ul
+                    className="monitor-query-terms-list"
+                    aria-label={t("web.a11y.monitorQueryTerms")}
+                  >
                     {queryTermsDraft.map((term) => (
                       <li className="monitor-query-term" key={term}>
                         <span>{term}</span>
@@ -339,7 +342,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                   </ul>
                   <div className="monitor-query-term-form">
                     <input
-                      aria-label="Add monitor query term"
+                      aria-label={t("web.a11y.addMonitorQueryTerm")}
                       className="monitor-input"
                       onChange={(event) => {
                         setQueryTermInput(event.target.value);
@@ -355,7 +358,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
                       value={queryTermInput}
                     />
                     <ActionButton
-                      aria-label="Add query term"
+                      aria-label={t("web.a11y.addQueryTerm")}
                       className="monitor-query-add"
                       onClick={() => {
                         appendQueryTerm(queryTermInput);
@@ -421,7 +424,7 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
             </div>
             <div className="monitor-config-footer">
               <ActionButton
-                aria-label="Save monitor settings"
+                aria-label={t("web.a11y.saveMonitorSettings")}
                 className="monitor-config-save"
                 disabled={isSavingMonitorConfig || !canSaveConfig}
                 onClick={saveMonitorSettings}
@@ -436,8 +439,8 @@ export const MonitorPrimaryView = ({ monitorRuntime }: MonitorPrimaryViewProps) 
           </section>
         </section>
       ) : (
-        <section className="monitor-resources" aria-label="Monitor resources">
-          <section className="monitor-feed" aria-label="Monitor feed results">
+        <section className="monitor-resources" aria-label={t("web.a11y.monitorResources")}>
+          <section className="monitor-feed" aria-label={t("web.a11y.monitorFeedResults")}>
             <header>
               <h3>{t("web.monitor.resources.topPosts")}</h3>
               <span>{`${monitorFeed?.posts.length ?? 0} / ${configuredMaxPosts}`}</span>

@@ -33,8 +33,8 @@ export const SettingsPrimaryView = ({
   const t = useT();
 
   return (
-    <section className="settings-view" aria-label="Settings primary view">
-      <section className="settings-panel" aria-label="Completion notification settings">
+    <section className="settings-view" aria-label={t("web.a11y.settingsView")}>
+      <section className="settings-panel" aria-label={t("web.a11y.completionNotificationSettings")}>
         <header className="settings-panel-header">
           <h2>{t("web.settings.soundTitle")}</h2>
           <p>{t("web.settings.soundDesc")}</p>
@@ -74,7 +74,7 @@ export const SettingsPrimaryView = ({
           <span className="settings-saved-pill">{t("web.settings.saved")}</span>
         </div>
       </section>
-      <section className="settings-panel" aria-label="Workspace surface visibility settings">
+      <section className="settings-panel" aria-label={t("web.a11y.workspaceSurfaceVisibility")}>
         <header className="settings-panel-header">
           <h2>{t("web.settings.visibilityTitle")}</h2>
           <p>{t("web.settings.visibilityDesc")}</p>
@@ -97,7 +97,7 @@ export const SettingsPrimaryView = ({
           />
         </div>
       </section>
-      <section className="settings-panel" aria-label="Language settings">
+      <section className="settings-panel" aria-label={t("web.a11y.languageSettings")}>
         <header className="settings-panel-header">
           <h2>{t("web.settings.languageTitle")}</h2>
           <p>{t("web.settings.languageDesc")}</p>

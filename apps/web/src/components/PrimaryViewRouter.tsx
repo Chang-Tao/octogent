@@ -68,7 +68,7 @@ export const PrimaryViewRouter = ({
       return <MonitorPrimaryView monitorRuntime={monitorRuntime} />;
     }
     return (
-      <section className="monitor-view" aria-label="Monitor primary view disabled">
+      <section className="monitor-view" aria-label={t("web.a11y.monitorViewDisabled")}>
         <section className="monitor-panel monitor-panel--configure">
           <h3>{t("web.monitor.disabledTitle")}</h3>
           <p>{t("web.monitor.disabledDesc")}</p>

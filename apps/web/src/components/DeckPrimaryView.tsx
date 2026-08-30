@@ -429,7 +429,7 @@ export const DeckPrimaryView = ({
         className="deck-view"
         data-mode="grid"
         data-empty-mode={emptyViewMode}
-        aria-label="Deck"
+        aria-label={t("web.a11y.deck")}
       >
         <div className="deck-empty-state">
           <div className="deck-empty-left">
@@ -491,7 +491,7 @@ export const DeckPrimaryView = ({
       className="deck-view"
       data-mode={mode}
       data-has-pods={tentacles.length > 0}
-      aria-label="Deck"
+      aria-label={t("web.a11y.deck")}
     >
       <div className="deck-pods-container">
         {tentacles.map((t) => {

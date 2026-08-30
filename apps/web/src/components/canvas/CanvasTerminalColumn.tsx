@@ -72,7 +72,7 @@ export const CanvasTerminalColumn = ({
             type="button"
             className="canvas-terminal-column-minimize"
             onClick={onMinimize}
-            aria-label="Minimize terminal panel"
+            aria-label={t("web.a11y.minimizeTerminalPanel")}
             title={t("web.terminal.minimize")}
           >
             <Minus size={14} />
@@ -81,7 +81,7 @@ export const CanvasTerminalColumn = ({
             type="button"
             className="canvas-terminal-column-close"
             onClick={onClose}
-            aria-label="Close terminal session"
+            aria-label={t("web.a11y.closeTerminalSession")}
             title={t("web.terminal.close")}
           >
             <X size={14} />

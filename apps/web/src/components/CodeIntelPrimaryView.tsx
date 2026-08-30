@@ -17,7 +17,7 @@ export const CodeIntelPrimaryView = ({ enabled }: CodeIntelPrimaryViewProps) => 
 
   if (isLoading && events.length === 0) {
     return (
-      <section className="code-intel-view" aria-label="Code Intel primary view">
+      <section className="code-intel-view" aria-label={t("web.a11y.codeIntelView")}>
         <section className="code-intel-panel">
           <header className="code-intel-panel-header">
             <h2>{t("web.codeIntel.title")}</h2>
@@ -30,7 +30,7 @@ export const CodeIntelPrimaryView = ({ enabled }: CodeIntelPrimaryViewProps) => 
 
   if (error) {
     return (
-      <section className="code-intel-view" aria-label="Code Intel primary view">
+      <section className="code-intel-view" aria-label={t("web.a11y.codeIntelView")}>
         <section className="code-intel-panel">
           <header className="code-intel-panel-header">
             <h2>{t("web.codeIntel.title")}</h2>
@@ -43,7 +43,7 @@ export const CodeIntelPrimaryView = ({ enabled }: CodeIntelPrimaryViewProps) => 
 
   if (events.length === 0) {
     return (
-      <section className="code-intel-view" aria-label="Code Intel primary view">
+      <section className="code-intel-view" aria-label={t("web.a11y.codeIntelView")}>
         <section className="code-intel-panel">
           <header className="code-intel-panel-header">
             <h2>{t("web.codeIntel.title")}</h2>
@@ -55,7 +55,7 @@ export const CodeIntelPrimaryView = ({ enabled }: CodeIntelPrimaryViewProps) => 
   }
 
   return (
-    <section className="code-intel-view" aria-label="Code Intel primary view">
+    <section className="code-intel-view" aria-label={t("web.a11y.codeIntelView")}>
       <header className="code-intel-view-header">
         <span className="code-intel-stat">
           <PenLine size={13} className="code-intel-stat-icon code-intel-stat-icon--edits" />

@@ -119,10 +119,13 @@ export const SidebarConversationsList = ({
   const isShowingResults = searchQuery.length > 0;
 
   return (
-    <section className="active-agents-section" aria-label="Sidebar section Conversations">
+    <section
+      className="active-agents-section"
+      aria-label={t("web.a11y.sidebarSectionConversations")}
+    >
       <div className="sidebar-conversations-toolbar">
         <button
-          aria-label="Refresh conversations"
+          aria-label={t("web.a11y.refreshConversations")}
           className="sidebar-conversations-icon-btn"
           disabled={isLoadingSessions}
           onClick={onRefresh}
@@ -145,7 +148,7 @@ export const SidebarConversationsList = ({
           </svg>
         </button>
         <button
-          aria-label="Clear all conversations"
+          aria-label={t("web.a11y.clearAllConversations")}
           className="sidebar-conversations-icon-btn sidebar-conversations-icon-btn--danger"
           disabled={sessions.length === 0}
           onClick={onClearAll}
@@ -196,14 +199,14 @@ export const SidebarConversationsList = ({
               setInputValue(e.target.value);
             }}
             onKeyDown={handleKeyDown}
-            aria-label="Search conversations"
+            aria-label={t("web.a11y.searchConversations")}
           />
           {(inputValue.length > 0 || isShowingResults) && (
             <button
               type="button"
               className="sidebar-conversations-search-clear"
               onClick={handleClearSearch}
-              aria-label="Clear search"
+              aria-label={t("web.a11y.clearSearch")}
             >
               <svg
                 aria-hidden="true"

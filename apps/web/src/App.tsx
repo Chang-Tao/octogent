@@ -1,4 +1,4 @@
-import { type TerminalSnapshot, buildTerminalList, isAgentRuntimeState } from "@octogent/core";
+import { type TerminalSnapshot, buildTerminalList, isAgentRuntimeState, t } from "@octogent/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { useBackendLivenessPolling } from "./app/hooks/useBackendLivenessPolling";
@@ -440,7 +440,10 @@ export const App = () => {
           onPrimaryNavChange={setActivePrimaryNav}
         />
 
-        <section className="console-main-canvas" aria-label="Main content canvas">
+        <section
+          className="console-main-canvas"
+          aria-label={t(locale, "web.a11y.mainContentCanvas")}
+        >
           <div
             className={`workspace-shell${isAgentsSidebarVisible && activePrimaryNav !== 1 && activePrimaryNav !== 3 && activePrimaryNav !== 4 && activePrimaryNav !== 5 && activePrimaryNav !== 8 ? "" : " workspace-shell--full"}`}
           >

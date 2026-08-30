@@ -143,14 +143,14 @@ export const GitHubPrimaryView = ({
     : null;
 
   return (
-    <section className="github-view" aria-label="GitHub primary view">
-      <section className="github-overview" aria-label="GitHub overview">
+    <section className="github-view" aria-label={t("web.a11y.githubView")}>
+      <section className="github-overview" aria-label={t("web.a11y.githubOverview")}>
         <header className="github-overview-header">
           <h2>{githubRepoLabel}</h2>
           <div className="github-overview-header-actions">
             <span className="console-status-pill">{githubStatusPill}</span>
             <ActionButton
-              aria-label="Refresh GitHub overview data"
+              aria-label={t("web.a11y.refreshGithubOverview")}
               className="github-overview-refresh"
               disabled={isRefreshingGitHubSummary}
               onClick={onRefresh}
@@ -163,7 +163,10 @@ export const GitHubPrimaryView = ({
         </header>
         <div className="github-overview-content">
           <section className="github-overview-main">
-            <section className="github-overview-graph" aria-label="GitHub commits graph">
+            <section
+              className="github-overview-graph"
+              aria-label={t("web.a11y.githubCommitsGraph")}
+            >
               <div className="github-overview-graph-meta">
                 <strong>{t("web.github.commitsPerDay")}</strong>
                 <span>{githubOverviewHoverLabel}</span>
@@ -307,8 +310,8 @@ export const GitHubPrimaryView = ({
             </section>
           </section>
 
-          <aside className="github-overview-side" aria-label="GitHub recent activity">
-            <dl className="github-overview-stats" aria-label="Repository stats">
+          <aside className="github-overview-side" aria-label={t("web.a11y.githubRecentActivity")}>
+            <dl className="github-overview-stats" aria-label={t("web.a11y.repositoryStats")}>
               <div
                 aria-label={`${t("web.github.stars")} ${githubStarCountLabel}`}
                 className="github-overview-stat"
@@ -377,7 +380,7 @@ export const GitHubPrimaryView = ({
             </dl>
             <section
               className="github-overview-recent"
-              aria-label="Recent commits"
+              aria-label={t("web.a11y.recentCommits")}
               ref={recentSectionRef}
             >
               <header className="github-overview-recent-header">

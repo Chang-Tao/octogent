@@ -176,7 +176,7 @@ export const TentaclePod = ({
             type="button"
             className="deck-pod-btn deck-pod-btn--delete"
             onClick={() => setConfirmingDelete(true)}
-            aria-label="Delete tentacle"
+            aria-label={t("web.a11y.deleteTentacle")}
           >
             <svg className="deck-pod-btn-icon" viewBox="0 0 16 16" aria-hidden="true">
               <path

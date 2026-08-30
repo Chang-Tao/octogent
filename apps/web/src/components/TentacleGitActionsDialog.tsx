@@ -111,7 +111,7 @@ export const TentacleGitActionsDialog = ({
         <div className="git-actions-header-actions">
           <span className="pill git-actions-worktree-badge">{t("web.git.worktreeBadge")}</span>
           <ActionButton
-            aria-label="Close sidebar action panel"
+            aria-label={t("web.a11y.closeSidebarActionPanel")}
             className="git-actions-close"
             disabled={isMutating}
             onClick={onClose}
@@ -163,7 +163,10 @@ export const TentacleGitActionsDialog = ({
           <p className="git-actions-loading">{t("web.git.noStatus")}</p>
         )}
 
-        <section className="git-actions-commit-panel" aria-label="Source control composer">
+        <section
+          className="git-actions-commit-panel"
+          aria-label={t("web.a11y.sourceControlComposer")}
+        >
           <label className="git-actions-commit-label" htmlFor="git-actions-commit-input">
             {t("web.git.section.message")}
           </label>
@@ -180,7 +183,7 @@ export const TentacleGitActionsDialog = ({
           />
           <div className="git-actions-commit-controls">
             <ActionButton
-              aria-label="Commit changes"
+              aria-label={t("web.a11y.commitChanges")}
               className="git-actions-commit-main"
               disabled={Boolean(commitDisabledReason)}
               onClick={onCommit}
@@ -192,7 +195,7 @@ export const TentacleGitActionsDialog = ({
             <button
               aria-expanded={isCommitMenuOpen}
               aria-haspopup="menu"
-              aria-label="Open commit options"
+              aria-label={t("web.a11y.openCommitOptions")}
               className="git-actions-commit-toggle"
               disabled={Boolean(globalDisabledReason)}
               onClick={() => {
@@ -264,7 +267,7 @@ export const TentacleGitActionsDialog = ({
           )}
         </section>
 
-        <section className="git-actions-pr-section" aria-label="Pull request workflow">
+        <section className="git-actions-pr-section" aria-label={t("web.a11y.pullRequestWorkflow")}>
           <div className="git-actions-pr-header">
             <h3>{t("web.git.section.pr")}</h3>
             <p className="git-actions-pr-status">
