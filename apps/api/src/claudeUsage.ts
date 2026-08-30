@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { type ClaudeUsageSnapshot, asNumber, asRecord, asString } from "@octogent/core";
@@ -495,6 +495,29 @@ const isClaudeCliReady = (normalized: string, collapsed: string): boolean => {
   return collapsed.includes("claudecodev") && normalized.includes("❯");
 };
 
+/**
+ * Terminates the probe's whole process group.
+ *
+ * node-pty starts the shell in its own session, so the child is a group leader.
+ * Killing only that pid orphans everything Claude Code spawned underneath it,
+ * and those orphans accumulate until the host runs out of room.
+ */
+export const killProcessGroup = (
+  pid: number,
+  kill: (target: number, signal: NodeJS.Signals) => void = process.kill,
+): void => {
+  try {
+    kill(-pid, "SIGKILL");
+  } catch {
+    // The group may already be gone; still try the pid itself below.
+  }
+  try {
+    kill(pid, "SIGKILL");
+  } catch {
+    // Already dead.
+  }
+};
+
 const spawnCliAndCapture = (binary: string): Promise<string | null> =>
   new Promise<string | null>((resolve) => {
     import("node-pty")
@@ -504,15 +527,19 @@ const spawnCliAndCapture = (binary: string): Promise<string | null> =>
         let done = false;
         let phase: "waiting" | "capturing" = "waiting";
         let settleTimer: ReturnType<typeof setTimeout> | null = null;
-        let enterTimer: ReturnType<typeof setInterval> | null = null;
         let usageRetryTimer: ReturnType<typeof setTimeout> | null = null;
         let usageSentAt = 0;
         let usageSendCount = 0;
 
-        const term = pty.spawn(binary, ["--allowed-tools", ""], {
+        // Run outside the project. Octogent installs its own SessionStart hook
+        // into the workspace, and that hook asks the API to refresh usage — so a
+        // probe started here would spawn the next probe, without end. A neutral
+        // cwd (and user-only setting sources) keeps the probe off that loop.
+        const term = pty.spawn(binary, ["--allowed-tools", "", "--setting-sources", "user"], {
           name: "xterm-256color",
           cols: CLI_PTY_COLS,
           rows: CLI_PTY_ROWS,
+          cwd: tmpdir(),
           env: scrubbedEnv(),
         });
 
@@ -521,13 +548,13 @@ const spawnCliAndCapture = (binary: string): Promise<string | null> =>
           done = true;
           if (deadlineTimer) clearTimeout(deadlineTimer);
           if (settleTimer) clearTimeout(settleTimer);
-          if (enterTimer) clearInterval(enterTimer);
           if (usageRetryTimer) clearTimeout(usageRetryTimer);
           try {
             term.kill();
           } catch {
             /* already dead */
           }
+          killProcessGroup(term.pid);
           resolve(result);
         };
 
@@ -551,14 +578,11 @@ const spawnCliAndCapture = (binary: string): Promise<string | null> =>
             finish(null);
             return;
           }
-          // Periodic Enter presses to refresh TUI render
-          enterTimer = setInterval(() => {
-            try {
-              term.write("\r");
-            } catch {
-              /* ignore */
-            }
-          }, CLI_PTY_ENTER_INTERVAL_MS);
+          // No periodic Enter here. In the Claude Code TUI a Return submits a
+          // turn, so a timer pressing it every CLI_PTY_ENTER_INTERVAL_MS spawned
+          // a process per press — dozens per probe, all orphaned on timeout.
+          // The /usage write above renders the view; the retry below covers a
+          // slow first paint.
 
           if (usageRetryTimer) clearTimeout(usageRetryTimer);
           usageRetryTimer = setTimeout(() => {

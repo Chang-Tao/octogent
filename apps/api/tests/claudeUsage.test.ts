@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   invalidateUsageCache,
+  killProcessGroup,
   parseCliUsageOutput,
   readClaudeUsageSnapshot,
   resetCliSession,
@@ -579,5 +580,29 @@ describe("readClaudeUsageSnapshot", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 90));
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("killProcessGroup", () => {
+  it("reaps the group before the leader so nothing is orphaned", () => {
+    const calls: Array<[number, NodeJS.Signals]> = [];
+    killProcessGroup(4321, (target, signal) => {
+      calls.push([target, signal]);
+    });
+
+    expect(calls).toEqual([
+      [-4321, "SIGKILL"],
+      [4321, "SIGKILL"],
+    ]);
+  });
+
+  it("still kills the leader when the group is already gone", () => {
+    const calls: number[] = [];
+    killProcessGroup(99, (target) => {
+      if (target < 0) throw new Error("ESRCH");
+      calls.push(target);
+    });
+
+    expect(calls).toEqual([99]);
   });
 });
