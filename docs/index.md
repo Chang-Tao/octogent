@@ -31,6 +31,7 @@ Octogent has three main layers:
 - [Filesystem Layout](reference/filesystem-layout.md)
 - [API](reference/api.md)
 - [Experimental Features](reference/experimental-features.md)
+- [Running as a systemd User Service](reference/systemd.md)
 - [Troubleshooting](reference/troubleshooting.md)
 
 ## Contributor policy
