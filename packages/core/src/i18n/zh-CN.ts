@@ -7,6 +7,7 @@ export const zhCN: TranslationMap = {
   "cli.server.running": "Octogent 运行中",
   "cli.server.project": "项目：",
   "cli.server.api": "API：",
+  "cli.server.lan": "局域网：",
   "cli.created.tentacle": "已创建触手 {id}",
   "cli.created.terminal": "已在触手 {tentacleId} 上创建终端 {id}",
   "cli.killed.terminal": "已终止终端 {id}",

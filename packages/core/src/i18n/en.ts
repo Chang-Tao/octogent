@@ -7,6 +7,7 @@ export const en: TranslationMap = {
   "cli.server.running": "Octogent is running",
   "cli.server.project": "Project:",
   "cli.server.api": "API:",
+  "cli.server.lan": "LAN:",
   "cli.created.tentacle": "Created tentacle {id}",
   "cli.created.terminal": "Created terminal {id} on tentacle {tentacleId}",
   "cli.killed.terminal": "Killed terminal {id}",

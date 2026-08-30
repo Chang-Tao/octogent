@@ -1,9 +1,17 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
+import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
+import {
+  isRemoteAccessEnabled,
+  isWildcardHost,
+  listLanAddresses,
+  resolveListenHost,
+  toConnectableHost,
+} from "./listenHost";
 import {
   ensureOctogentGitignoreEntry,
   ensureProjectScaffold,
@@ -112,17 +120,17 @@ const initProject = (name?: string) => {
   console.log(t(locale, "cli.init.ready"));
 };
 
-const canListenOnPort = (port: number): Promise<boolean> =>
+const canListenOnPort = (port: number, host: string): Promise<boolean> =>
   new Promise((resolvePort) => {
     const server = createServer();
     server.once("error", () => resolvePort(false));
     server.once("listening", () => {
       server.close(() => resolvePort(true));
     });
-    server.listen(port, "127.0.0.1");
+    server.listen(port, host);
   });
 
-const findOpenPort = async (startPort: number): Promise<number> => {
+const findOpenPort = async (startPort: number, host: string): Promise<number> => {
   for (let offset = 0; offset < MAX_PORT_ATTEMPTS; offset += 1) {
     const port = startPort + offset;
     if (port > 65535) {
@@ -130,7 +138,7 @@ const findOpenPort = async (startPort: number): Promise<number> => {
     }
 
     // eslint-disable-next-line no-await-in-loop
-    if (await canListenOnPort(port)) {
+    if (await canListenOnPort(port, host)) {
       return port;
     }
   }
@@ -224,7 +232,8 @@ const startServer = async () => {
     resolveStartupProjectContext(workspaceCwd);
   const promptsDir = resolveRuntimeAssetPath(["dist", "prompts"], ["prompts"]);
   const webDistDir = resolveRuntimeAssetPath(["dist", "web"], ["apps", "web", "dist"]);
-  const port = await findOpenPort(readPreferredStartPort());
+  const listenHost = resolveListenHost(process.env);
+  const port = await findOpenPort(readPreferredStartPort(), listenHost);
   const { createApiServer } = await import("./createApiServer");
 
   const apiServer = createApiServer({
@@ -232,7 +241,7 @@ const startServer = async () => {
     projectStateDir,
     promptsDir,
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
-    allowRemoteAccess: process.env.OCTOGENT_ALLOW_REMOTE_ACCESS === "1",
+    allowRemoteAccess: isRemoteAccessEnabled(process.env),
   });
 
   const shutdown = async () => {
@@ -244,8 +253,10 @@ const startServer = async () => {
   process.on("SIGINT", () => void shutdown());
   process.on("SIGTERM", () => void shutdown());
 
-  const { host, port: activePort } = await apiServer.start(port, "127.0.0.1");
-  const apiBaseUrl = `http://${host}:${activePort}`;
+  const { host, port: activePort } = await apiServer.start(port, listenHost);
+  // A wildcard bind is not a destination: the browser, the CLI client, and the
+  // runtime metadata all need an address they can actually dial.
+  const apiBaseUrl = `http://${toConnectableHost(host)}:${activePort}`;
   writeRuntimeMetadata(projectStateDir, {
     apiBaseUrl,
     host,
@@ -264,6 +275,11 @@ const startServer = async () => {
   console.log(`  ${t(locale, "cli.server.running")}`);
   console.log(`  ${t(locale, "cli.server.project")} ${workspaceCwd}`);
   console.log(`  ${t(locale, "cli.server.api")} ${apiBaseUrl}`);
+  if (isWildcardHost(host)) {
+    for (const address of listLanAddresses(networkInterfaces())) {
+      console.log(`  ${t(locale, "cli.server.lan")} http://${address}:${activePort}`);
+    }
+  }
   console.log();
 };
 

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
 import { createApiServer } from "./createApiServer";
+import { isRemoteAccessEnabled, resolveListenHost } from "./listenHost";
 
 const locale: Locale = (process.env.OCTOGENT_LOCALE as Locale) ?? DEFAULT_LOCALE;
 
@@ -16,11 +17,8 @@ const parsePort = (value: string | undefined, fallback: number) => {
   return parsed;
 };
 
-const allowRemoteAccess = process.env.OCTOGENT_ALLOW_REMOTE_ACCESS === "1";
-// Opting into remote access implies binding beyond loopback unless the
-// operator pins HOST explicitly; without this the flag still required a
-// separate HOST override to be reachable from other machines.
-const host = process.env.HOST ?? (allowRemoteAccess ? "0.0.0.0" : "127.0.0.1");
+const allowRemoteAccess = isRemoteAccessEnabled(process.env);
+const host = resolveListenHost(process.env);
 const port = parsePort(process.env.OCTOGENT_API_PORT ?? process.env.PORT, 8787);
 const workspaceCwd = process.env.OCTOGENT_WORKSPACE_CWD ?? process.cwd();
 const projectStateDir = process.env.OCTOGENT_PROJECT_STATE_DIR;
