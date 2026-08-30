@@ -33,6 +33,21 @@ export type { ClaudeUsageSnapshot };
 
 type ClaudeUsageStatus = ClaudeUsageSnapshot["status"];
 
+export type ClaudeUsageSourceMode = "auto" | "oauth" | "cli" | "off";
+
+const CLAUDE_USAGE_SOURCE_ENV = "OCTOGENT_CLAUDE_USAGE_SOURCE";
+
+/** Parses `OCTOGENT_CLAUDE_USAGE_SOURCE`; blank or unknown values fall back to `auto`. */
+export const parseClaudeUsageSource = (value: string | undefined): ClaudeUsageSourceMode => {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "auto" ||
+    normalized === "oauth" ||
+    normalized === "cli" ||
+    normalized === "off"
+    ? normalized
+    : "auto";
+};
+
 type ClaudeOauthCredentials = {
   accessToken: string;
   scopes: string[];
@@ -46,7 +61,15 @@ type ClaudeUsageDependencies = {
   spawnCliUsage?: () => Promise<string | null>;
   projectStateDir?: string;
   backgroundRefreshOnly?: boolean;
+  /** Raw source-mode override; defaults to the OCTOGENT_CLAUDE_USAGE_SOURCE env var. */
+  usageSource?: string;
 };
+
+const resolveUsageSource = (dependencies: ClaudeUsageDependencies): ClaudeUsageSourceMode =>
+  parseClaudeUsageSource(dependencies.usageSource ?? process.env[CLAUDE_USAGE_SOURCE_ENV]);
+
+const disabledSnapshot = (now: Date): ClaudeUsageSnapshot =>
+  unavailableSnapshot(now, `Claude usage collection is disabled (${CLAUDE_USAGE_SOURCE_ENV}=off).`);
 
 const unavailableSnapshot = (
   now: Date,
@@ -776,10 +799,11 @@ export const readClaudeOauthUsageSnapshot = async (
     : snapshot;
 };
 
-export const readClaudeCliUsageSnapshot = async (
-  dependencies: ClaudeUsageDependencies = {},
-): Promise<ClaudeUsageSnapshot> => {
-  const now = dependencies.now?.() ?? new Date();
+/** Runs the CLI PTY probe; returns a cached ok snapshot, or null when it yields no data. */
+const readCliOkSnapshot = async (
+  dependencies: ClaudeUsageDependencies,
+  now: Date,
+): Promise<ClaudeUsageSnapshot | null> => {
   const spawnCliUsage = dependencies.spawnCliUsage ?? spawnDefaultCliUsage;
   try {
     const cliOutput = await spawnCliUsage();
@@ -805,48 +829,52 @@ export const readClaudeCliUsageSnapshot = async (
     );
   }
 
-  return unavailableSnapshot(now, "Claude CLI usage unavailable.", "error");
+  return null;
+};
+
+export const readClaudeCliUsageSnapshot = async (
+  dependencies: ClaudeUsageDependencies = {},
+): Promise<ClaudeUsageSnapshot> => {
+  const now = dependencies.now?.() ?? new Date();
+  return (
+    (await readCliOkSnapshot(dependencies, now)) ??
+    unavailableSnapshot(now, "Claude CLI usage unavailable.", "error")
+  );
 };
 
 const refreshClaudeUsageSnapshot = async (
   dependencies: ClaudeUsageDependencies = {},
 ): Promise<ClaudeUsageSnapshot> => {
   const now = dependencies.now?.() ?? new Date();
+  const sourceMode = resolveUsageSource(dependencies);
 
-  // Prefer the CLI PTY path when it works, since it reflects Claude Code
-  // usage directly and avoids OAuth API rate-limit failures.
-  const spawnCliUsage = dependencies.spawnCliUsage ?? spawnDefaultCliUsage;
-  try {
-    const cliOutput = await spawnCliUsage();
-    if (cliOutput) {
-      const cleaned = stripAnsiCodes(cliOutput);
-      logVerbose(`[claude-usage] CLI PTY captured ${cleaned.length} chars`);
-      const parsed = parseCliUsageOutput(cliOutput);
-      if (cliHasRealData(parsed)) {
-        logVerbose(
-          `[claude-usage] CLI PTY parsed: session=${parsed.primaryUsedPercent}% week=${parsed.secondaryUsedPercent}% sonnet=${parsed.sonnetUsedPercent}%`,
-        );
-        return await cacheOkSnapshot(buildCliSnapshot(parsed, now), dependencies.projectStateDir);
-      }
-      logVerbose(
-        `[claude-usage] CLI PTY output had no parseable usage data. First 500 chars:\n${cleaned.slice(0, 500)}`,
-      );
-    } else {
-      logVerbose("[claude-usage] CLI PTY returned null (binary missing or node-pty unavailable)");
-    }
-  } catch (error) {
-    logVerbose(
-      `[claude-usage] CLI PTY error: ${error instanceof Error ? error.message : String(error)}`,
+  if (sourceMode === "off") {
+    return disabledSnapshot(now);
+  }
+
+  if (sourceMode === "cli") {
+    return (
+      (await readCliOkSnapshot(dependencies, now)) ??
+      unavailableSnapshot(now, "Claude CLI usage unavailable.", "error")
     );
   }
 
-  // Fall back to OAuth API when CLI does not yield usable data.
+  // Prefer the OAuth API: it is cheap and structured. The CLI PTY probe
+  // screen-scrapes an interactive TUI and is fragile, so `auto` only falls
+  // back to it when OAuth yields no data (and `oauth` never does).
   const readCredentialsJson = dependencies.readCredentialsJson ?? readDefaultCredentialsJson;
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const oauthSnapshot = await readOauthUsageSnapshot(now, readCredentialsJson, fetchImpl);
 
   if (oauthSnapshot.status === "ok") {
     return await cacheOkSnapshot(oauthSnapshot, dependencies.projectStateDir);
+  }
+
+  if (sourceMode === "auto") {
+    const cliSnapshot = await readCliOkSnapshot(dependencies, now);
+    if (cliSnapshot) {
+      return cliSnapshot;
+    }
   }
 
   const cachedOkSnapshot = getCachedOkSnapshot();
@@ -901,6 +929,12 @@ export const readClaudeUsageSnapshot = async (
 ): Promise<ClaudeUsageSnapshot> => {
   const now = dependencies.now?.() ?? new Date();
   const backgroundRefreshOnly = dependencies.backgroundRefreshOnly ?? false;
+
+  // `off` means "do not collect": short-circuit before serving cache or
+  // starting any refresh, so no source is contacted at all.
+  if (resolveUsageSource(dependencies) === "off") {
+    return disabledSnapshot(now);
+  }
 
   // Return cached snapshot if fresh enough (prevents rate-limit storms)
   if (cachedSnapshot && Date.now() - cachedSnapshot.fetchedAt < CACHE_TTL_MS) {

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   invalidateUsageCache,
   killProcessGroup,
+  parseClaudeUsageSource,
   parseCliUsageOutput,
   readClaudeUsageSnapshot,
   resetCliSession,
@@ -145,10 +146,33 @@ describe("parseCliUsageOutput", () => {
   });
 });
 
+describe("parseClaudeUsageSource", () => {
+  it("accepts the four supported values", () => {
+    expect(parseClaudeUsageSource("auto")).toBe("auto");
+    expect(parseClaudeUsageSource("oauth")).toBe("oauth");
+    expect(parseClaudeUsageSource("cli")).toBe("cli");
+    expect(parseClaudeUsageSource("off")).toBe("off");
+  });
+
+  it("trims whitespace and ignores case", () => {
+    expect(parseClaudeUsageSource("  OAuth ")).toBe("oauth");
+    expect(parseClaudeUsageSource("OFF")).toBe("off");
+  });
+
+  it("falls back to auto for blank, undefined, and unknown values", () => {
+    expect(parseClaudeUsageSource(undefined)).toBe("auto");
+    expect(parseClaudeUsageSource("")).toBe("auto");
+    expect(parseClaudeUsageSource("   ")).toBe("auto");
+    expect(parseClaudeUsageSource("bogus")).toBe("auto");
+  });
+});
+
 describe("readClaudeUsageSnapshot", () => {
   beforeEach(() => resetCliSession());
+  afterEach(() => vi.unstubAllEnvs());
 
-  it("falls back to OAuth when CLI returns null", async () => {
+  it("auto prefers OAuth and does not spawn the CLI when OAuth succeeds", async () => {
+    const spawnCliUsage = vi.fn(async () => cliUsageOutput);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
       new Response(usageResponseBody, {
         status: 200,
@@ -158,7 +182,7 @@ describe("readClaudeUsageSnapshot", () => {
 
     const snapshot = await readClaudeUsageSnapshot({
       now: () => new Date("2026-03-03T12:00:00.000Z"),
-      spawnCliUsage: noCliPty,
+      spawnCliUsage,
       readCredentialsJson: async () => validCredentials(),
       fetchImpl: fetchMock,
     });
@@ -166,59 +190,15 @@ describe("readClaudeUsageSnapshot", () => {
     expect(snapshot.status).toBe("ok");
     expect(snapshot.source).toBe("oauth-api");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(spawnCliUsage).not.toHaveBeenCalled();
   });
 
-  it("falls back to OAuth when CLI output has no parseable percentages", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      new Response(usageResponseBody, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-
-    const snapshot = await readClaudeUsageSnapshot({
-      now: () => new Date("2026-03-03T12:00:00.000Z"),
-      spawnCliUsage: async () => "Welcome to Claude! No usage data here.",
-      readCredentialsJson: async () => validCredentials(),
-      fetchImpl: fetchMock,
-    });
-
-    expect(snapshot.source).toBe("oauth-api");
-  });
-
-  it("falls back to OAuth when CLI throws", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      new Response(usageResponseBody, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-
-    const snapshot = await readClaudeUsageSnapshot({
-      now: () => new Date("2026-03-03T12:00:00.000Z"),
-      spawnCliUsage: async () => {
-        throw new Error("pty crashed");
-      },
-      readCredentialsJson: async () => validCredentials(),
-      fetchImpl: fetchMock,
-    });
-
-    expect(snapshot.source).toBe("oauth-api");
-  });
-
-  it("prefers CLI data over OAuth when both are available", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      new Response(usageResponseBody, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-
+  it("auto falls back to CLI when OAuth fails", async () => {
     const snapshot = await readClaudeUsageSnapshot({
       now: () => new Date("2026-03-03T12:00:00.000Z"),
       spawnCliUsage: async () => cliUsageOutput,
       readCredentialsJson: async () => validCredentials(),
-      fetchImpl: fetchMock,
+      fetchImpl: async () => new Response("boom", { status: 500 }),
     });
 
     expect(snapshot.status).toBe("ok");
@@ -226,6 +206,145 @@ describe("readClaudeUsageSnapshot", () => {
     expect(snapshot.primaryUsedPercent).toBe(2);
     expect(snapshot.secondaryUsedPercent).toBe(0);
     expect(snapshot.sonnetUsedPercent).toBe(0);
+  });
+
+  it("auto returns the OAuth failure when the CLI fallback yields no data", async () => {
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage: async () => "Welcome to Claude! No usage data here.",
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: async () => new Response("boom", { status: 500 }),
+    });
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.message).toMatch(/HTTP 500/);
+  });
+
+  it("an unrecognized usageSource behaves like auto", async () => {
+    const spawnCliUsage = vi.fn(async () => cliUsageOutput);
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      usageSource: "bogus",
+      spawnCliUsage,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: async () =>
+        new Response(usageResponseBody, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+
+    expect(snapshot.source).toBe("oauth-api");
+    expect(spawnCliUsage).not.toHaveBeenCalled();
+  });
+
+  it("oauth mode never spawns the CLI even when OAuth fails", async () => {
+    const spawnCliUsage = vi.fn(async () => cliUsageOutput);
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      usageSource: "oauth",
+      spawnCliUsage,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: async () => new Response("boom", { status: 500 }),
+    });
+
+    expect(snapshot.status).toBe("error");
+    expect(spawnCliUsage).not.toHaveBeenCalled();
+  });
+
+  it("cli mode uses the CLI without calling the OAuth API", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const readCredentialsJson = vi.fn(async () => validCredentials());
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      usageSource: "cli",
+      spawnCliUsage: async () => cliUsageOutput,
+      readCredentialsJson,
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("ok");
+    expect(snapshot.source).toBe("cli-pty");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readCredentialsJson).not.toHaveBeenCalled();
+  });
+
+  it("cli mode reports an error when the CLI yields no data", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      usageSource: "cli",
+      spawnCliUsage: noCliPty,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.message).toMatch(/cli usage unavailable/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("off mode returns a disabled snapshot without contacting any source", async () => {
+    const spawnCliUsage = vi.fn(async () => cliUsageOutput);
+    const fetchMock = vi.fn<typeof fetch>();
+    const readCredentialsJson = vi.fn(async () => validCredentials());
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      usageSource: "off",
+      spawnCliUsage,
+      readCredentialsJson,
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("unavailable");
+    expect(snapshot.source).toBe("none");
+    expect(snapshot.fetchedAt).toBe("2026-03-03T12:00:00.000Z");
+    expect(snapshot.message).toMatch(/disabled/i);
+    expect(snapshot.message).toContain("OCTOGENT_CLAUDE_USAGE_SOURCE");
+    expect(spawnCliUsage).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readCredentialsJson).not.toHaveBeenCalled();
+  });
+
+  it("off mode ignores a previously cached snapshot", async () => {
+    const deps = {
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage: noCliPty,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: async () =>
+        new Response(usageResponseBody, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    };
+
+    const okSnapshot = await readClaudeUsageSnapshot(deps);
+    expect(okSnapshot.status).toBe("ok");
+
+    const disabledSnapshot = await readClaudeUsageSnapshot({ ...deps, usageSource: "off" });
+    expect(disabledSnapshot.status).toBe("unavailable");
+    expect(disabledSnapshot.message).toMatch(/disabled/i);
+  });
+
+  it("reads the mode from OCTOGENT_CLAUDE_USAGE_SOURCE by default", async () => {
+    vi.stubEnv("OCTOGENT_CLAUDE_USAGE_SOURCE", "off");
+
+    const spawnCliUsage = vi.fn(async () => cliUsageOutput);
+    const fetchMock = vi.fn<typeof fetch>();
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("unavailable");
+    expect(snapshot.message).toMatch(/disabled/i);
+    expect(spawnCliUsage).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("returns unavailable when credentials cannot be found", async () => {

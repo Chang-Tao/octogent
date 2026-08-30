@@ -23,6 +23,7 @@ octogent
 - `OCTOGENT_LOCALE`：UI/CLI 语言（`en` 或 `zh-CN`）
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`：并发运行终端会话的上限
 - `OCTOGENT_TERMINAL_STALL_MS`：运行中的终端在多少毫秒无转录活动后被标记为 `stalled`（默认 `120000`）
+- `OCTOGENT_CLAUDE_USAGE_SOURCE`：Claude 用量数据源：`auto`（OAuth 优先、CLI PTY 回退）、`oauth`、`cli`，或 `off` 禁用采集（默认 `auto`）
 
 无界面服务器示例：
 
