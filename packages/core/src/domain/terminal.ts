@@ -60,4 +60,7 @@ export type TerminalSnapshot = {
   exitSignal?: number | string;
   completedAt?: string;
   completionSummary?: TerminalCompletionSummary;
+  // Set when the record has aged out of default listings; transcripts and
+  // completion summaries are kept on disk.
+  archivedAt?: string;
 };

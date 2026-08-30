@@ -23,6 +23,7 @@ octogent
 - `OCTOGENT_LOCALE`：UI/CLI 语言（`en` 或 `zh-CN`）
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`：并发运行终端会话的上限
 - `OCTOGENT_TERMINAL_STALL_MS`：运行中的终端在多少毫秒无转录活动后被标记为 `stalled`（默认 `120000`）
+- `OCTOGENT_TERMINAL_RETENTION_HOURS`：`completed`、`stopped`、`exited` 终端记录在多少小时后被自动归档；`awaiting-review` 记录永不过期（默认 `72`，非法值回落默认）
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`：Claude 用量数据源：`auto`（OAuth 优先、CLI PTY 回退）、`oauth`、`cli`，或 `off` 禁用采集（默认 `auto`）
 
 无界面服务器示例：
@@ -87,7 +88,7 @@ octogent terminal create [options]
 octogent terminal list
 ```
 
-显示每个终端的 ID、生命周期状态、可用时的进程 ID、生命周期原因和显示名。
+显示每个终端的 ID、生命周期状态、可用时的进程 ID、生命周期原因和显示名。已归档记录默认隐藏；传入 `--archived` 可仅列出已归档记录。
 
 ## 停止或杀死终端
 
@@ -97,6 +98,15 @@ octogent terminal kill <terminal-id>
 ```
 
 `stop` 关闭活动会话，或对 stale 终端记录的进程发送 `SIGTERM`；`kill` 使用 `SIGKILL`。
+
+## 归档终端记录
+
+```bash
+octogent terminal archive <terminal-id>
+octogent terminal archive --all-completed
+```
+
+归档会在记录上写入 `archivedAt`，使默认列表隐藏它；转录与完成摘要仍保留在磁盘上。运行中的终端不能归档。`--all-completed` 归档所有生命周期状态为 `completed` 的记录。`completed`、`stopped`、`exited` 状态的记录在超过 `OCTOGENT_TERMINAL_RETENTION_HOURS` 后也会被自动归档；`awaiting-review` 记录永不自动归档，未合并的工作会一直醒目。
 
 ## 清理不活跃的终端记录
 

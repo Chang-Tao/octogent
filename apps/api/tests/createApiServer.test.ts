@@ -445,9 +445,14 @@ describe("createApiServer", () => {
     while (Date.now() < timeoutAt) {
       if (existsSync(registryPath)) {
         lastSeen = readFileSync(registryPath, "utf8");
-        const document = JSON.parse(lastSeen) as TDocument;
-        if (predicate(document)) {
-          return document;
+        try {
+          const document = JSON.parse(lastSeen) as TDocument;
+          if (predicate(document)) {
+            return document;
+          }
+        } catch {
+          // The registry write is not atomic, so a poll can observe a
+          // half-written file. Treat it as "not persisted yet" and keep polling.
         }
       }
 

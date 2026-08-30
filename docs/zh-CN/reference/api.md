@@ -11,13 +11,15 @@ API 涉及两类不同的状态：
 
 ## 终端
 
-- `GET /api/terminal-snapshots` - 返回供 UI 使用的当前终端列表与快照状态
+- `GET /api/terminal-snapshots` - 返回供 UI 使用的当前终端列表与快照状态；默认排除已归档记录，传 `?includeArchived=1` 时包含
 - `POST /api/terminals` - 创建新的终端会话
 - `POST /api/terminals/prune` - 移除生命周期状态为 `stale`、`stopped` 或 `exited` 的终端记录
+- `POST /api/terminals/archive-completed` - 归档所有生命周期状态为 `completed` 的终端记录
 - `PATCH /api/terminals/:terminalId` - 更新终端元数据，如显示名
 - `DELETE /api/terminals/:terminalId` - 移除终端并关闭其活动会话
 - `POST /api/terminals/:terminalId/stop` - 停止活动会话或记录中的 stale 进程
 - `POST /api/terminals/:terminalId/kill` - 杀死活动会话或记录中的 stale 进程
+- `POST /api/terminals/:terminalId/archive` - 归档一条非运行中的终端记录（运行中的终端返回 `409`）；转录与完成摘要等文件保留
 - `WS /api/terminals/:terminalId/ws` - 通过 WebSocket 流式传输终端实时 IO
 
 终端快照在已知时包含 `lifecycleState`。支持的生命周期状态为 `registered`、`running`、`stopped`、`exited` 与 `stale`。stale 终端是那些持久化为 running、但启动后无法重新接回活动 Octogent PTY 会话的记录。

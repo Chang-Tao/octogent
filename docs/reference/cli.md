@@ -23,6 +23,7 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_LOCALE`: UI/CLI locale (`en` or `zh-CN`)
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`: Cap on concurrently running terminal sessions
 - `OCTOGENT_TERMINAL_STALL_MS`: Milliseconds without transcript activity before a running terminal is marked `stalled` (default: `120000`)
+- `OCTOGENT_TERMINAL_RETENTION_HOURS`: Hours after which `completed`, `stopped`, and `exited` terminal records are auto-archived; `awaiting-review` records never expire (default: `72`, invalid values fall back to the default)
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`: Claude usage data source: `auto` (OAuth first, CLI PTY fallback), `oauth`, `cli`, or `off` to disable collection (default: `auto`)
 
 Example for headless servers:
@@ -87,7 +88,7 @@ Options:
 octogent terminal list
 ```
 
-Shows each terminal ID, lifecycle state, recorded process ID when available, lifecycle reason, and display name.
+Shows each terminal ID, lifecycle state, recorded process ID when available, lifecycle reason, and display name. Archived records are hidden by default; pass `--archived` to list only archived records.
 
 ## Stop or kill a terminal
 
@@ -97,6 +98,15 @@ octogent terminal kill <terminal-id>
 ```
 
 `stop` closes an active session or sends `SIGTERM` to the recorded process for a stale terminal. `kill` uses `SIGKILL`.
+
+## Archive terminal records
+
+```bash
+octogent terminal archive <terminal-id>
+octogent terminal archive --all-completed
+```
+
+Archiving stamps `archivedAt` on the record so default listings hide it; transcripts and completion summaries are kept on disk. A running terminal cannot be archived. `--all-completed` archives every record whose lifecycle state is `completed`. Records in `completed`, `stopped`, or `exited` state are also archived automatically once `OCTOGENT_TERMINAL_RETENTION_HOURS` passes; `awaiting-review` records are never auto-archived so unmerged work stays visible.
 
 ## Prune inactive terminal records
 
