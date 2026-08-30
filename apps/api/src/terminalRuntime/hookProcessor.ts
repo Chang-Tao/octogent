@@ -29,6 +29,7 @@ export const createHookProcessor = (deps: {
   persistRegistry: () => void;
   deliverChannelMessages: (terminalId: string) => number;
   releaseSessionKeepAlive: (terminalId: string) => boolean;
+  reviveSessionTranscript: (terminalId: string) => boolean;
   onStateChange?: (
     terminalId: string,
     state: TerminalSession["agentState"],
@@ -43,6 +44,7 @@ export const createHookProcessor = (deps: {
     persistRegistry,
     deliverChannelMessages,
     releaseSessionKeepAlive,
+    reviveSessionTranscript,
     onStateChange,
   } = deps;
 
@@ -214,6 +216,18 @@ export const createHookProcessor = (deps: {
     }
 
     const hookPayloadRecord = payload as Record<string, unknown>;
+
+    if (hookName === "session-start") {
+      if (!octogentSessionId) {
+        return { ok: true };
+      }
+      // A new agent came up in this PTY. Reopen the transcript if the previous
+      // agent closed it, then hand over anything that queued up in between.
+      if (reviveSessionTranscript(octogentSessionId)) {
+        deliverChannelMessages(octogentSessionId);
+      }
+      return { ok: true };
+    }
 
     if (hookName === "notification") {
       if (!octogentSessionId) {

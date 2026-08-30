@@ -340,6 +340,7 @@ export const createTerminalRuntime = ({
     getApiBaseUrl,
     persistRegistry,
     deliverChannelMessages: channelMessaging.deliverChannelMessages,
+    reviveSessionTranscript: (terminalId) => sessionRuntime.reviveSessionTranscript(terminalId),
     releaseSessionKeepAlive: sessionRuntime.releaseSessionKeepAlive,
     onStateChange: broadcastTerminalStateChanged,
   });

@@ -9,6 +9,9 @@ import type { WebSocket, WebSocketServer } from "ws";
 import { type AgentRuntimeState, AgentStateTracker } from "../agentStateDetection";
 import { resolveBootstrapCommand } from "./bootstrapCommand";
 import {
+  AGENT_INJECT_SUBMIT_DELAY_MS,
+  AGENT_PASTE_END,
+  AGENT_PASTE_START,
   DEFAULT_AGENT_PROVIDER,
   TERMINAL_BOOTSTRAP_COMMANDS,
   TERMINAL_MAX_CONCURRENT_SESSIONS,
@@ -455,9 +458,9 @@ export const createSessionRuntime = ({
   };
 
   const INITIAL_PROMPT_DELAY_MS = 4_000;
-  const INITIAL_PROMPT_SUBMIT_DELAY_MS = 150;
-  const BRACKETED_PASTE_START = "\x1b[200~";
-  const BRACKETED_PASTE_END = "\x1b[201~";
+  const INITIAL_PROMPT_SUBMIT_DELAY_MS = AGENT_INJECT_SUBMIT_DELAY_MS;
+  const BRACKETED_PASTE_START = AGENT_PASTE_START;
+  const BRACKETED_PASTE_END = AGENT_PASTE_END;
 
   const scheduleIdleCloseIfNeeded = (session: TerminalSession, sessionId: string) => {
     if (session.isClosed || sessions.get(sessionId) !== session) {
@@ -877,10 +880,36 @@ export const createSessionRuntime = ({
     return true;
   };
 
+  // A fresh agent session can start inside a PTY whose previous transcript was
+  // closed (the prior agent exited). Without reviving the log, the new agent's
+  // events are dropped and queued channel messages can never be delivered.
+  const reviveSessionTranscript = (sessionId: string): boolean => {
+    const session = sessions.get(sessionId);
+    if (!session || session.isClosed) {
+      return false;
+    }
+
+    if (!session.hasTranscriptEnded && session.transcriptLog) {
+      return true;
+    }
+
+    session.hasTranscriptEnded = false;
+    if (!session.transcriptLog) {
+      session.transcriptLog = createTranscriptLog(sessionId);
+    }
+    appendTranscriptEvent(session, sessionId, {
+      type: "session_start",
+      timestamp: new Date().toISOString(),
+      tentacleId: session.tentacleId,
+    });
+    return true;
+  };
+
   return {
     closeSession,
     stopSession,
     killSession,
+    reviveSessionTranscript,
     handleUpgrade,
     connectDirect,
     startSession,
