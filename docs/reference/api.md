@@ -34,6 +34,7 @@ Creating a terminal registers metadata first. A PTY starts immediately only when
 - `POST /api/tentacles/:tentacleId/git/sync` - syncs the tentacle worktree with its base branch
 - `GET /api/tentacles/:tentacleId/git/pr` - reads pull request information for the tentacle branch
 - `POST /api/tentacles/:tentacleId/git/pr/merge` - merges the tentacle pull request
+- `POST /api/worktrees/gc` - reclaims the worktree directory and branch of every archived worktree terminal whose work is proven merged (`completed` lifecycle state or a `merged: true` completion summary); pass `?dryRun=1` to list the candidates without removing anything. Returns `dryRun`, `candidates`, `reclaimedWorktreeIds`, and `failedWorktreeIds`. Unmerged work is never reclaimed.
 
 ## Deck and tentacles
 

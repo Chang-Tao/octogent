@@ -114,7 +114,16 @@ Archiving stamps `archivedAt` on the record so default listings hide it; transcr
 octogent terminal prune
 ```
 
-Removes terminal records whose lifecycle state is `stale`, `stopped`, or `exited`. It does not remove active sessions.
+Removes terminal records whose lifecycle state is `stale`, `stopped`, or `exited`. It does not remove active sessions. Prune only cleans up records — it never touches the disk; use `octogent worktree gc` to reclaim merged worktrees and branches.
+
+## Reclaim merged worktrees
+
+```bash
+octogent worktree gc
+octogent worktree gc --dry-run
+```
+
+Removes the worktree directory and branch of every archived worktree terminal whose work is proven merged — the record's lifecycle state is `completed`, or its completion summary says `merged`. Unmerged work (including `awaiting-review`) is never reclaimed, and a worktree shared by several terminal records is only reclaimed when every record qualifies. `--dry-run` lists the reclaimable worktrees without removing anything. The server also reclaims eligible worktrees automatically when the archive sweep archives their records. Terminal records stay in place either way — that is what `octogent terminal prune` is for.
 
 ## Send a message
 

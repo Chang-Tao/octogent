@@ -38,6 +38,36 @@ const isTerminalLifecycleState = (value: unknown): value is TerminalLifecycleSta
   value === "awaiting-review" ||
   value === "completed";
 
+// The registry file is a contract surface: parse the persisted completion
+// summary defensively rather than trusting its shape, and drop it entirely
+// when the load-bearing `merged` flag is missing — worktree gc must never act
+// on a summary it cannot trust.
+const parseTerminalCompletionSummary = (value: unknown): PersistedTerminal["completionSummary"] => {
+  if (!isRecord(value) || typeof value.merged !== "boolean") {
+    return undefined;
+  }
+
+  const commits = Array.isArray(value.commits)
+    ? value.commits.flatMap((commit) =>
+        isRecord(commit) && typeof commit.hash === "string" && typeof commit.message === "string"
+          ? [{ hash: commit.hash, message: commit.message }]
+          : [],
+      )
+    : [];
+
+  return {
+    taskLine: typeof value.taskLine === "string" ? value.taskLine : null,
+    commits,
+    filesChanged: typeof value.filesChanged === "number" ? value.filesChanged : 0,
+    insertions: typeof value.insertions === "number" ? value.insertions : 0,
+    deletions: typeof value.deletions === "number" ? value.deletions : 0,
+    branch: typeof value.branch === "string" ? value.branch : null,
+    merged: value.merged,
+    durationMs: typeof value.durationMs === "number" ? value.durationMs : null,
+    workspaceMode: value.workspaceMode === "worktree" ? "worktree" : "shared",
+  };
+};
+
 const inferTerminalNameOrigin = (terminalId: string, tentacleName: string): TerminalNameOrigin => {
   if (tentacleName === terminalId || /^Octogent Terminal \d+$/.test(tentacleName)) {
     return "generated";
@@ -306,6 +336,9 @@ const parseV3Terminals = (
       terminal.exitSignal = entry.exitSignal;
     }
     if (typeof entry.archivedAt === "string") terminal.archivedAt = entry.archivedAt;
+    if (typeof entry.completedAt === "string") terminal.completedAt = entry.completedAt;
+    const completionSummary = parseTerminalCompletionSummary(entry.completionSummary);
+    if (completionSummary) terminal.completionSummary = completionSummary;
     terminals.set(terminalId, terminal);
   }
 

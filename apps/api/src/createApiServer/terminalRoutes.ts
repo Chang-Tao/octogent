@@ -372,6 +372,24 @@ export const handleTerminalPruneRoute: ApiRouteHandler = async (
   return true;
 };
 
+export const handleWorktreeGcRoute: ApiRouteHandler = async (
+  { request, response, requestUrl, corsOrigin },
+  { runtime },
+) => {
+  if (requestUrl.pathname !== "/api/worktrees/gc") {
+    return false;
+  }
+
+  if (request.method !== "POST") {
+    writeMethodNotAllowed(response, corsOrigin);
+    return true;
+  }
+
+  const dryRun = requestUrl.searchParams.get("dryRun") === "1";
+  writeJson(response, 200, runtime.gcWorktrees({ dryRun }), corsOrigin);
+  return true;
+};
+
 export const handleTerminalArchiveCompletedRoute: ApiRouteHandler = async (
   { request, response, requestUrl, corsOrigin },
   { runtime },
