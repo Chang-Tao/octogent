@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
@@ -7,7 +8,12 @@ import type { TerminalSnapshot } from "@octogent/core";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { buildCompletionSummary } from "./completionSummary";
 import { createChannelMessaging } from "./terminalRuntime/channelMessaging";
+import {
+  evaluateCompletionOnStop,
+  resolveSnapshotLifecycle,
+} from "./terminalRuntime/completionDetection";
 import {
   DEFAULT_AGENT_PROVIDER,
   DEFAULT_TERMINAL_INACTIVITY_THRESHOLD_MS,
@@ -243,6 +249,21 @@ export const createTerminalRuntime = ({
       terminal.lastActiveAt = new Date().toISOString();
       // Auto-recover from a previously-stalled state if the agent
       // resumes — flip lifecycleState back to running.
+      // A finished terminal that starts acting again (a new instruction, a
+      // follow-up turn) is back in business; the next Stop re-evaluates.
+      if (
+        (terminal.lifecycleState === "completed" ||
+          terminal.lifecycleState === "awaiting-review") &&
+        agentRuntimeState !== "idle"
+      ) {
+        terminal.lifecycleState = "running";
+        terminal.lifecycleUpdatedAt = terminal.lastActiveAt;
+        broadcastTerminalEvent({
+          type: "terminal-lifecycle-changed",
+          terminalId,
+          lifecycleState: "running",
+        });
+      }
       if (terminal.lifecycleState === "stalled") {
         terminal.lifecycleState = "running";
         terminal.lifecycleReason = undefined;
@@ -327,6 +348,65 @@ export const createTerminalRuntime = ({
     gitClient,
   });
 
+  const runGit = (cwd: string, args: string[]): string =>
+    execFileSync("git", args, { cwd, encoding: "utf8" });
+
+  // On a Stop hook, decide whether this terminal's work is finished and stamp
+  // the verdict plus a git-facts completion summary onto the record.
+  const evaluateSessionCompletion = (terminalId: string) => {
+    const terminal = terminals.get(terminalId);
+    if (!terminal) {
+      return;
+    }
+
+    let worktreeCwd: string | null = null;
+    if (terminal.workspaceMode === "worktree") {
+      const worktreeId = terminal.worktreeId ?? terminal.terminalId;
+      worktreeCwd = worktreeManager.getTentacleWorktreePath(worktreeId);
+    }
+
+    // "Merged" means merged into whatever the operator's main workspace has
+    // checked out; a detached workspace falls back to comparing against HEAD.
+    let baseRef = "HEAD";
+    try {
+      const branch = runGit(workspaceCwd, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+      if (branch.length > 0) {
+        baseRef = branch;
+      }
+    } catch {
+      // Keep the HEAD fallback.
+    }
+
+    const verdict = evaluateCompletionOnStop({
+      workspaceMode: terminal.workspaceMode === "worktree" ? "worktree" : "shared",
+      worktreeCwd,
+      baseRef,
+      run: runGit,
+    });
+    if (verdict.outcome === "none") {
+      return;
+    }
+
+    const completedAt = new Date().toISOString();
+    terminal.lifecycleState = verdict.outcome;
+    terminal.lifecycleReason = undefined;
+    terminal.lifecycleUpdatedAt = completedAt;
+    terminal.completedAt = completedAt;
+    terminal.completionSummary = buildCompletionSummary({
+      initialPrompt: terminal.initialPrompt ?? null,
+      createdAt: terminal.createdAt ?? null,
+      completedAt,
+      workspaceMode: terminal.workspaceMode === "worktree" ? "worktree" : "shared",
+      gitFacts: verdict.gitFacts,
+    });
+    persistRegistry();
+    broadcastTerminalEvent({
+      type: "terminal-lifecycle-changed",
+      terminalId,
+      lifecycleState: verdict.outcome,
+    });
+  };
+
   const channelMessaging = createChannelMessaging({
     terminals,
     sessions,
@@ -340,6 +420,7 @@ export const createTerminalRuntime = ({
     getApiBaseUrl,
     persistRegistry,
     deliverChannelMessages: channelMessaging.deliverChannelMessages,
+    evaluateSessionCompletion,
     reviveSessionTranscript: (terminalId) => sessionRuntime.reviveSessionTranscript(terminalId),
     releaseSessionKeepAlive: sessionRuntime.releaseSessionKeepAlive,
     onStateChange: broadcastTerminalStateChanged,
@@ -393,9 +474,10 @@ export const createTerminalRuntime = ({
 
   const toTerminalSnapshot = (terminal: PersistedTerminal): TerminalSnapshot => {
     const session = sessions.get(terminal.terminalId);
-    const lifecycleState: TerminalLifecycleState = session
-      ? "running"
-      : (terminal.lifecycleState ?? "registered");
+    const lifecycleState: TerminalLifecycleState = resolveSnapshotLifecycle(
+      session !== undefined,
+      terminal.lifecycleState,
+    );
     return {
       terminalId: terminal.terminalId,
       label: terminal.terminalId,
@@ -406,6 +488,8 @@ export const createTerminalRuntime = ({
       createdAt: terminal.createdAt,
       hasUserPrompt: isTerminalRecentlyActive(terminal),
       ...(terminal.parentTerminalId ? { parentTerminalId: terminal.parentTerminalId } : {}),
+      ...(terminal.completedAt ? { completedAt: terminal.completedAt } : {}),
+      ...(terminal.completionSummary ? { completionSummary: terminal.completionSummary } : {}),
       ...(session ? { agentRuntimeState: session.agentState } : {}),
       lifecycleState,
       ...(terminal.lifecycleReason ? { lifecycleReason: terminal.lifecycleReason } : {}),

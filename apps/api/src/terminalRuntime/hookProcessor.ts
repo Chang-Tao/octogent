@@ -30,6 +30,7 @@ export const createHookProcessor = (deps: {
   deliverChannelMessages: (terminalId: string) => number;
   releaseSessionKeepAlive: (terminalId: string) => boolean;
   reviveSessionTranscript: (terminalId: string) => boolean;
+  evaluateSessionCompletion: (terminalId: string) => void;
   onStateChange?: (
     terminalId: string,
     state: TerminalSession["agentState"],
@@ -45,6 +46,7 @@ export const createHookProcessor = (deps: {
     deliverChannelMessages,
     releaseSessionKeepAlive,
     reviveSessionTranscript,
+    evaluateSessionCompletion,
     onStateChange,
   } = deps;
 
@@ -407,6 +409,11 @@ export const createHookProcessor = (deps: {
     } else if (turns && turns.length > 0) {
       storeClaudeTranscriptTurns(transcriptDirectoryPath, matchedSessionId, turns);
       logVerbose(`[Hook] Stored ${turns.length} turns for session ${matchedSessionId}.`);
+    }
+
+    // The turn is over: decide whether this terminal's work is now finished.
+    if (matchedSessionId) {
+      evaluateSessionCompletion(matchedSessionId);
     }
 
     // Deliver any queued channel messages now that the agent is idle.

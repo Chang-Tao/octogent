@@ -7,6 +7,7 @@ import type {
   TentaclePullRequestSnapshot,
   TentacleWorkspaceMode,
   TerminalAgentProvider,
+  TerminalCompletionSummary,
   TerminalLifecycleState,
 } from "@octogent/core";
 import { isTerminalAgentProvider, isTerminalCompletionSoundId } from "@octogent/core";
@@ -138,6 +139,8 @@ export type PersistedTerminal = {
   parentTerminalId?: string;
   lifecycleState?: TerminalLifecycleState | undefined;
   lifecycleReason?: string | undefined;
+  completedAt?: string | undefined;
+  completionSummary?: TerminalCompletionSummary | undefined;
   lifecycleUpdatedAt?: string | undefined;
   processId?: number | undefined;
   startedAt?: string | undefined;
