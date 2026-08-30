@@ -55,7 +55,8 @@ export const handleTerminalSnapshotsRoute: ApiRouteHandler = async (
     return true;
   }
 
-  const payload = runtime.listTerminalSnapshots();
+  const includeArchived = requestUrl.searchParams.get("includeArchived") === "1";
+  const payload = runtime.listTerminalSnapshots({ includeArchived });
   writeJson(response, 200, payload, corsOrigin);
   return true;
 };
@@ -258,7 +259,7 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
 };
 
 const TERMINAL_ITEM_PATH_PATTERN = /^\/api\/terminals\/([^/]+)$/;
-const TERMINAL_ACTION_PATH_PATTERN = /^\/api\/terminals\/([^/]+)\/(stop|kill)$/;
+const TERMINAL_ACTION_PATH_PATTERN = /^\/api\/terminals\/([^/]+)\/(stop|kill|archive)$/;
 
 export const handleTerminalItemRoute: ApiRouteHandler = async (
   { request, response, requestUrl, corsOrigin },
@@ -331,15 +332,27 @@ export const handleTerminalActionRoute: ApiRouteHandler = async (
 
   const terminalId = decodeURIComponent(actionMatch[1] ?? "");
   const action = actionMatch[2];
-  const snapshot =
-    action === "kill" ? runtime.killTerminal(terminalId) : runtime.stopTerminal(terminalId);
-  if (!snapshot) {
-    writeJson(response, 404, { error: "Terminal not found." }, corsOrigin);
-    return true;
-  }
+  try {
+    const snapshot =
+      action === "archive"
+        ? runtime.archiveTerminal(terminalId)
+        : action === "kill"
+          ? runtime.killTerminal(terminalId)
+          : runtime.stopTerminal(terminalId);
+    if (!snapshot) {
+      writeJson(response, 404, { error: "Terminal not found." }, corsOrigin);
+      return true;
+    }
 
-  writeJson(response, 200, snapshot, corsOrigin);
-  return true;
+    writeJson(response, 200, snapshot, corsOrigin);
+    return true;
+  } catch (error) {
+    if (error instanceof RuntimeInputError) {
+      writeJson(response, 409, { error: error.message }, corsOrigin);
+      return true;
+    }
+    throw error;
+  }
 };
 
 export const handleTerminalPruneRoute: ApiRouteHandler = async (
@@ -356,5 +369,27 @@ export const handleTerminalPruneRoute: ApiRouteHandler = async (
   }
 
   writeJson(response, 200, { prunedTerminalIds: runtime.pruneTerminals() }, corsOrigin);
+  return true;
+};
+
+export const handleTerminalArchiveCompletedRoute: ApiRouteHandler = async (
+  { request, response, requestUrl, corsOrigin },
+  { runtime },
+) => {
+  if (requestUrl.pathname !== "/api/terminals/archive-completed") {
+    return false;
+  }
+
+  if (request.method !== "POST") {
+    writeMethodNotAllowed(response, corsOrigin);
+    return true;
+  }
+
+  writeJson(
+    response,
+    200,
+    { archivedTerminalIds: runtime.archiveCompletedTerminals() },
+    corsOrigin,
+  );
   return true;
 };

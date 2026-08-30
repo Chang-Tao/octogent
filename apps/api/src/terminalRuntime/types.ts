@@ -144,6 +144,7 @@ export type PersistedTerminal = {
   endedAt?: string | undefined;
   exitCode?: number | undefined;
   exitSignal?: number | string | undefined;
+  archivedAt?: string | undefined;
 };
 
 export type GitClientPullRequestSnapshot = Omit<

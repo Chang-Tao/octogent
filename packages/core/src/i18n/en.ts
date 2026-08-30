@@ -12,6 +12,8 @@ export const en: TranslationMap = {
   "cli.created.terminal": "Created terminal {id} on tentacle {tentacleId}",
   "cli.killed.terminal": "Killed terminal {id}",
   "cli.stopped.terminal": "Stopped terminal {id}",
+  "cli.archived.terminal": "Archived terminal {id}",
+  "cli.archived.terminals": "Archived {count} completed terminals.",
   "cli.sent.message": "Message sent to terminal {to}",
   "cli.migrated.state": "Migrated state to {path}",
   "cli.error.apiUnreachable": "Error: Could not reach API at {url}",
@@ -27,6 +29,8 @@ export const en: TranslationMap = {
   "cli.empty.tentacles": "No tentacles found.",
   "cli.empty.terminals": "No terminals found.",
   "cli.empty.stale": "No stale, stopped, or exited terminals to prune.",
+  "cli.empty.completed": "No completed terminals to archive.",
+  "cli.empty.archived": "No archived terminals found.",
   "cli.empty.messages": "No messages for {id}.",
   "cli.pruned": "Pruned {count} terminals.",
   "cli.empty.projects":
@@ -49,8 +53,11 @@ export const en: TranslationMap = {
     --prompt-template                  Prompt template name
     --prompt-variables                 JSON object of prompt template variables
   octogent terminal list               List terminal lifecycle state
+    --archived                         List only archived terminal records
   octogent terminal stop <id>          Stop a terminal session
   octogent terminal kill <id>          Kill a terminal session or recorded process
+  octogent terminal archive <id>       Archive a non-running terminal record
+  octogent terminal archive --all-completed  Archive every completed terminal record
   octogent terminal prune              Remove stale, stopped, and exited terminal records
   octogent channel send <id> <msg>     Send a channel message
   octogent channel list <id>           List channel messages`,

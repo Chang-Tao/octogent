@@ -12,6 +12,8 @@ export const zhCN: TranslationMap = {
   "cli.created.terminal": "已在触手 {tentacleId} 上创建终端 {id}",
   "cli.killed.terminal": "已终止终端 {id}",
   "cli.stopped.terminal": "已停止终端 {id}",
+  "cli.archived.terminal": "已归档终端 {id}",
+  "cli.archived.terminals": "已归档 {count} 个已完成终端。",
   "cli.sent.message": "消息已发送至终端 {to}",
   "cli.migrated.state": "已将状态迁移至 {path}",
   "cli.error.apiUnreachable": "错误：无法连接到 API {url}",
@@ -27,6 +29,8 @@ export const zhCN: TranslationMap = {
   "cli.empty.tentacles": "未找到触手。",
   "cli.empty.terminals": "未找到终端。",
   "cli.empty.stale": "没有需要清理的残留、已停止或已退出的终端。",
+  "cli.empty.completed": "没有需要归档的已完成终端。",
+  "cli.empty.archived": "未找到已归档的终端。",
   "cli.empty.messages": "{id} 没有消息。",
   "cli.pruned": "已清理 {count} 个终端。",
   "cli.empty.projects": "尚未注册任何项目。在项目目录中运行 `octogent` 或 `octogent init`。",
@@ -48,8 +52,11 @@ export const zhCN: TranslationMap = {
     --prompt-template                  提示词模板名称
     --prompt-variables                 提示词模板变量的 JSON 对象
   octogent terminal list                列出终端生命周期状态
+    --archived                         仅列出已归档的终端记录
   octogent terminal stop <id>          停止终端会话
   octogent terminal kill <id>          终止终端会话或记录进程
+  octogent terminal archive <id>       归档一条非运行中的终端记录
+  octogent terminal archive --all-completed  归档所有已完成的终端记录
   octogent terminal prune              移除残留、已停止和已退出的终端记录
   octogent channel send <id> <消息>    发送频道消息
   octogent channel list <id>           列出频道消息`,

@@ -453,10 +453,12 @@ const terminalCreate = async () => {
 };
 
 const terminalList = async () => {
+  const isArchivedOnly = args.includes("--archived");
   const apiBase = resolveRuntimeApiBase();
 
   try {
-    const response = await fetch(`${apiBase}/api/terminal-snapshots`, {
+    const query = isArchivedOnly ? "?includeArchived=1" : "";
+    const response = await fetch(`${apiBase}/api/terminal-snapshots${query}`, {
       headers: { Accept: "application/json" },
     });
     if (!response.ok) {
@@ -464,9 +466,12 @@ const terminalList = async () => {
       process.exit(1);
     }
 
-    const terminals = (await response.json()) as Array<Record<string, unknown>>;
+    const snapshots = (await response.json()) as Array<Record<string, unknown>>;
+    const terminals = isArchivedOnly
+      ? snapshots.filter((snapshot) => typeof snapshot.archivedAt === "string")
+      : snapshots;
     if (terminals.length === 0) {
-      console.log(t(locale, "cli.empty.terminals"));
+      console.log(t(locale, isArchivedOnly ? "cli.empty.archived" : "cli.empty.terminals"));
       return;
     }
 
@@ -513,6 +518,58 @@ const terminalAction = async (action: "stop" | "kill") => {
         id: String(data.terminalId ?? ""),
       }),
     );
+  } catch {
+    apiError();
+  }
+};
+
+const terminalArchive = async () => {
+  const apiBase = resolveRuntimeApiBase();
+
+  if (args.includes("--all-completed")) {
+    try {
+      const response = await fetch(`${apiBase}/api/terminals/archive-completed`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      const data = (await response.json()) as { archivedTerminalIds?: string[]; error?: unknown };
+      if (!response.ok) {
+        console.error(`Error: ${data.error ?? "Failed"}`);
+        process.exit(1);
+      }
+
+      const archivedTerminalIds = data.archivedTerminalIds ?? [];
+      if (archivedTerminalIds.length === 0) {
+        console.log(t(locale, "cli.empty.completed"));
+        return;
+      }
+      console.log(t(locale, "cli.archived.terminals", { count: archivedTerminalIds.length }));
+    } catch {
+      apiError();
+    }
+    return;
+  }
+
+  const terminalId = args[2];
+  if (!terminalId || terminalId.startsWith("-")) {
+    console.error(t(locale, "cli.error.terminalIdRequired"));
+    process.exit(1);
+  }
+
+  try {
+    const response = await fetch(
+      `${apiBase}/api/terminals/${encodeURIComponent(terminalId)}/archive`,
+      {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      },
+    );
+    const data = (await response.json()) as Record<string, unknown>;
+    if (!response.ok) {
+      console.error(`Error: ${data.error ?? "Failed"}`);
+      process.exit(1);
+    }
+    console.log(t(locale, "cli.archived.terminal", { id: String(data.terminalId ?? "") }));
   } catch {
     apiError();
   }
@@ -673,6 +730,9 @@ const main = async () => {
     if (args[1] === "kill") {
       return terminalAction("kill");
     }
+    if (args[1] === "archive") {
+      return terminalArchive();
+    }
     if (args[1] === "prune") {
       return terminalPrune();
     }
@@ -705,8 +765,11 @@ const main = async () => {
     --prompt-template                  Prompt template name
     --prompt-variables                 JSON object of prompt template variables
   octogent terminal list               List terminal lifecycle state
+    --archived                         List only archived terminal records
   octogent terminal stop <id>          Stop a terminal session
   octogent terminal kill <id>          Kill a terminal session or recorded process
+  octogent terminal archive <id>       Archive a non-running terminal record
+  octogent terminal archive --all-completed  Archive every completed terminal record
   octogent terminal prune              Remove stale, stopped, and exited terminal records
   octogent channel send <id> <msg>     Send a channel message
   octogent channel list <id>           List channel messages`);

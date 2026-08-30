@@ -7,6 +7,7 @@ import type { TerminalSnapshot } from "@octogent/core";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { resolveTerminalRetentionHours, shouldAutoArchive } from "./terminalRuntime/archivePolicy";
 import { createChannelMessaging } from "./terminalRuntime/channelMessaging";
 import {
   DEFAULT_AGENT_PROVIDER,
@@ -306,6 +307,44 @@ export const createTerminalRuntime = ({
     stallDetectorInterval.unref();
   }
 
+  // Archive sweeper: without it, completed/stopped/exited terminal records
+  // accumulate forever in long-lived projects. Once the retention window
+  // passes, stamp archivedAt so default listings hide the record; transcripts
+  // and completion summaries stay on disk, and awaiting-review never expires
+  // (unmerged work must stay visible until an operator acts on it).
+  const TERMINAL_RETENTION_HOURS = resolveTerminalRetentionHours(
+    process.env.OCTOGENT_TERMINAL_RETENTION_HOURS,
+  );
+  const archiveExpiredTerminals = () => {
+    const nowMs = Date.now();
+    const archivedTerminals: PersistedTerminal[] = [];
+    for (const terminal of terminals.values()) {
+      // A live session means the record is effectively running regardless of
+      // its persisted lifecycle state.
+      if (sessions.has(terminal.terminalId)) continue;
+      if (!shouldAutoArchive(terminal, nowMs, TERMINAL_RETENTION_HOURS)) continue;
+
+      terminal.archivedAt = new Date(nowMs).toISOString();
+      archivedTerminals.push(terminal);
+    }
+
+    if (archivedTerminals.length === 0) {
+      return;
+    }
+
+    persistRegistry();
+    for (const terminal of archivedTerminals) {
+      broadcastTerminalEvent({
+        type: "terminal-updated",
+        snapshot: toTerminalSnapshot(terminal),
+      });
+    }
+  };
+  const archiveSweepInterval = setInterval(archiveExpiredTerminals, 60 * 60 * 1000);
+  if (typeof archiveSweepInterval.unref === "function") {
+    archiveSweepInterval.unref();
+  }
+
   const sessionRuntime = createSessionRuntime({
     websocketServer,
     terminals,
@@ -415,6 +454,7 @@ export const createTerminalRuntime = ({
       ...(terminal.endedAt ? { endedAt: terminal.endedAt } : {}),
       ...(terminal.exitCode !== undefined ? { exitCode: terminal.exitCode } : {}),
       ...(terminal.exitSignal !== undefined ? { exitSignal: terminal.exitSignal } : {}),
+      ...(terminal.archivedAt ? { archivedAt: terminal.archivedAt } : {}),
     };
   };
 
@@ -431,6 +471,12 @@ export const createTerminalRuntime = ({
   const broadcastTerminalListChanged = () => {
     broadcastTerminalEvent({ type: "terminal-list-changed" });
   };
+
+  // Catch up on records that expired while the process was down: with an
+  // hourly cadence, a frequently restarted server would otherwise never sweep.
+  // (Runs here, after the broadcast helpers exist; no clients are connected
+  // yet, so the terminal-updated events are no-ops at startup.)
+  archiveExpiredTerminals();
 
   const collectTerminalCascade = (rootTerminalId: string): string[] => {
     const toDelete = new Set<string>();
@@ -587,9 +633,12 @@ export const createTerminalRuntime = ({
   };
 
   return {
-    listTerminalSnapshots(): TerminalSnapshot[] {
+    listTerminalSnapshots(options?: { includeArchived?: boolean }): TerminalSnapshot[] {
       const snapshots: TerminalSnapshot[] = [];
       for (const terminal of terminals.values()) {
+        if (terminal.archivedAt && !options?.includeArchived) {
+          continue;
+        }
         snapshots.push(toTerminalSnapshot(terminal));
       }
       return snapshots;
@@ -793,6 +842,63 @@ export const createTerminalRuntime = ({
       return toTerminalSnapshot(terminal);
     },
 
+    archiveTerminal(terminalId: string): TerminalSnapshot | null {
+      const terminal = terminals.get(terminalId);
+      if (!terminal) {
+        return null;
+      }
+
+      if (sessions.has(terminalId) || terminal.lifecycleState === "running") {
+        throw new RuntimeInputError(
+          `Terminal "${terminalId}" is running. Stop it before archiving.`,
+        );
+      }
+
+      if (!terminal.archivedAt) {
+        terminal.archivedAt = new Date().toISOString();
+        persistRegistry();
+        broadcastTerminalEvent({
+          type: "terminal-updated",
+          snapshot: toTerminalSnapshot(terminal),
+        });
+      }
+
+      return toTerminalSnapshot(terminal);
+    },
+
+    archiveCompletedTerminals(): string[] {
+      const archivedAt = new Date().toISOString();
+      const archivedTerminalIds: string[] = [];
+
+      for (const terminal of terminals.values()) {
+        if (terminal.archivedAt || terminal.lifecycleState !== "completed") {
+          continue;
+        }
+        if (sessions.has(terminal.terminalId)) {
+          continue;
+        }
+
+        terminal.archivedAt = archivedAt;
+        archivedTerminalIds.push(terminal.terminalId);
+      }
+
+      if (archivedTerminalIds.length === 0) {
+        return [];
+      }
+
+      persistRegistry();
+      for (const terminalId of archivedTerminalIds) {
+        const terminal = terminals.get(terminalId);
+        if (terminal) {
+          broadcastTerminalEvent({
+            type: "terminal-updated",
+            snapshot: toTerminalSnapshot(terminal),
+          });
+        }
+      }
+      return archivedTerminalIds;
+    },
+
     pruneTerminals(): string[] {
       const prunableStates = new Set<TerminalLifecycleState>(["stale", "exited", "stopped"]);
       const prunedTerminalIds: string[] = [];
@@ -902,6 +1008,7 @@ export const createTerminalRuntime = ({
 
     async close() {
       clearInterval(stallDetectorInterval);
+      clearInterval(archiveSweepInterval);
       sessionRuntime.close();
       await registryPersistence.close();
       for (const client of terminalEventClients) {

@@ -33,7 +33,10 @@ const isTerminalLifecycleState = (value: unknown): value is TerminalLifecycleSta
   value === "running" ||
   value === "stopped" ||
   value === "exited" ||
-  value === "stale";
+  value === "stale" ||
+  value === "stalled" ||
+  value === "awaiting-review" ||
+  value === "completed";
 
 const inferTerminalNameOrigin = (terminalId: string, tentacleName: string): TerminalNameOrigin => {
   if (tentacleName === terminalId || /^Octogent Terminal \d+$/.test(tentacleName)) {
@@ -302,6 +305,7 @@ const parseV3Terminals = (
     ) {
       terminal.exitSignal = entry.exitSignal;
     }
+    if (typeof entry.archivedAt === "string") terminal.archivedAt = entry.archivedAt;
     terminals.set(terminalId, terminal);
   }
 
