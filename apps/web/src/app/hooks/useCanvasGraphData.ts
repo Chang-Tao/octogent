@@ -325,6 +325,9 @@ export const useCanvasGraphData = ({
           ...(activeTerminal.parentTerminalId
             ? { parentTerminalId: activeTerminal.parentTerminalId }
             : {}),
+          ...(activeTerminal.completionSummary
+            ? { completionSummary: activeTerminal.completionSummary }
+            : {}),
           ...(runtimeInfo ? { agentRuntimeState: runtimeInfo.state } : {}),
           ...(runtimeInfo?.toolName ? { waitingToolName: runtimeInfo.toolName } : {}),
         };
@@ -384,6 +387,7 @@ export const useCanvasGraphData = ({
       hasUserPrompt: terminal.hasUserPrompt ?? false,
       ...(terminal.workspaceMode ? { workspaceMode: terminal.workspaceMode } : {}),
       ...(terminal.parentTerminalId ? { parentTerminalId: terminal.parentTerminalId } : {}),
+      ...(terminal.completionSummary ? { completionSummary: terminal.completionSummary } : {}),
       ...(bossRuntimeInfo ? { agentRuntimeState: bossRuntimeInfo.state } : {}),
       ...(bossRuntimeInfo?.toolName ? { waitingToolName: bossRuntimeInfo.toolName } : {}),
     };

@@ -185,6 +185,8 @@ export const zhCN: TranslationMap = {
   "web.canvas.toolbar.refresh": "刷新",
   "web.canvas.toolbar.showIdle": "显示空闲",
   "web.canvas.toolbar.hideIdle": "隐藏空闲",
+  "web.canvas.toolbar.hideCompleted": "隐藏已完成",
+  "web.canvas.toolbar.showCompleted": "显示已完成",
   "web.canvas.toolbar.deleteAll": "删除全部",
   "web.canvas.context.newTentacle": "新建触手",
   "web.canvas.context.newTerminal": "新建终端",

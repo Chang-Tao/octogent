@@ -134,6 +134,10 @@ export const createTerminalRuntime = ({
         return "exited";
       case "stopped":
         return "stopped";
+      case "awaiting-review":
+        return "awaiting-review";
+      case "completed":
+        return "completed";
       default:
         return "live";
     }

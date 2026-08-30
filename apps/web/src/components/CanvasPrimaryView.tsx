@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { WorkspaceSetupSnapshot, WorkspaceSetupStepId } from "@octogent/core";
 import {
+  CheckCircle2,
   Check as CheckIcon,
   ChevronDown,
   GitBranch,
@@ -241,6 +242,7 @@ export const CanvasPrimaryView = ({
   const [terminalsPanelWidth, setTerminalsPanelWidth] = useState<number | null>(null);
   const [pendingOpenAgentId, setPendingOpenAgentId] = useState<string | null>(null);
   const [hideIdleTerminals, setHideIdleTerminals] = useState(false);
+  const [hideCompletedTerminals, setHideCompletedTerminals] = useState(false);
   const [isLaunchingWorkspaceSetupPlanner, setIsLaunchingWorkspaceSetupPlanner] = useState(false);
   const hasHydratedTerminals = useRef(false);
   const hasRestoredOpenTerminals = useRef(false);
@@ -882,6 +884,7 @@ export const CanvasPrimaryView = ({
       (n.agentState === "idle" || n.hasUserPrompt === false)
     )
       return false;
+    if (hideCompletedTerminals && n.agentState === "completed") return false;
     return true;
   });
 
@@ -1047,6 +1050,7 @@ export const CanvasPrimaryView = ({
                     (n.agentState === "idle" || n.hasUserPrompt === false)
                   )
                     return false;
+                  if (hideCompletedTerminals && n.agentState === "completed") return false;
                   return true;
                 });
 
@@ -1149,6 +1153,20 @@ export const CanvasPrimaryView = ({
               {hideIdleTerminals
                 ? t("web.canvas.toolbar.showIdle")
                 : t("web.canvas.toolbar.hideIdle")}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`canvas-toolbar-btn${hideCompletedTerminals ? " canvas-toolbar-btn--active" : ""}`}
+            onClick={() => setHideCompletedTerminals((prev) => !prev)}
+          >
+            <span className="canvas-toolbar-icon">
+              <CheckCircle2 size={14} />
+            </span>
+            <span className="canvas-toolbar-label">
+              {hideCompletedTerminals
+                ? t("web.canvas.toolbar.showCompleted")
+                : t("web.canvas.toolbar.hideCompleted")}
             </span>
           </button>
           <div className="canvas-toolbar-separator" />

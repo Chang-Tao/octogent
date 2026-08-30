@@ -189,6 +189,8 @@ export const en: TranslationMap = {
   "web.canvas.toolbar.refresh": "Refresh",
   "web.canvas.toolbar.showIdle": "Show Idle",
   "web.canvas.toolbar.hideIdle": "Hide Idle",
+  "web.canvas.toolbar.hideCompleted": "Hide Done",
+  "web.canvas.toolbar.showCompleted": "Show Done",
   "web.canvas.toolbar.deleteAll": "Delete All",
   "web.canvas.context.newTentacle": "New Tentacle",
   "web.canvas.context.newTerminal": "New Terminal",
