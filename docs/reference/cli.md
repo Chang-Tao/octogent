@@ -23,6 +23,7 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_LOCALE`: UI/CLI locale (`en` or `zh-CN`)
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`: Cap on concurrently running terminal sessions
 - `OCTOGENT_TERMINAL_STALL_MS`: Milliseconds without transcript activity before a running terminal is marked `stalled` (default: `120000`)
+- `OCTOGENT_CLAUDE_USAGE_SOURCE`: Claude usage data source: `auto` (OAuth first, CLI PTY fallback), `oauth`, `cli`, or `off` to disable collection (default: `auto`)
 
 Example for headless servers:
 
