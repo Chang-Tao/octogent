@@ -81,6 +81,10 @@ Current hook names:
 - `notification`
 - `stop`
 
+## Health
+
+- `GET /api/health` - returns a liveness snapshot for daemon scripts and monitors: `status`, `uptimeMs`, `version`, `eventLoopDelayP95Ms` (p95 event-loop delay in ms, one decimal), `ptySessions`, `terminals` (counts by lifecycle state), and `terminalEventClients`
+
 ## Usage and telemetry
 
 - `GET /api/codex/usage` - returns Codex usage data when available

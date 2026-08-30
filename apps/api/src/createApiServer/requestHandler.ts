@@ -8,6 +8,7 @@ import type { ClaudeUsageSnapshot } from "../claudeUsage";
 import type { CodeIntelStore } from "../codeIntelStore";
 import type { CodexUsageSnapshot } from "../codexUsage";
 import type { GitHubRepoSummarySnapshot } from "../githubRepoSummary";
+import type { HealthSnapshot } from "../healthSnapshot";
 import { logVerbose } from "../logging";
 import type { MonitorService } from "../monitor";
 import { handleCodeIntelEventsRoute } from "./codeIntelRoutes";
@@ -31,6 +32,7 @@ import {
   handleDeckVaultFileRoute,
 } from "./deckRoutes";
 import { handleTentacleGitPullRequestRoute, handleTentacleGitRoute } from "./gitRoutes";
+import { handleHealthRoute } from "./healthRoutes";
 import {
   handleChannelMessagesRoute,
   handleHookRoute,
@@ -103,6 +105,7 @@ type CreateApiRequestHandlerOptions = {
   monitorService: MonitorService;
   invalidateClaudeUsageCache: () => void;
   codeIntelStore: CodeIntelStore;
+  readHealthSnapshot: () => HealthSnapshot;
   allowRemoteAccess: boolean;
 };
 
@@ -127,6 +130,7 @@ const API_ROUTE_MAP: ReadonlyMap<string, readonly ApiRouteHandler[]> = new Map([
     ],
   ],
   ["terminal-snapshots", [handleTerminalSnapshotsRoute]],
+  ["health", [handleHealthRoute]],
   ["codex", [handleCodexUsageRoute]],
   ["claude", [handleClaudeUsageRoute]],
   ["analytics", [handleUsageHeatmapRoute]],
@@ -214,6 +218,7 @@ export const createApiRequestHandler = ({
   monitorService,
   invalidateClaudeUsageCache,
   codeIntelStore,
+  readHealthSnapshot,
   allowRemoteAccess,
 }: CreateApiRequestHandlerOptions) => {
   const resolvedWebDistDir = webDistDir && existsSync(webDistDir) ? webDistDir : null;
@@ -235,6 +240,7 @@ export const createApiRequestHandler = ({
     monitorService,
     invalidateClaudeUsageCache,
     codeIntelStore,
+    readHealthSnapshot,
   };
 
   return async (request: IncomingMessage, response: ServerResponse) => {
