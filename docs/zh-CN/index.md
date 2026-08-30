@@ -31,6 +31,7 @@ Octogent 包含三个主要层次：
 - [文件系统布局](reference/filesystem-layout.md)
 - [API](reference/api.md)
 - [实验性功能](reference/experimental-features.md)
+- [以 systemd 用户服务运行](reference/systemd.md)
 - [故障排查](reference/troubleshooting.md)
 
 ## 贡献者政策
