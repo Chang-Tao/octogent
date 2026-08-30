@@ -11,7 +11,13 @@ import {
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-export const GLOBAL_OCTOGENT_DIR = join(homedir(), ".octogent");
+// OCTOGENT_HOME relocates the global state root. Tests point it at a temp
+// directory so a run cannot register throwaway projects into the operator's
+// real ~/.octogent registry; operators can use it to keep isolated roots.
+export const resolveGlobalOctogentDir = (): string =>
+  process.env.OCTOGENT_HOME?.trim() || join(homedir(), ".octogent");
+
+export const GLOBAL_OCTOGENT_DIR = resolveGlobalOctogentDir();
 export const PROJECTS_FILE = join(GLOBAL_OCTOGENT_DIR, "projects.json");
 export const PROJECT_CONFIG_RELATIVE_PATH = join(".octogent", "project.json");
 
