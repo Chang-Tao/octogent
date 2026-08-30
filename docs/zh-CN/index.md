@@ -17,21 +17,21 @@ Octogent 包含三个主要层次：
 ## 概念
 
 - [触手](concepts/tentacles.md) 解释了基于文件的上下文模型以及 Deck 如何读取它
-- [运行时与 API](../concepts/runtime-and-api.md) 解释了终端生命周期、WebSocket、钩子、持久化和重启行为
+- [运行时与 API](concepts/runtime-and-api.md) 解释了终端生命周期、WebSocket、钩子、持久化和重启行为
 
 ## 指南
 
-- [使用待办事项](../guides/working-with-todos.md) 解释了复选框行如何变成进度和工作输入
-- [编排子代理](../guides/orchestrating-child-agents.md) 解释了父/工作代理的生成、共享模式和工作树模式
-- [代理间消息传递](../guides/inter-agent-messaging.md) 解释了内存通道队列和投递规则
+- [使用待办事项](guides/working-with-todos.md) 解释了复选框行如何变成进度和工作输入
+- [编排子代理](guides/orchestrating-child-agents.md) 解释了父/工作代理的生成、共享模式和工作树模式
+- [代理间消息传递](guides/inter-agent-messaging.md) 解释了内存通道队列和投递规则
 
 ## 参考
 
-- [CLI](../reference/cli.md)
-- [文件系统布局](../reference/filesystem-layout.md)
-- [API](../reference/api.md)
-- [实验性功能](../reference/experimental-features.md)
-- [故障排查](../reference/troubleshooting.md)
+- [CLI](reference/cli.md)
+- [文件系统布局](reference/filesystem-layout.md)
+- [API](reference/api.md)
+- [实验性功能](reference/experimental-features.md)
+- [故障排查](reference/troubleshooting.md)
 
 ## 贡献者政策
 
