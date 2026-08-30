@@ -9,6 +9,9 @@ import { afterAll } from "vitest";
 // they capture at load time already points here.
 const globalStateRoot = mkdtempSync(join(tmpdir(), "octogent-test-home-"));
 process.env.OCTOGENT_HOME = globalStateRoot;
+// Worktree terminals seed Claude Code's trust list; without this a test run
+// appends a permanent entry per worktree to the operator's real ~/.claude.json.
+process.env.OCTOGENT_CLAUDE_CONFIG = join(globalStateRoot, "claude.json");
 
 afterAll(() => {
   rmSync(globalStateRoot, { force: true, recursive: true });

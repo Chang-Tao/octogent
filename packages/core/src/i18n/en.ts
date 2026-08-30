@@ -281,8 +281,7 @@ export const en: TranslationMap = {
   "web.monitor.disabledTitle": "Monitor is disabled",
   "web.monitor.disabledDesc": "Enable Monitor workspace view in Settings to restore this panel.",
   "web.codeIntel.noCoupling": "No coupling detected",
-  "web.terminal.minimize": "Minimize terminal panel",
-  "web.terminal.close": "Close terminal session",
+  "web.terminal.close": "Close terminal panel",
 
   // ── Web: Dialogs ─────────────────────────────────────
   "web.dialog.delete.cleanupTitle": "Cleanup Worktree Tentacle",
@@ -580,7 +579,7 @@ export const en: TranslationMap = {
   "web.a11y.closeConfirmation": "Close confirmation",
   "web.a11y.closeSidebarActionPanel": "Close sidebar action panel",
   "web.a11y.closeTerminal": "Close terminal",
-  "web.a11y.closeTerminalSession": "Close terminal session",
+  "web.a11y.closeTerminalPanel": "Close terminal panel",
   "web.a11y.codeIntelView": "Code Intel primary view",
   "web.a11y.commitChanges": "Commit changes",
   "web.a11y.commitsPerDay30d": "Commits per day over last 30 days",
@@ -600,7 +599,6 @@ export const en: TranslationMap = {
   "web.a11y.githubView": "GitHub primary view",
   "web.a11y.languageSettings": "Language settings",
   "web.a11y.mainContentCanvas": "Main content canvas",
-  "web.a11y.minimizeTerminalPanel": "Minimize terminal panel",
   "web.a11y.monitorConfiguration": "Monitor configuration",
   "web.a11y.monitorConfigurationPanel": "Monitor configuration panel",
   "web.a11y.monitorFeedResults": "Monitor feed results",

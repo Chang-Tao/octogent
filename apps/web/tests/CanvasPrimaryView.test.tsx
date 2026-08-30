@@ -130,21 +130,16 @@ vi.mock("../src/components/canvas/CanvasTerminalColumn", () => ({
   CanvasTerminalColumn: ({
     node,
     panelRef,
-    onMinimize,
     onClose,
   }: {
     node: (typeof nodes)[number];
     panelRef?: ((element: HTMLElement | null) => void) | undefined;
-    onMinimize?: () => void;
     onClose?: () => void;
   }) => (
     <section ref={panelRef} data-testid={`panel-${node.id}`} tabIndex={-1}>
       panel {node.id} label {node.label}
-      <button type="button" onClick={onMinimize}>
-        Minimize terminal panel
-      </button>
       <button type="button" onClick={onClose}>
-        Close terminal session
+        Close terminal panel
       </button>
     </section>
   ),
@@ -197,8 +192,7 @@ describe("CanvasPrimaryView", () => {
     });
   });
 
-  it("minimizes a terminal panel separately from closing the terminal session", async () => {
-    const onCloseActiveSession = vi.fn();
+  it("collapses a terminal panel without ending the agent behind it", async () => {
     renderWithLocale(
       <CanvasPrimaryView
         columns={[
@@ -213,7 +207,6 @@ describe("CanvasPrimaryView", () => {
           },
         ]}
         isUiStateHydrated
-        onCloseActiveSession={onCloseActiveSession}
       />,
     );
 
@@ -226,17 +219,16 @@ describe("CanvasPrimaryView", () => {
       expect(screen.getByTestId("panel-a:terminal-1")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Minimize terminal panel" }));
+    // The panel control hides the window only: an operator watching several
+    // agents must be able to put one away without destroying its worktree.
+    fireEvent.click(screen.getByRole("button", { name: "Close terminal panel" }));
     expect(screen.queryByTestId("panel-a:terminal-1")).not.toBeInTheDocument();
-    expect(onCloseActiveSession).not.toHaveBeenCalled();
 
+    // Same toggle as the tentacle nodes: clicking the node brings it back.
     fireEvent.click(terminalButton);
     await waitFor(() => {
       expect(screen.getByTestId("panel-a:terminal-1")).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByRole("button", { name: "Close terminal session" }));
-    expect(onCloseActiveSession).toHaveBeenCalledWith("terminal-1", "terminal one", "shared");
   });
 
   it("auto-opens a newly created child terminal when its parent panel is already open", async () => {

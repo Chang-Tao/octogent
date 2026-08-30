@@ -147,11 +147,11 @@ const mockAppRequests = (
     }
 
     if (url.endsWith("/api/ui-state") && method === "GET") {
-      return jsonResponse({});
+      return jsonResponse({ locale: "en" });
     }
 
     if (url.endsWith("/api/ui-state") && method === "PATCH") {
-      return jsonResponse({});
+      return jsonResponse({ locale: "en" });
     }
 
     return notFoundResponse();

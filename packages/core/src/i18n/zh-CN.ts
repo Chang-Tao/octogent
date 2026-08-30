@@ -271,8 +271,7 @@ export const zhCN: TranslationMap = {
   "web.monitor.disabledTitle": "监控已关闭",
   "web.monitor.disabledDesc": "在设置中启用「监控」工作区视图即可恢复此面板。",
   "web.codeIntel.noCoupling": "未检测到耦合关系",
-  "web.terminal.minimize": "最小化终端面板",
-  "web.terminal.close": "关闭终端会话",
+  "web.terminal.close": "关闭终端面板",
 
   // ── Web: Dialogs ─────────────────────────────────────
   "web.dialog.delete.cleanupTitle": "清理 Worktree 触手",
@@ -567,7 +566,7 @@ export const zhCN: TranslationMap = {
   "web.a11y.closeConfirmation": "关闭确认框",
   "web.a11y.closeSidebarActionPanel": "关闭侧边栏操作面板",
   "web.a11y.closeTerminal": "关闭终端",
-  "web.a11y.closeTerminalSession": "关闭终端会话",
+  "web.a11y.closeTerminalPanel": "关闭终端面板",
   "web.a11y.codeIntelView": "代码洞察主视图",
   "web.a11y.commitChanges": "提交更改",
   "web.a11y.commitsPerDay30d": "最近 30 天每日提交数",
@@ -587,7 +586,6 @@ export const zhCN: TranslationMap = {
   "web.a11y.githubView": "GitHub 主视图",
   "web.a11y.languageSettings": "语言设置",
   "web.a11y.mainContentCanvas": "主内容画布",
-  "web.a11y.minimizeTerminalPanel": "最小化终端面板",
   "web.a11y.monitorConfiguration": "监控配置",
   "web.a11y.monitorConfigurationPanel": "监控配置面板",
   "web.a11y.monitorFeedResults": "监控信息流结果",

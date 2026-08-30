@@ -35,3 +35,9 @@ describe("resolveGlobalOctogentDir", () => {
     expect(resolveGlobalOctogentDir()).not.toBe(join(homedir(), ".octogent"));
   });
 });
+
+describe("claude config isolation", () => {
+  it("keeps trust seeding out of the operator's real config during tests", () => {
+    expect(process.env.OCTOGENT_CLAUDE_CONFIG).toMatch(/octogent-test-home-/);
+  });
+});

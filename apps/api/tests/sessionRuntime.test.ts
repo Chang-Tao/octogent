@@ -319,7 +319,7 @@ describe("createSessionRuntime", () => {
     });
 
     expect(runtime.startSession(tentacleId)).toBe(true);
-    expect(pty.write).toHaveBeenNthCalledWith(1, "claude\r");
+    expect(pty.write).toHaveBeenNthCalledWith(1, "claude --permission-mode auto\r");
 
     expect(runtime.closeSession(tentacleId)).toBe(true);
     vi.advanceTimersByTime(10_000);
@@ -676,16 +676,36 @@ describe("createSessionRuntime", () => {
     runtime.close();
 
     const transcriptPath = join(transcriptDirectoryPath, `${encodeURIComponent(tentacleId)}.jsonl`);
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      if (existsSync(transcriptPath)) {
+    type TranscriptEvent = { type: string; text?: string; reason?: string };
+
+    // The file appearing does not mean the stream flushed a whole line, so wait
+    // for content that parses rather than for the path to exist.
+    const readTranscriptEvents = (): TranscriptEvent[] => {
+      if (!existsSync(transcriptPath)) {
+        return [];
+      }
+      const contents = readFileSync(transcriptPath, "utf8").trim();
+      if (!contents) {
+        return [];
+      }
+      try {
+        return contents.split(/\r?\n/).map((line) => JSON.parse(line) as TranscriptEvent);
+      } catch {
+        return [];
+      }
+    };
+
+    let transcriptEvents: TranscriptEvent[] = [];
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      transcriptEvents = readTranscriptEvents();
+      if (
+        transcriptEvents.some((event) => event.type === "session_start") &&
+        transcriptEvents.some((event) => event.type === "session_end")
+      ) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    const transcriptEvents = readFileSync(transcriptPath, "utf8")
-      .trim()
-      .split(/\r?\n/)
-      .map((line) => JSON.parse(line) as { type: string; text?: string; reason?: string });
 
     expect(transcriptEvents.some((event) => event.type === "session_start")).toBe(true);
     expect(
@@ -732,7 +752,7 @@ describe("createSessionRuntime", () => {
 
     expect(runtime.startSession(tentacleId)).toBe(true);
     expect(sessions.has(tentacleId)).toBe(true);
-    expect(pty.write).toHaveBeenNthCalledWith(1, "claude\r");
+    expect(pty.write).toHaveBeenNthCalledWith(1, "claude --permission-mode auto\r");
 
     vi.advanceTimersByTime(4_000);
     expect(pty.write).toHaveBeenNthCalledWith(
@@ -790,7 +810,7 @@ describe("createSessionRuntime", () => {
       runtime.handleUpgrade(createUpgradeRequest(tentacleId), {} as Duplex, Buffer.alloc(0)),
     ).toBe(true);
 
-    expect(pty.write).toHaveBeenNthCalledWith(1, "claude\r");
+    expect(pty.write).toHaveBeenNthCalledWith(1, "claude --permission-mode auto\r");
 
     vi.advanceTimersByTime(4_000);
     expect(pty.write).toHaveBeenNthCalledWith(2, "\u001b[200~You are working on docs.\u001b[201~");

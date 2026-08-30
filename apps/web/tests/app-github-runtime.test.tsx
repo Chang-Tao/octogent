@@ -74,7 +74,7 @@ const mockGithubRuntimeRequests = () => {
     }
 
     if (url.endsWith("/api/ui-state") && method === "GET") {
-      return jsonResponse({});
+      return jsonResponse({ locale: "en" });
     }
 
     return notFoundResponse();
@@ -104,8 +104,10 @@ describe("App GitHub runtime views", () => {
     mockGithubRuntimeRequests();
 
     const { container } = render(<App />);
+    // The shell first paints in the product default language and only switches
+    // once the persisted ui state arrives, so wait for the hydrated label.
     fireEvent.click(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "[3] Activity",
       }),
     );

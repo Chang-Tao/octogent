@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
-import type { Locale } from "@octogent/core";
+import { DEFAULT_LOCALE, type Locale } from "@octogent/core";
 import { buildUiStateUrl } from "../../runtime/runtimeEndpoints";
 import type { PrimaryNavIndex } from "../constants";
 import { MIN_SIDEBAR_WIDTH, PRIMARY_NAV_ITEMS, UI_STATE_SAVE_DEBOUNCE_MS } from "../constants";
@@ -18,7 +18,6 @@ type UsePersistedUiStateOptions = {
 };
 
 const DEFAULT_ACTIVE_PRIMARY_NAV: PrimaryNavIndex = 1;
-const DEFAULT_LOCALE: Locale = "en";
 const DEFAULT_IS_AGENTS_SIDEBAR_VISIBLE = true;
 const DEFAULT_IS_ACTIVE_AGENTS_SECTION_EXPANDED = true;
 const DEFAULT_IS_RUNTIME_STATUS_STRIP_VISIBLE = true;

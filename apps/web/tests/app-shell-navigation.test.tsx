@@ -47,7 +47,7 @@ const mockShellRequests = () => {
     }
 
     if (url.endsWith("/api/ui-state") && method === "GET") {
-      return jsonResponse({});
+      return jsonResponse({ locale: "en" });
     }
 
     return notFoundResponse();

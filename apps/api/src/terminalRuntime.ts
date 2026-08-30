@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
+import { ensureDirectoryTrusted } from "./claudeTrust";
 
 import type { TerminalSnapshot } from "@octogent/core";
 import type { WebSocket } from "ws";
@@ -540,10 +541,16 @@ export const createTerminalRuntime = ({
     if (terminal.agentProvider === "claude-code") {
       // Claude hooks should only be installed for Claude-backed terminals.
       try {
+        // The terminal is not in the registry yet, so resolve the worktree path
+        // directly; getTentacleWorkspaceCwd would throw and this whole block
+        // would be skipped, leaving worktree agents without hooks or trust.
         const hookTargetCwd = shouldCreateWorktree
-          ? worktreeManager.getTentacleWorkspaceCwd(effectiveWorktreeId)
+          ? worktreeManager.getTentacleWorktreePath(effectiveWorktreeId)
           : workspaceCwd;
         hookProcessor.installHooksInDirectory(hookTargetCwd);
+        // A worktree is a path Claude Code has never seen, so its trust prompt
+        // would strand the session before the first instruction is read.
+        ensureDirectoryTrusted(hookTargetCwd);
       } catch {
         // Best-effort: hook installation should not block terminal creation.
       }

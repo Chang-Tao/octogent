@@ -1,4 +1,5 @@
-import { asRecord } from "@octogent/core";
+import { SUPPORTED_LOCALES, asRecord } from "@octogent/core";
+import type { Locale } from "@octogent/core";
 
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, PRIMARY_NAV_MAX } from "./constants";
 import { isTerminalCompletionSoundId } from "./notificationSounds";
@@ -23,6 +24,12 @@ export const normalizeFrontendUiStateSnapshot = (
     record.activePrimaryNav <= PRIMARY_NAV_MAX
   ) {
     nextState.activePrimaryNav = record.activePrimaryNav;
+  }
+
+  // Without this the language picker never survived a reload: the persisted
+  // snapshot round-trips through here, and an unhandled field is dropped.
+  if (typeof record.locale === "string" && SUPPORTED_LOCALES.includes(record.locale as Locale)) {
+    nextState.locale = record.locale as Locale;
   }
 
   if (typeof record.isAgentsSidebarVisible === "boolean") {
