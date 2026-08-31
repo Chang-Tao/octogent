@@ -80,6 +80,7 @@ Options:
 - `--tentacle-id`: existing tentacle ID to attach to
 - `--worktree-id`: explicit worktree ID
 - `--parent-terminal-id`: parent terminal ID for child terminals
+- `--agent-provider`: agent provider, `claude-code` or `codex` (defaults to the server-side default)
 - `--prompt-template`: prompt template name
 - `--prompt-variables`: JSON object of prompt template variables
 

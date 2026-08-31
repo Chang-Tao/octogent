@@ -29,6 +29,8 @@ export const en: TranslationMap = {
   "cli.error.spawnFailed": "Error: failed to spawn agent.",
   "cli.error.jsonFlag": "Error: {flag} must be a JSON object.",
   "cli.error.validJsonFlag": "Error: {flag} must be valid JSON.",
+  "cli.error.invalidAgentProvider":
+    "Error: invalid --agent-provider {value}. Allowed values: {allowed}.",
   "cli.empty.tentacles": "No tentacles found.",
   "cli.empty.terminals": "No terminals found.",
   "cli.empty.stale": "No stale, stopped, or exited terminals to prune.",
