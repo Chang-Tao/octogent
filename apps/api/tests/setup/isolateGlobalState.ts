@@ -12,6 +12,9 @@ process.env.OCTOGENT_HOME = globalStateRoot;
 // Worktree terminals seed Claude Code's trust list; without this a test run
 // appends a permanent entry per worktree to the operator's real ~/.claude.json.
 process.env.OCTOGENT_CLAUDE_CONFIG = join(globalStateRoot, "claude.json");
+// Same hazard for Codex: without this, seeding worktree trust from a test run
+// appends permanent entries to the operator's real ~/.codex/config.toml.
+process.env.OCTOGENT_CODEX_CONFIG = join(globalStateRoot, "codex-config.toml");
 
 afterAll(() => {
   rmSync(globalStateRoot, { force: true, recursive: true });
