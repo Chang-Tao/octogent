@@ -244,3 +244,51 @@
   color: rgba(255, 255, 255, 0.35);
   pointer-events: none;
 }
+
+.flow-card-role {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.flow-card-steps {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+}
+
+.flow-card-step {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.flow-card-step dt {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.flow-card-step dd {
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.8);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.flow-card-step--now dt {
+  color: var(--accent-primary, #d4a017);
+}
+
+.flow-card-step--now dd {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.flow-card-facts {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}

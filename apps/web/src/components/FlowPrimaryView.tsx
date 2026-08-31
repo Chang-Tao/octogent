@@ -3,14 +3,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { normalizeDeckTentacleSummary } from "../app/deckNormalizers";
 import { type FlowCamera, type FlowNode, buildFlowLayout, project } from "../app/flow/layout";
+import { useAgentRuntimeStates } from "../app/hooks/useAgentRuntimeStates";
 import { useT } from "../app/providers/LocaleProvider";
+import type { TerminalRuntimeStateStore } from "../app/terminalRuntimeStateStore";
 import type { TerminalView } from "../app/types";
 import { buildDeckTentaclesUrl } from "../runtime/runtimeEndpoints";
 import { OctopusGlyph } from "./EmptyOctopus";
+import { FlowNodeCard } from "./flow/FlowNodeCard";
 
 type FlowPrimaryViewProps = {
   columns: TerminalView;
   deckRevision?: number;
+  runtimeStateStore: TerminalRuntimeStateStore;
   onOpenTerminal?: (terminalId: string) => void;
 };
 
@@ -35,79 +39,10 @@ const agentDotClass = (node: FlowNode): string => {
   }
 };
 
-const NodeCard = ({
-  node,
-  onOpenTerminal,
-}: {
-  node: FlowNode;
-  onOpenTerminal?: ((terminalId: string) => void) | undefined;
-}) => {
-  const t = useT();
-  const summary = node.completionSummary;
-
-  return (
-    <div className="flow-card">
-      <div className="flow-card-title-row">
-        <span className="flow-card-title">{node.label}</span>
-        {node.agentState && (
-          <span className={`flow-card-state flow-card-state--${node.agentState}`}>
-            {t(`agentState.${node.agentState}`)}
-          </span>
-        )}
-      </div>
-      {node.kind === "tentacle" && node.todoTotal !== undefined && (
-        <div className="flow-card-progress">
-          <div className="flow-card-progress-track">
-            <div
-              className="flow-card-progress-fill"
-              style={{
-                width: `${node.todoTotal > 0 ? Math.round(((node.todoDone ?? 0) / node.todoTotal) * 100) : 0}%`,
-              }}
-            />
-          </div>
-          <span className="flow-card-progress-text">
-            {t("web.flow.todoProgress", {
-              done: node.todoDone ?? 0,
-              total: node.todoTotal,
-            })}
-          </span>
-        </div>
-      )}
-      {summary && (
-        <div className="flow-card-summary">
-          {summary.taskLine && <p className="flow-card-task">{summary.taskLine}</p>}
-          <p className="flow-card-facts">
-            {summary.commits.length > 0 &&
-              `${summary.commits.length} commits · +${summary.insertions}/-${summary.deletions}`}
-            {summary.branch && (
-              <>
-                <br />
-                {summary.branch}
-                {summary.merged ? " ✓" : ""}
-              </>
-            )}
-          </p>
-        </div>
-      )}
-      {node.kind === "agent" && node.refId && onOpenTerminal && (
-        <button
-          type="button"
-          className="flow-card-open"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenTerminal(node.refId as string);
-          }}
-        >
-          {t("web.flow.openTerminal")}
-        </button>
-      )}
-    </div>
-  );
-};
-
 export const FlowPrimaryView = ({
   columns,
   deckRevision,
+  runtimeStateStore,
   onOpenTerminal,
 }: FlowPrimaryViewProps) => {
   const t = useT();
@@ -146,9 +81,10 @@ export const FlowPrimaryView = ({
     null,
   );
 
+  const agentRuntimeStates = useAgentRuntimeStates(runtimeStateStore, columns);
   const layout = useMemo(
-    () => buildFlowLayout({ tentacles, terminals: columns }),
-    [tentacles, columns],
+    () => buildFlowLayout({ tentacles, terminals: columns, agentRuntimeStates }),
+    [tentacles, columns, agentRuntimeStates],
   );
 
   const projected = useMemo(() => {
@@ -279,7 +215,7 @@ export const FlowPrimaryView = ({
             zIndex: 400,
           }}
         >
-          <NodeCard node={activeNode} onOpenTerminal={onOpenTerminal} />
+          <FlowNodeCard node={activeNode} onOpenTerminal={onOpenTerminal} />
         </div>
       )}
 

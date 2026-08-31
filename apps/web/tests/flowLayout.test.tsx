@@ -117,6 +117,49 @@ describe("buildFlowLayout", () => {
   });
 });
 
+describe("card data on nodes", () => {
+  it("marks a parent agent as coordinator and counts its children", () => {
+    const { nodes } = buildFlowLayout({
+      tentacles: [tentacle("mini")],
+      terminals: [terminal("p", "mini"), terminal("w1", "mini", "p"), terminal("w2", "mini", "p")],
+    });
+
+    const parent = nodes.find((n) => n.refId === "p");
+    const worker = nodes.find((n) => n.refId === "w1");
+    expect(parent?.role).toBe("coordinator");
+    expect(parent?.childCount).toBe(2);
+    expect(worker?.role).toBe("worker");
+  });
+
+  it("carries tentacle description and todo items through to the node", () => {
+    const rich = {
+      ...tentacle("api"),
+      description: "负责 API 层",
+      todoItems: [
+        { text: "第一项", done: true },
+        { text: "第二项", done: false },
+      ],
+    } as AnyTentacle;
+    const { nodes } = buildFlowLayout({ tentacles: [rich], terminals: [] });
+
+    const node = nodes.find((n) => n.kind === "tentacle");
+    expect(node?.description).toBe("负责 API 层");
+    expect(node?.todoItems).toHaveLength(2);
+  });
+
+  it("injects live runtime state and tool onto agent nodes", () => {
+    const { nodes } = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [terminal("t-1", "api")],
+      agentRuntimeStates: new Map([["t-1", { state: "processing" as const, toolName: "Bash" }]]),
+    });
+
+    const node = nodes.find((n) => n.refId === "t-1");
+    expect(node?.runtimeState).toBe("processing");
+    expect(node?.runtimeToolName).toBe("Bash");
+  });
+});
+
 describe("project", () => {
   const camera: FlowCamera = { panX: 0, panY: 0, zoom: 1, perspective: 900 };
 

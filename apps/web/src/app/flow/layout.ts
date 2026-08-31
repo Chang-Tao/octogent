@@ -1,4 +1,5 @@
 import type {
+  AgentRuntimeState,
   AgentState,
   DeckTentacleSummary,
   TentacleWorkspaceMode,
@@ -8,6 +9,9 @@ import type {
 import type { TerminalView } from "../types";
 
 export type FlowNodeKind = "octoboss" | "tentacle" | "agent";
+
+/** What the node is in the org chart, for the card's role line. */
+export type FlowNodeRole = "octoboss" | "tentacle" | "coordinator" | "worker";
 
 export type FlowNode = {
   id: string;
@@ -20,10 +24,16 @@ export type FlowNode = {
   x: number;
   y: number;
   z: number;
+  role: FlowNodeRole;
   agentState?: AgentState;
   workspaceMode?: TentacleWorkspaceMode;
   todoTotal?: number;
   todoDone?: number;
+  description?: string;
+  todoItems?: Array<{ text: string; done: boolean }>;
+  childCount?: number;
+  runtimeState?: AgentRuntimeState;
+  runtimeToolName?: string;
   completionSummary?: TerminalCompletionSummary;
 };
 
@@ -54,6 +64,7 @@ const centeredOffset = (index: number, count: number, spacing: number): number =
 type FlowLayoutInput = {
   tentacles: DeckTentacleSummary[];
   terminals: TerminalView;
+  agentRuntimeStates?: ReadonlyMap<string, { state: AgentRuntimeState; toolName?: string }>;
 };
 
 /**
@@ -62,7 +73,11 @@ type FlowLayoutInput = {
  * further right and deeper. Pure and deterministic so the view layer only
  * projects and draws.
  */
-export const buildFlowLayout = ({ tentacles, terminals }: FlowLayoutInput): FlowLayout => {
+export const buildFlowLayout = ({
+  tentacles,
+  terminals,
+  agentRuntimeStates,
+}: FlowLayoutInput): FlowLayout => {
   const nodes: FlowNode[] = [];
   const edges: FlowEdge[] = [];
 
@@ -71,6 +86,7 @@ export const buildFlowLayout = ({ tentacles, terminals }: FlowLayoutInput): Flow
     kind: "octoboss",
     label: "OCTOBOSS",
     color: OCTOBOSS_COLOR,
+    role: "octoboss",
     level: 0,
     x: 0,
     y: 0,
@@ -91,8 +107,11 @@ export const buildFlowLayout = ({ tentacles, terminals }: FlowLayoutInput): Flow
       x: LEVEL_SPACING_X,
       y: centeredOffset(index, sortedTentacles.length, SIBLING_SPACING_Y),
       z: LEVEL_DEPTH_Z,
+      role: "tentacle",
       todoTotal: entry.todoTotal,
       todoDone: entry.todoDone,
+      ...(entry.description ? { description: entry.description } : {}),
+      ...(entry.todoItems?.length ? { todoItems: entry.todoItems } : {}),
     };
     tentacleNodes.set(entry.tentacleId, node);
     nodes.push(node);
@@ -134,6 +153,14 @@ export const buildFlowLayout = ({ tentacles, terminals }: FlowLayoutInput): Flow
 
   // Materialize in chain-depth order so every anchor node exists before its
   // children are placed relative to it.
+  const childCounts = new Map<string, number>();
+  for (const record of terminals) {
+    const parentId = record.parentTerminalId;
+    if (parentId && byTerminalId.has(parentId)) {
+      childCounts.set(parentId, (childCounts.get(parentId) ?? 0) + 1);
+    }
+  }
+
   const pending = [...terminals].sort(
     (a, b) => chainDepth(a.terminalId) - chainDepth(b.terminalId),
   );
@@ -160,9 +187,21 @@ export const buildFlowLayout = ({ tentacles, terminals }: FlowLayoutInput): Flow
         centeredOffset(Math.max(0, index), Math.max(1, siblings.length), AGENT_FAN_SPACING_Y),
       // In front of its anchor: one step back toward the viewer.
       z: anchor.z + AGENT_FORWARD_Z,
+      role: (childCounts.get(record.terminalId) ?? 0) > 0 ? "coordinator" : "worker",
       agentState: record.state,
+      childCount: childCounts.get(record.terminalId) ?? 0,
       ...(record.workspaceMode ? { workspaceMode: record.workspaceMode } : {}),
       ...(record.completionSummary ? { completionSummary: record.completionSummary } : {}),
+      ...(() => {
+        const info = agentRuntimeStates?.get(record.terminalId);
+        if (!info) {
+          return {};
+        }
+        return {
+          runtimeState: info.state,
+          ...(info.toolName ? { runtimeToolName: info.toolName } : {}),
+        };
+      })(),
     };
     agentNodes.set(node.id, node);
     nodes.push(node);

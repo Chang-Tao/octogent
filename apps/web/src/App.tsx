@@ -485,6 +485,7 @@ export const App = () => {
                 flowPrimaryViewProps={{
                   columns: terminals,
                   deckRevision,
+                  runtimeStateStore,
                   onOpenTerminal: (terminalId) => {
                     void terminalId;
                     setActivePrimaryNav(1);
