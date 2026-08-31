@@ -5,6 +5,7 @@ import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
+import { parseTerminalCreateArgs } from "./cliTerminalCreate";
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
 import {
   isRemoteAccessEnabled,
@@ -342,27 +343,6 @@ const parseFlag = (flag: string): string | undefined => {
   return args[index + 1];
 };
 
-const parseJsonFlag = (flag: string): Record<string, string> | undefined => {
-  const raw = parseFlag(flag);
-  if (!raw) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      console.error(t(locale, "cli.error.jsonFlag", { flag }));
-      process.exit(1);
-    }
-
-    const entries = Object.entries(parsed).filter(([, value]) => typeof value === "string");
-    return Object.fromEntries(entries);
-  } catch {
-    console.error(t(locale, "cli.error.validJsonFlag", { flag }));
-    process.exit(1);
-  }
-};
-
 const tentacleCreate = async () => {
   const name = args[2];
   if (!name || name.startsWith("-")) {
@@ -417,31 +397,14 @@ const tentacleList = async () => {
 };
 
 const terminalCreate = async () => {
-  const name = parseFlag("--name") ?? parseFlag("-n");
-  const initialPrompt = parseFlag("--initial-prompt") ?? parseFlag("-p");
-  const workspaceMode = parseFlag("--workspace-mode") ?? parseFlag("-w") ?? "shared";
-  const terminalId = parseFlag("--terminal-id");
-  const tentacleId = parseFlag("--tentacle-id");
-  const worktreeId = parseFlag("--worktree-id");
-  const parentTerminalId = parseFlag("--parent-terminal-id");
-  const nameOrigin = parseFlag("--name-origin");
-  const autoRenamePromptContext = parseFlag("--auto-rename-prompt-context");
-  const promptTemplate = parseFlag("--prompt-template");
-  const promptVariables = parseJsonFlag("--prompt-variables");
+  const parsed = parseTerminalCreateArgs(args);
+  if (!parsed.ok) {
+    console.error(t(locale, parsed.errorKey, parsed.params));
+    process.exit(1);
+  }
+  const { body } = parsed;
+  const tentacleId = typeof body.tentacleId === "string" ? body.tentacleId : undefined;
   const apiBase = resolveRuntimeApiBase();
-
-  const body: Record<string, unknown> = {};
-  if (name) body.name = name;
-  if (initialPrompt) body.initialPrompt = initialPrompt;
-  if (workspaceMode) body.workspaceMode = workspaceMode;
-  if (terminalId) body.terminalId = terminalId;
-  if (tentacleId) body.tentacleId = tentacleId;
-  if (worktreeId) body.worktreeId = worktreeId;
-  if (parentTerminalId) body.parentTerminalId = parentTerminalId;
-  if (nameOrigin) body.nameOrigin = nameOrigin;
-  if (autoRenamePromptContext) body.autoRenamePromptContext = autoRenamePromptContext;
-  if (promptTemplate) body.promptTemplate = promptTemplate;
-  if (promptVariables) body.promptVariables = promptVariables;
 
   try {
     const response = await fetch(`${apiBase}/api/terminals`, {

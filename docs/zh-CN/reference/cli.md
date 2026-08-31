@@ -80,6 +80,7 @@ octogent terminal create [options]
 - `--tentacle-id`：要挂载到的已有触手 ID
 - `--worktree-id`：显式指定工作树 ID
 - `--parent-terminal-id`：子终端的父终端 ID
+- `--agent-provider`：agent 提供方，`claude-code` 或 `codex`（未传时沿用服务端默认）
 - `--prompt-template`：提示词模板名称
 - `--prompt-variables`：提示词模板变量的 JSON 对象
 

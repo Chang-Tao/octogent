@@ -28,6 +28,7 @@ export const zhCN: TranslationMap = {
   "cli.error.spawnFailed": "错误：派生 agent 失败。",
   "cli.error.jsonFlag": "错误：{flag} 必须为 JSON 对象。",
   "cli.error.validJsonFlag": "错误：{flag} 必须为有效 JSON。",
+  "cli.error.invalidAgentProvider": "错误：--agent-provider {value} 不合法，可选值：{allowed}。",
   "cli.empty.tentacles": "未找到触手。",
   "cli.empty.terminals": "未找到终端。",
   "cli.empty.stale": "没有需要清理的残留、已停止或已退出的终端。",
