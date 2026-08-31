@@ -25,8 +25,28 @@ describe("resolveBootstrapCommand", () => {
     ).toBe("claude --permission-mode auto");
   });
 
-  it("leaves Codex alone", () => {
-    expect(resolveBootstrapCommand("codex", {})).toBe("codex");
+  it("runs Codex sandboxed and unattended by default", () => {
+    expect(resolveBootstrapCommand("codex", {})).toBe(
+      "codex --sandbox workspace-write --ask-for-approval never",
+    );
+  });
+
+  it("lets an operator pick a different Codex sandbox mode", () => {
+    expect(resolveBootstrapCommand("codex", { OCTOGENT_CODEX_SANDBOX_MODE: "read-only" })).toBe(
+      "codex --sandbox read-only --ask-for-approval never",
+    );
+  });
+
+  it("lets an operator re-enable Codex approval prompts", () => {
+    expect(resolveBootstrapCommand("codex", { OCTOGENT_CODEX_APPROVAL_POLICY: "on-request" })).toBe(
+      "codex --sandbox workspace-write --ask-for-approval on-request",
+    );
+  });
+
+  it("rejects a sandbox mode Codex does not accept rather than launching a broken command", () => {
+    expect(resolveBootstrapCommand("codex", { OCTOGENT_CODEX_SANDBOX_MODE: "; rm -rf /" })).toBe(
+      "codex --sandbox workspace-write --ask-for-approval never",
+    );
   });
 
   it("falls back to the default provider for an unknown one", () => {

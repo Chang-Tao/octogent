@@ -8,10 +8,16 @@ import type { TerminalSnapshot } from "@octogent/core";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { ensureCodexDirectoryTrusted } from "./codexTrust";
 import { buildCompletionSummary } from "./completionSummary";
 import { logVerbose } from "./logging";
+import {
+  createAgentProviderAdapters,
+  resolveAgentProviderAdapter,
+} from "./terminalRuntime/agentProviders";
 import { resolveTerminalRetentionHours, shouldAutoArchive } from "./terminalRuntime/archivePolicy";
 import { createChannelMessaging } from "./terminalRuntime/channelMessaging";
+import { installCodexHooksInDirectory } from "./terminalRuntime/codexHooks";
 import {
   evaluateCompletionOnStop,
   resolveSnapshotLifecycle,
@@ -540,6 +546,13 @@ export const createTerminalRuntime = ({
     onStateChange: broadcastTerminalStateChanged,
   });
 
+  const agentProviderAdapters = createAgentProviderAdapters({
+    installClaudeHooks: hookProcessor.installHooksInDirectory,
+    ensureClaudeTrusted: ensureDirectoryTrusted,
+    installCodexHooks: (targetCwd) => installCodexHooksInDirectory(targetCwd, getApiBaseUrl()),
+    ensureCodexTrusted: ensureCodexDirectoryTrusted,
+  });
+
   reconcilePersistedLifecycle();
 
   const allocateTerminalId = () => {
@@ -744,22 +757,21 @@ export const createTerminalRuntime = ({
       worktreeManager.createTentacleWorktree(effectiveWorktreeId, baseRef);
     }
 
-    if (terminal.agentProvider === "claude-code") {
-      // Claude hooks should only be installed for Claude-backed terminals.
-      try {
-        // The terminal is not in the registry yet, so resolve the worktree path
-        // directly; getTentacleWorkspaceCwd would throw and this whole block
-        // would be skipped, leaving worktree agents without hooks or trust.
-        const hookTargetCwd = shouldCreateWorktree
-          ? worktreeManager.getTentacleWorktreePath(effectiveWorktreeId)
-          : workspaceCwd;
-        hookProcessor.installHooksInDirectory(hookTargetCwd);
-        // A worktree is a path Claude Code has never seen, so its trust prompt
-        // would strand the session before the first instruction is read.
-        ensureDirectoryTrusted(hookTargetCwd);
-      } catch {
-        // Best-effort: hook installation should not block terminal creation.
-      }
+    try {
+      // The terminal is not in the registry yet, so resolve the worktree path
+      // directly; getTentacleWorkspaceCwd would throw and this whole block
+      // would be skipped, leaving worktree agents without hooks or trust.
+      const hookTargetCwd = shouldCreateWorktree
+        ? worktreeManager.getTentacleWorktreePath(effectiveWorktreeId)
+        : workspaceCwd;
+      // A worktree is a path the agent has never seen, so its trust prompt
+      // would strand the session before the first instruction is read; each
+      // provider adapter installs its hooks and pre-seeds trust accordingly.
+      resolveAgentProviderAdapter(agentProviderAdapters, terminal.agentProvider).prepareWorkspace(
+        hookTargetCwd,
+      );
+    } catch {
+      // Best-effort: workspace preparation should not block terminal creation.
     }
 
     terminals.set(terminalId, terminal);

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { logVerbose } from "../logging";
 import { parseClaudeTranscript } from "./claudeTranscript";
 import { storeClaudeTranscriptTurns } from "./conversations";
+import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
 import { broadcastMessage } from "./protocol";
 import type { PersistedTerminal, TerminalSession } from "./types";
 
@@ -49,46 +50,6 @@ export const createHookProcessor = (deps: {
     evaluateSessionCompletion,
     onStateChange,
   } = deps;
-
-  const parseSettingsObject = (fileContents: string): Record<string, unknown> | null => {
-    try {
-      const parsed = JSON.parse(fileContents) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return null;
-      }
-      return parsed as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  };
-
-  const mergeHookEntries = (
-    existingValue: unknown,
-    eventName: string,
-    nextEntries: unknown[],
-  ): Record<string, unknown> => {
-    const nextHooks =
-      existingValue && typeof existingValue === "object" && !Array.isArray(existingValue)
-        ? { ...(existingValue as Record<string, unknown>) }
-        : {};
-    const existingEntries = Array.isArray(nextHooks[eventName])
-      ? [...(nextHooks[eventName] as unknown[])]
-      : [];
-    const mergedEntries = [...existingEntries];
-
-    for (const nextEntry of nextEntries) {
-      const serializedNextEntry = JSON.stringify(nextEntry);
-      const alreadyPresent = existingEntries.some(
-        (existingEntry) => JSON.stringify(existingEntry) === serializedNextEntry,
-      );
-      if (!alreadyPresent) {
-        mergedEntries.push(nextEntry);
-      }
-    }
-
-    nextHooks[eventName] = mergedEntries;
-    return nextHooks;
-  };
 
   const installHooksInDirectory = (targetCwd: string) => {
     const targetClaudeDir = join(targetCwd, ".claude");
