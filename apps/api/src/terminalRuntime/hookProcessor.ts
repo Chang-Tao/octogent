@@ -231,6 +231,39 @@ export const createHookProcessor = (deps: {
       return { ok: true };
     }
 
+    if (hookName === "permission-request") {
+      // Codex reports pending approvals through a dedicated PermissionRequest
+      // event instead of Claude's Notification/permission_prompt; only codex
+      // terminals may take this path.
+      if (!octogentSessionId || terminals.get(octogentSessionId)?.agentProvider !== "codex") {
+        return { ok: true };
+      }
+      const session = sessions.get(octogentSessionId);
+      if (!session) {
+        logVerbose(`[Hook] permission-request: no session for ${octogentSessionId}, skipping.`);
+        return { ok: true };
+      }
+
+      const toolName =
+        typeof hookPayloadRecord.tool_name === "string" ? hookPayloadRecord.tool_name : null;
+      if (toolName) {
+        session.lastToolName = toolName;
+      }
+
+      logVerbose(`[Hook] permission-request: tool=${toolName} session=${octogentSessionId}`);
+
+      session.agentState = "waiting_for_permission";
+      session.stateTracker.forceState("waiting_for_permission");
+      onStateChange?.(octogentSessionId, "waiting_for_permission", session.lastToolName);
+      broadcastMessage(session, {
+        type: "state",
+        state: "waiting_for_permission",
+        ...(session.lastToolName ? { toolName: session.lastToolName } : {}),
+      });
+
+      return { ok: true };
+    }
+
     if (hookName === "pre-tool-use") {
       if (!octogentSessionId) {
         return { ok: true };
@@ -338,8 +371,12 @@ export const createHookProcessor = (deps: {
       return { ok: true };
     }
 
+    // Codex writes its own rollout-format JSONL at transcript_path, which the
+    // Claude parser cannot read; rely on last_assistant_message alone there.
+    const isCodexSession = terminals.get(matchedSessionId)?.agentProvider === "codex";
+
     logVerbose(`[Hook] Matched session: ${matchedSessionId}, parsing transcript...`);
-    const turns = parseClaudeTranscript(transcriptPath);
+    const turns = isCodexSession ? null : parseClaudeTranscript(transcriptPath);
     logVerbose(`[Hook] Parsed ${turns?.length ?? 0} turns from transcript.`);
 
     const lastAssistantMessage =
@@ -375,6 +412,19 @@ export const createHookProcessor = (deps: {
     // The turn is over: decide whether this terminal's work is now finished.
     if (matchedSessionId) {
       evaluateSessionCompletion(matchedSessionId);
+    }
+
+    // Codex has no idle_prompt notification, so a codex session never returns
+    // to idle on its own; force it here — before delivery, whose idle gate
+    // would otherwise stay closed forever.
+    if (isCodexSession && matchedSessionId) {
+      const session = sessions.get(matchedSessionId);
+      if (session) {
+        session.agentState = "idle";
+        session.stateTracker.forceState("idle");
+        onStateChange?.(matchedSessionId, "idle");
+        broadcastMessage(session, { type: "state", state: "idle" });
+      }
     }
 
     // Deliver any queued channel messages now that the agent is idle.
