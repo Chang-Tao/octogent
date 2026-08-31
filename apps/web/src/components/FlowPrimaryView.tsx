@@ -46,7 +46,7 @@ const NodeCard = ({
   const summary = node.completionSummary;
 
   return (
-    <div className="flow-card" role="status">
+    <div className="flow-card">
       <div className="flow-card-title-row">
         <span className="flow-card-title">{node.label}</span>
         {node.agentState && (
@@ -114,6 +114,8 @@ export const FlowPrimaryView = ({
   const [tentacles, setTentacles] = useState<DeckTentacleSummary[]>([]);
 
   useEffect(() => {
+    // deckRevision is the refetch trigger: the server bumps it on deck changes.
+    void deckRevision;
     let disposed = false;
     const load = async () => {
       try {
