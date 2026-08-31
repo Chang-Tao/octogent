@@ -25,6 +25,7 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_TERMINAL_STALL_MS`: Milliseconds without transcript activity before a running terminal is marked `stalled` (default: `120000`)
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`: Hours after which `completed`, `stopped`, and `exited` terminal records are auto-archived; `awaiting-review` records never expire (default: `72`, invalid values fall back to the default)
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`: Claude usage data source: `auto` (OAuth first, CLI PTY fallback), `oauth`, `cli`, or `off` to disable collection (default: `auto`)
+- `OCTOGENT_ACCESS_TOKEN`: Access token required from non-loopback clients when remote access is on; auto-generated per session (and printed with the LAN URL) when unset
 
 Example for headless servers:
 

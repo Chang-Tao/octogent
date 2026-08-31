@@ -8,6 +8,8 @@ export const zhCN: TranslationMap = {
   "cli.server.project": "项目：",
   "cli.server.api": "API：",
   "cli.server.lan": "局域网：",
+  "cli.server.token": "访问令牌：",
+  "cli.server.tokenHint": "其他设备通过上面的 ?token= 链接首次访问即可；之后由 Cookie 保持登录。",
   "cli.created.tentacle": "已创建触手 {id}",
   "cli.created.terminal": "已在触手 {tentacleId} 上创建终端 {id}",
   "cli.killed.terminal": "已终止终端 {id}",

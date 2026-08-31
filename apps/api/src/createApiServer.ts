@@ -11,6 +11,7 @@ import {
 } from "./claudeUsage";
 import { createCodeIntelStore } from "./codeIntelStore";
 import { readCodexUsageSnapshot as readCodexUsageSnapshotDefault } from "./codexUsage";
+import { resolveAccessToken } from "./createApiServer/remoteAuth";
 import { createApiRequestHandler } from "./createApiServer/requestHandler";
 import type { CreateApiServerOptions } from "./createApiServer/types";
 import { createUpgradeHandler } from "./createApiServer/upgradeHandler";
@@ -35,6 +36,7 @@ export const createApiServer = ({
   monitorService,
   invalidateClaudeUsageCache = invalidateUsageCacheDefault,
   allowRemoteAccess = false,
+  accessToken = resolveAccessToken(process.env),
 }: CreateApiServerOptions = {}) => {
   const resolvedWorkspaceCwd = workspaceCwd ?? process.cwd();
   // State lives in ~/.octogent/projects/<name>/ when provided, else falls back to <project>/.octogent/
@@ -136,6 +138,7 @@ export const createApiServer = ({
     codeIntelStore,
     readHealthSnapshot: () => healthSnapshotSource.readHealthSnapshot(runtime.readHealthCounts()),
     allowRemoteAccess,
+    accessToken,
   });
 
   const server = createServer(requestHandler);
@@ -145,6 +148,7 @@ export const createApiServer = ({
     createUpgradeHandler({
       runtime,
       allowRemoteAccess,
+      accessToken,
     }),
   );
 

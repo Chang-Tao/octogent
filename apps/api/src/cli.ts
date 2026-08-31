@@ -5,6 +5,7 @@ import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
+import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
 import {
   isRemoteAccessEnabled,
   isWildcardHost,
@@ -233,6 +234,12 @@ const startServer = async () => {
   const promptsDir = resolveRuntimeAssetPath(["dist", "prompts"], ["prompts"]);
   const webDistDir = resolveRuntimeAssetPath(["dist", "web"], ["apps", "web", "dist"]);
   const listenHost = resolveListenHost(process.env);
+  // Remote access without a token would leave every agent and the codebase
+  // open to the whole LAN; generate one for the session when none is set.
+  let accessToken = resolveAccessToken(process.env);
+  if (isRemoteAccessEnabled(process.env) && !accessToken) {
+    accessToken = generateAccessToken();
+  }
   const port = await findOpenPort(readPreferredStartPort(), listenHost);
   const { createApiServer } = await import("./createApiServer");
 
@@ -242,6 +249,7 @@ const startServer = async () => {
     promptsDir,
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
     allowRemoteAccess: isRemoteAccessEnabled(process.env),
+    accessToken,
   });
 
   const shutdown = async () => {
@@ -277,7 +285,12 @@ const startServer = async () => {
   console.log(`  ${t(locale, "cli.server.api")} ${apiBaseUrl}`);
   if (isWildcardHost(host)) {
     for (const address of listLanAddresses(networkInterfaces())) {
-      console.log(`  ${t(locale, "cli.server.lan")} http://${address}:${activePort}`);
+      const suffix = accessToken ? `/?token=${accessToken}` : "";
+      console.log(`  ${t(locale, "cli.server.lan")} http://${address}:${activePort}${suffix}`);
+    }
+    if (accessToken) {
+      console.log(`  ${t(locale, "cli.server.token")} ${accessToken}`);
+      console.log(`  ${t(locale, "cli.server.tokenHint")}`);
     }
   }
   console.log();

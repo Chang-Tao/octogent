@@ -18,6 +18,7 @@ describe("createUpgradeHandler", () => {
     const handler = createUpgradeHandler({
       runtime: runtime as never,
       allowRemoteAccess: true,
+      accessToken: null,
     });
     const socket = {
       destroy: vi.fn(),
@@ -26,6 +27,7 @@ describe("createUpgradeHandler", () => {
     expect(() =>
       handler(
         {
+          socket: { remoteAddress: "127.0.0.1" },
           headers: {
             host: "127.0.0.1:8787",
             origin: "http://127.0.0.1:5173",

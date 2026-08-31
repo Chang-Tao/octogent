@@ -21,4 +21,5 @@ export type CreateApiServerOptions = {
   monitorService?: MonitorService;
   invalidateClaudeUsageCache?: () => void;
   allowRemoteAccess?: boolean;
+  accessToken?: string | null;
 };

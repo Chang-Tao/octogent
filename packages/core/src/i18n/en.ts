@@ -8,6 +8,9 @@ export const en: TranslationMap = {
   "cli.server.project": "Project:",
   "cli.server.api": "API:",
   "cli.server.lan": "LAN:",
+  "cli.server.token": "Access token:",
+  "cli.server.tokenHint":
+    "Other devices sign in once via the ?token= link above; a cookie keeps them signed in.",
   "cli.created.tentacle": "Created tentacle {id}",
   "cli.created.terminal": "Created terminal {id} on tentacle {tentacleId}",
   "cli.killed.terminal": "Killed terminal {id}",

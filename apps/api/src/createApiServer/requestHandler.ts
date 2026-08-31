@@ -46,6 +46,7 @@ import {
   handleMonitorFeedRoute,
   handleMonitorRefreshRoute,
 } from "./monitorRoutes";
+import { evaluateRemoteAuth } from "./remoteAuth";
 import type {
   ApiRouteHandler,
   RouteHandlerContext,
@@ -109,6 +110,7 @@ type CreateApiRequestHandlerOptions = {
   codeIntelStore: CodeIntelStore;
   readHealthSnapshot: () => HealthSnapshot;
   allowRemoteAccess: boolean;
+  accessToken: string | null;
 };
 
 const API_ROUTE_MAP: ReadonlyMap<string, readonly ApiRouteHandler[]> = new Map([
@@ -224,6 +226,7 @@ export const createApiRequestHandler = ({
   codeIntelStore,
   readHealthSnapshot,
   allowRemoteAccess,
+  accessToken,
 }: CreateApiRequestHandlerOptions) => {
   const resolvedWebDistDir = webDistDir && existsSync(webDistDir) ? webDistDir : null;
 
@@ -270,6 +273,24 @@ export const createApiRequestHandler = ({
       writeJson(response, 403, { error: "Origin not allowed." }, null);
       logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
       return;
+    }
+
+    const authDecision = evaluateRemoteAuth({
+      remoteAddress: request.socket.remoteAddress,
+      url: request.url ?? "/",
+      headers: {
+        "x-octogent-token": request.headers["x-octogent-token"],
+        cookie: request.headers.cookie,
+      },
+      accessToken,
+    });
+    if (authDecision.kind === "deny") {
+      writeJson(response, 401, { error: "Access token required." }, corsOrigin);
+      logRequest(request.method ?? "?", request.url ?? "/", 401, startTime);
+      return;
+    }
+    if (authDecision.kind === "allow-set-cookie") {
+      response.setHeader("Set-Cookie", authDecision.cookie);
     }
 
     try {
