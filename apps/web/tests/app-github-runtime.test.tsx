@@ -108,7 +108,7 @@ describe("App GitHub runtime views", () => {
     // once the persisted ui state arrives, so wait for the hydrated label.
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "[3] Activity",
+        name: "[4] Activity",
       }),
     );
 

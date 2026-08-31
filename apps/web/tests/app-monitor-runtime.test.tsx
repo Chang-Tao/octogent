@@ -203,7 +203,7 @@ describe("App Monitor runtime", () => {
 
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "[5] Monitor",
+        name: "[6] Monitor",
       }),
     );
 
@@ -427,7 +427,7 @@ describe("App Monitor runtime", () => {
 
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "[5] Monitor",
+        name: "[6] Monitor",
       }),
     );
 
@@ -649,7 +649,7 @@ describe("App Monitor runtime", () => {
 
     expect(screen.queryByLabelText("Telemetry ticker tape")).toBeNull();
 
-    fireEvent.click(await screen.findByRole("button", { name: "[5] Monitor" }));
+    fireEvent.click(await screen.findByRole("button", { name: "[6] Monitor" }));
     expect(await screen.findByLabelText("Monitor primary view disabled")).toBeInTheDocument();
 
     expect(monitorConfigCalls).toBe(0);

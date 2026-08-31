@@ -2,6 +2,7 @@ import type { Locale } from "../i18n";
 import type { TerminalCompletionSoundId } from "./completionSound";
 
 export type PersistedUiState = {
+  navSchemaVersion?: number;
   activePrimaryNav?: number;
   isAgentsSidebarVisible?: boolean;
   sidebarWidth?: number;

@@ -1,5 +1,6 @@
 import { type TerminalSnapshot, buildTerminalList, isAgentRuntimeState, t } from "@octogent/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { NAV_INDEX } from "./app/constants";
 
 import { useBackendLivenessPolling } from "./app/hooks/useBackendLivenessPolling";
 import { OCTOBOSS_ID } from "./app/hooks/useCanvasGraphData";
@@ -38,6 +39,16 @@ import {
   buildTerminalEventsSocketUrl,
   buildTerminalSnapshotsUrl,
 } from "./runtime/runtimeEndpoints";
+
+// Views that own the full canvas and never show the agents sidebar.
+const SIDEBARLESS_NAV: ReadonlySet<number> = new Set([
+  NAV_INDEX.flow,
+  NAV_INDEX.agents,
+  NAV_INDEX.activity,
+  NAV_INDEX.codeIntel,
+  NAV_INDEX.monitor,
+  NAV_INDEX.settings,
+]);
 
 export const App = () => {
   const [terminals, setTerminals] = useState<TerminalView>([]);
@@ -327,7 +338,8 @@ export const App = () => {
     terminalCompletionSound,
   );
   const { heatmapData, isLoadingHeatmap, refreshHeatmap } = useUsageHeatmapPolling({
-    enabled: isUiStateHydrated && (activePrimaryNav === 3 || isRuntimeStatusStripVisible),
+    enabled:
+      isUiStateHydrated && (activePrimaryNav === NAV_INDEX.activity || isRuntimeStatusStripVisible),
   });
 
   useConsoleKeyboardShortcuts({ setActivePrimaryNav });
@@ -453,31 +465,26 @@ export const App = () => {
           aria-label={t(locale, "web.a11y.mainContentCanvas")}
         >
           <div
-            className={`workspace-shell${isAgentsSidebarVisible && activePrimaryNav !== 1 && activePrimaryNav !== 3 && activePrimaryNav !== 4 && activePrimaryNav !== 5 && activePrimaryNav !== 8 ? "" : " workspace-shell--full"}`}
+            className={`workspace-shell${isAgentsSidebarVisible && !SIDEBARLESS_NAV.has(activePrimaryNav) ? "" : " workspace-shell--full"}`}
           >
-            {isAgentsSidebarVisible &&
-              activePrimaryNav !== 1 &&
-              activePrimaryNav !== 3 &&
-              activePrimaryNav !== 4 &&
-              activePrimaryNav !== 5 &&
-              activePrimaryNav !== 8 && (
-                <ActiveAgentsSidebar
-                  sidebarWidth={sidebarWidth}
-                  onSidebarWidthChange={(width) => {
-                    setSidebarWidth(clampSidebarWidth(width));
-                  }}
-                  actionPanel={sidebarActionPanel}
-                  bodyContent={
-                    activePrimaryNav === 2
-                      ? (deckSidebarContent ?? undefined)
-                      : activePrimaryNav === 6
-                        ? (conversationsSidebarContent ?? undefined)
-                        : activePrimaryNav === 7
-                          ? (promptsSidebarContent ?? undefined)
-                          : undefined
-                  }
-                />
-              )}
+            {isAgentsSidebarVisible && !SIDEBARLESS_NAV.has(activePrimaryNav) && (
+              <ActiveAgentsSidebar
+                sidebarWidth={sidebarWidth}
+                onSidebarWidthChange={(width) => {
+                  setSidebarWidth(clampSidebarWidth(width));
+                }}
+                actionPanel={sidebarActionPanel}
+                bodyContent={
+                  activePrimaryNav === NAV_INDEX.deck
+                    ? (deckSidebarContent ?? undefined)
+                    : activePrimaryNav === NAV_INDEX.conversations
+                      ? (conversationsSidebarContent ?? undefined)
+                      : activePrimaryNav === NAV_INDEX.prompts
+                        ? (promptsSidebarContent ?? undefined)
+                        : undefined
+                }
+              />
+            )}
 
             <ErrorBoundary label="PrimaryView">
               <PrimaryViewRouter
@@ -488,7 +495,7 @@ export const App = () => {
                   runtimeStateStore,
                   onOpenTerminal: (terminalId) => {
                     void terminalId;
-                    setActivePrimaryNav(1);
+                    setActivePrimaryNav(NAV_INDEX.agents);
                   },
                 }}
                 deckPrimaryViewProps={{
@@ -644,7 +651,7 @@ export const App = () => {
                       : undefined;
                   },
                   onNavigateToConversation: (_sessionId) => {
-                    setActivePrimaryNav(6);
+                    setActivePrimaryNav(NAV_INDEX.conversations);
                   },
                   onDeleteActiveSession: (terminalId, terminalName, workspaceMode) => {
                     requestDeleteTerminal(terminalId, terminalName, {
@@ -664,10 +671,12 @@ export const App = () => {
                     await refreshColumns();
                   },
                 }}
-                conversationsEnabled={isUiStateHydrated && activePrimaryNav === 6}
+                conversationsEnabled={
+                  isUiStateHydrated && activePrimaryNav === NAV_INDEX.conversations
+                }
                 onConversationsSidebarContent={setConversationsSidebarContent}
                 onConversationsActionPanel={setConversationsActionPanel}
-                promptsEnabled={isUiStateHydrated && activePrimaryNav === 7}
+                promptsEnabled={isUiStateHydrated && activePrimaryNav === NAV_INDEX.prompts}
                 onPromptsSidebarContent={setPromptsSidebarContent}
               />
             </ErrorBoundary>

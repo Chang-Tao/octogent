@@ -21,3 +21,25 @@ describe("normalizeFrontendUiStateSnapshot", () => {
     expect(normalizeFrontendUiStateSnapshot(null)).toBeNull();
   });
 });
+
+describe("primary nav migration", () => {
+  it("shifts a legacy snapshot's nav index for the flow-first order", () => {
+    // Old order: 1 was Agents. New order: Flow takes 1, everything shifts +1.
+    expect(normalizeFrontendUiStateSnapshot({ activePrimaryNav: 1 })?.activePrimaryNav).toBe(2);
+    expect(normalizeFrontendUiStateSnapshot({ activePrimaryNav: 8 })?.activePrimaryNav).toBe(9);
+  });
+
+  it("keeps a versioned snapshot untouched", () => {
+    const next = normalizeFrontendUiStateSnapshot({ navSchemaVersion: 2, activePrimaryNav: 1 });
+    expect(next?.activePrimaryNav).toBe(1);
+    expect(next?.navSchemaVersion).toBe(2);
+  });
+
+  it("maps the legacy preview slot 9 back to the new first page", () => {
+    expect(normalizeFrontendUiStateSnapshot({ activePrimaryNav: 9 })?.activePrimaryNav).toBe(1);
+  });
+
+  it("stamps the schema version on migrated snapshots", () => {
+    expect(normalizeFrontendUiStateSnapshot({ activePrimaryNav: 3 })?.navSchemaVersion).toBe(2);
+  });
+});
