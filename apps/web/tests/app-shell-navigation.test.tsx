@@ -70,7 +70,7 @@ describe("App shell and navigation", () => {
     expect(screen.getByLabelText("Main content canvas")).toBeInTheDocument();
     expect(screen.getByLabelText("Telemetry ticker tape")).toBeInTheDocument();
     expect(screen.queryByLabelText("Active Agents sidebar")).not.toBeInTheDocument();
-    expect(screen.getByText("Press 1-8 to navigate")).toBeInTheDocument();
+    expect(screen.getByText("Press 1-9 to navigate")).toBeInTheDocument();
   });
 
   it("supports keyboard-first primary navigation with number keys 1-8", async () => {

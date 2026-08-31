@@ -152,6 +152,11 @@ export const en: TranslationMap = {
   "web.nav.conversations": "Conversations",
   "web.nav.prompts": "Prompts",
   "web.nav.settings": "Settings",
+  "web.nav.flow": "Flow",
+  "web.a11y.flowView": "Flow progress view",
+  "web.flow.hint": "Drag to pan · scroll to zoom · click a node to pin its card",
+  "web.flow.openTerminal": "Open terminal",
+  "web.flow.todoProgress": "{done}/{total} todos",
   "web.nav.hint": "Press 1-{max} to navigate",
 
   // ── Web: Settings ────────────────────────────────────

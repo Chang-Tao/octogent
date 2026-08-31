@@ -482,6 +482,14 @@ export const App = () => {
             <ErrorBoundary label="PrimaryView">
               <PrimaryViewRouter
                 activePrimaryNav={activePrimaryNav}
+                flowPrimaryViewProps={{
+                  columns: terminals,
+                  deckRevision,
+                  onOpenTerminal: (terminalId) => {
+                    void terminalId;
+                    setActivePrimaryNav(1);
+                  },
+                }}
                 deckPrimaryViewProps={{
                   deckRevision,
                   onSidebarContent: setDeckSidebarContent,

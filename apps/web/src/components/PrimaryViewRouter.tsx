@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { FlowPrimaryView } from "./FlowPrimaryView";
 
 import type { PrimaryNavIndex } from "../app/constants";
 import type { UseMonitorRuntimeResult } from "../app/hooks/useMonitorRuntime";
@@ -13,6 +14,7 @@ import { PromptsPrimaryView } from "./PromptsPrimaryView";
 import { SettingsPrimaryView } from "./SettingsPrimaryView";
 
 type PrimaryViewRouterProps = {
+  flowPrimaryViewProps: React.ComponentProps<typeof FlowPrimaryView>;
   activePrimaryNav: PrimaryNavIndex;
   deckPrimaryViewProps: ComponentProps<typeof DeckPrimaryView>;
   isMonitorVisible: boolean;
@@ -37,6 +39,7 @@ type PrimaryViewRouterProps = {
 };
 
 export const PrimaryViewRouter = ({
+  flowPrimaryViewProps,
   activePrimaryNav,
   deckPrimaryViewProps,
   isMonitorVisible,
@@ -95,6 +98,10 @@ export const PrimaryViewRouter = ({
 
   if (activePrimaryNav === 8) {
     return <SettingsPrimaryView {...settingsPrimaryViewProps} />;
+  }
+
+  if (activePrimaryNav === 9) {
+    return <FlowPrimaryView {...flowPrimaryViewProps} />;
   }
 
   return <CanvasPrimaryView {...canvasPrimaryViewProps} />;

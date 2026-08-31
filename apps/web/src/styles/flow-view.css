@@ -1,0 +1,246 @@
+/* ─── Flow view: pseudo-3D fleet progress ────────────────────────────────── */
+
+.flow-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  background: radial-gradient(ellipse at 30% 20%, rgba(212, 160, 23, 0.05), transparent 60%),
+    var(--bg-primary, #0a0a0a);
+  user-select: none;
+  touch-action: none;
+}
+
+.flow-view:active {
+  cursor: grabbing;
+}
+
+.flow-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.flow-link {
+  fill: none;
+  stroke: var(--accent-primary, #d4a017);
+  stroke-width: 1.25;
+  opacity: 0.35;
+  stroke-dasharray: 6 10;
+  animation: flow-link-drift 1.4s linear infinite;
+}
+
+@keyframes flow-link-drift {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+.flow-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+
+.flow-node:hover {
+  filter: brightness(1.25);
+}
+
+.flow-node--dimmed {
+  opacity: 0.55;
+}
+
+.flow-node-label {
+  max-width: 140px;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--accent-primary, #d4a017);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-agent-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentcolor;
+}
+
+.flow-agent-dot--live {
+  background: #00c8ff;
+  color: #00c8ff;
+}
+
+.flow-agent-dot--review {
+  background: #f59e0b;
+  color: #f59e0b;
+  animation: flow-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.flow-agent-dot--done {
+  background: #22c55e;
+  color: #22c55e;
+}
+
+.flow-agent-dot--attention {
+  background: #f59e0b;
+  color: #f59e0b;
+}
+
+.flow-agent-dot--inactive {
+  background: #6b7280;
+  color: transparent;
+}
+
+@keyframes flow-dot-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px currentcolor;
+  }
+  50% {
+    box-shadow: 0 0 16px currentcolor;
+  }
+}
+
+/* ─── Hover / pinned card ─────────────────────────────────────────────────── */
+
+.flow-card-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.flow-card {
+  width: 240px;
+  padding: 10px 12px;
+  border: 1px solid rgba(212, 160, 23, 0.4);
+  border-radius: 6px;
+  background: rgba(10, 10, 10, 0.92);
+  pointer-events: auto;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.flow-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.flow-card-title {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary, #d4a017);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-card-state {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  background: rgba(0, 200, 255, 0.15);
+  color: #00c8ff;
+}
+
+.flow-card-state--awaiting-review {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+}
+
+.flow-card-state--completed {
+  background: rgba(34, 197, 94, 0.16);
+  color: #22c55e;
+}
+
+.flow-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.flow-card-progress-track {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.flow-card-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-primary, #d4a017);
+  transition: width 300ms ease;
+}
+
+.flow-card-progress-text {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+.flow-card-summary {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.flow-card-task {
+  margin: 0 0 4px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.85);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.flow-card-facts {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.flow-card-open {
+  margin-top: 8px;
+  padding: 3px 10px;
+  border: 1px solid rgba(212, 160, 23, 0.5);
+  border-radius: 4px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--accent-primary, #d4a017);
+  cursor: pointer;
+}
+
+.flow-card-open:hover {
+  background: rgba(212, 160, 23, 0.15);
+}
+
+.flow-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}

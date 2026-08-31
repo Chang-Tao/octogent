@@ -15,6 +15,7 @@ export const PRIMARY_NAV_ITEMS = [
   { index: 6, labelKey: "web.nav.conversations" as const },
   { index: 7, labelKey: "web.nav.prompts" as const },
   { index: 8, labelKey: "web.nav.settings" as const },
+  { index: 9, labelKey: "web.nav.flow" as const },
 ] as const;
 
 export const GITHUB_COMMIT_SERIES_LENGTH = 30;

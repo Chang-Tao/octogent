@@ -149,6 +149,11 @@ export const zhCN: TranslationMap = {
   "web.nav.conversations": "对话",
   "web.nav.prompts": "提示词",
   "web.nav.settings": "设置",
+  "web.nav.flow": "进度",
+  "web.a11y.flowView": "进度全景视图",
+  "web.flow.hint": "拖拽平移 · 滚轮缩放 · 单击节点固定卡片",
+  "web.flow.openTerminal": "打开终端",
+  "web.flow.todoProgress": "待办 {done}/{total}",
   "web.nav.hint": "按 1-{max} 导航",
 
   // ── Web: Settings ────────────────────────────────────
