@@ -45,6 +45,8 @@ type CreateSessionRuntimeOptions = {
     tentacleId: string;
   } | null;
   getTentacleWorkspaceCwd: (tentacleId: string) => string;
+  /** The primary workspace's .git dir, which worktree agents must reach. */
+  sharedGitDir?: string;
   isDebugPtyLogsEnabled: boolean;
   ptyLogDir: string;
   transcriptDirectoryPath: string;
@@ -68,6 +70,7 @@ export const createSessionRuntime = ({
   sessions,
   resolveTerminalSession,
   getTentacleWorkspaceCwd,
+  sharedGitDir,
   isDebugPtyLogsEnabled,
   ptyLogDir,
   transcriptDirectoryPath,
@@ -495,7 +498,11 @@ export const createSessionRuntime = ({
     const terminal = terminals.get(session.terminalId);
     const provider = terminal?.agentProvider ?? DEFAULT_AGENT_PROVIDER;
 
-    const bootstrapCommand = resolveBootstrapCommand(provider);
+    // A worktree keeps its git index under the primary repo's .git, which the
+    // Codex sandbox cannot reach unless that dir is opened explicitly.
+    const bootstrapCommand = resolveBootstrapCommand(provider, process.env, {
+      gitSharedDirs: terminal?.workspaceMode === "worktree" && sharedGitDir ? [sharedGitDir] : [],
+    });
     appendDebugLog(session, `bootstrap session=${sessionId} command=${bootstrapCommand}`);
     session.pty?.write(`${bootstrapCommand}\r`);
 

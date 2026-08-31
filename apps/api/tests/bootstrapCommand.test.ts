@@ -52,4 +52,16 @@ describe("resolveBootstrapCommand", () => {
   it("falls back to the default provider for an unknown one", () => {
     expect(resolveBootstrapCommand("who-knows", {})).toBe("claude --permission-mode auto");
   });
+
+  it("opens the shared git dir to Codex so worktree commits clear the sandbox", () => {
+    expect(resolveBootstrapCommand("codex", {}, { gitSharedDirs: ["/repo/.git"] })).toBe(
+      'codex --sandbox workspace-write --ask-for-approval never --add-dir "/repo/.git"',
+    );
+  });
+
+  it("does not add sandbox dirs to Claude, which has no sandbox", () => {
+    expect(resolveBootstrapCommand("claude-code", {}, { gitSharedDirs: ["/repo/.git"] })).toBe(
+      "claude --permission-mode auto",
+    );
+  });
 });

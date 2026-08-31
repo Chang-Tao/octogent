@@ -53,10 +53,24 @@ export const resolveCodexApprovalPolicy = (env: BootstrapEnv): string => {
  * each step can set OCTOGENT_CLAUDE_PERMISSION_MODE=manual or
  * OCTOGENT_CODEX_APPROVAL_POLICY=on-request.
  */
+type BootstrapOptions = {
+  /**
+   * Directories the Codex sandbox must be able to write beyond the workspace.
+   * A git worktree keeps its index and refs under the main repo's .git, which
+   * sits outside the worktree — without opening it, `git add`/`git commit`
+   * fail silently inside the sandbox. Claude has no sandbox and ignores this.
+   */
+  gitSharedDirs?: string[];
+};
+
 export const resolveBootstrapCommand = (
   provider: string,
   env: BootstrapEnv = process.env,
-): string =>
-  provider === "codex"
-    ? `codex --sandbox ${resolveCodexSandboxMode(env)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}`
-    : `claude --permission-mode ${resolveClaudePermissionMode(env)}`;
+  options: BootstrapOptions = {},
+): string => {
+  if (provider === "codex") {
+    const addDirFlags = (options.gitSharedDirs ?? []).map((dir) => ` --add-dir "${dir}"`).join("");
+    return `codex --sandbox ${resolveCodexSandboxMode(env)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}${addDirFlags}`;
+  }
+  return `claude --permission-mode ${resolveClaudePermissionMode(env)}`;
+};
