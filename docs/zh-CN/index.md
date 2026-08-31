@@ -16,6 +16,7 @@ Octogent 包含三个主要层次：
 
 ## 概念
 
+- [心智模型](concepts/mental-model.md) 解释了触手、终端、工作树和运行时状态之间的边界
 - [触手](concepts/tentacles.md) 解释了基于文件的上下文模型以及 Deck 如何读取它
 - [运行时与 API](concepts/runtime-and-api.md) 解释了终端生命周期、WebSocket、钩子、持久化和重启行为
 

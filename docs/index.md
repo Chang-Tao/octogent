@@ -16,6 +16,7 @@ Octogent has three main layers:
 
 ## Concepts
 
+- [Mental Model](concepts/mental-model.md) explains the boundaries between tentacles, terminals, worktrees, and runtime state
 - [Tentacles](concepts/tentacles.md) explains the file-backed context model and how Deck reads it
 - [Runtime and API](concepts/runtime-and-api.md) explains terminal lifecycle, WebSockets, hooks, persistence, and restart behavior
 

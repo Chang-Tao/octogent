@@ -71,6 +71,12 @@ This repo is a personal exploration of what an AI coding environment might look 
 - **Supports inter-agent messaging** so workers and coordinators can report completion, blockers, and handoff notes
 - **Keeps agent-facing context in files** so the system is more durable than a single prompt thread
 - **Provides a local API and UI** for terminal lifecycle, persistence, websocket transport, and orchestration
+- **Tracks a completion lifecycle** so Claude's Stop hook decides whether a finished terminal is completed or awaiting review, and stamps a completion summary card (task, commits, diff stats, branch, merged flag, duration)
+- **Opens on the flow progress view** — a pseudo-3D layered spread of the whole fleet, with hover cards narrating each node's role and its previous/current/next step
+- **Auto-archives finished terminals after a retention period** (`OCTOGENT_TERMINAL_RETENTION_HOURS`, default 72h) and reclaims merged worktrees (`octogent worktree gc`) — unmerged work is never deleted by any automated path
+- **Exposes `GET /api/health`** for daemon and monitor probes
+- **Runs as a systemd user service** so Octogent can stay up in the background
+- **Lets you switch the Claude usage source** via `OCTOGENT_CLAUDE_USAGE_SOURCE` (auto/oauth/cli/off, OAuth first by default)
 
 A **tentacle** is a folder under `.octogent/tentacles/<tentacle-id>/` that holds agent-readable markdown such as `CONTEXT.md`, `todo.md`, and any extra notes needed for that slice of the codebase.
 
@@ -182,7 +188,7 @@ Startup fails if neither `claude` nor another supported provider binary is insta
 - `~/.octogent/projects/<project-id>/state/` keeps runtime state, transcripts, monitor cache, and metadata
 - `.octogent/tentacles/<tentacle-id>/` keeps the context files and todos that agents read
 
-PTY sessions survive browser reloads during the idle grace period, but they do **not** survive an API restart. Octogent marks previously running terminal records as `stale` on startup when it cannot reattach them to a live PTY session; use `octogent terminal list`, `stop`, `kill`, and `prune` to inspect and clean them up. Octogent caps live PTY sessions at 32 by default to protect the host; set `OCTOGENT_MAX_TERMINAL_SESSIONS` to a positive integer to tune that limit for larger orchestration runs.
+PTY sessions survive browser reloads during the idle grace period, but they do **not** survive an API restart. Octogent marks previously running terminal records as `stale` on startup when it cannot reattach them to a live PTY session; use `octogent terminal list`, `stop`, `kill`, and `prune` to inspect and clean them up. Octogent caps live PTY sessions at 32 by default to protect the host; set `OCTOGENT_MAX_TERMINAL_SESSIONS` to a positive integer to tune that limit for larger orchestration runs. Archiving only hides a finished terminal record from default listings and deletes no files; archived records stay reachable via `octogent terminal list --archived` (or `?includeArchived=1` on the API).
 
 ## Docs
 
@@ -199,6 +205,7 @@ PTY sessions survive browser reloads during the idle grace period, but they do *
 - [Filesystem Layout](docs/reference/filesystem-layout.md)
 - [API Reference](docs/reference/api.md)
 - [Experimental Features](docs/reference/experimental-features.md)
+- [Running as a systemd User Service](docs/reference/systemd.md)
 - [Troubleshooting](docs/reference/troubleshooting.md)
 - [Contributing](CONTRIBUTING.md)
 
