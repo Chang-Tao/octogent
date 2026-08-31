@@ -16,16 +16,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A completion summary (task line, commits, diff stats, branch, merged flag,
   duration) is stamped on the record and shown in the canvas node tooltip;
   session nodes carry DONE / REVIEW pills and a Hide Done toolbar toggle.
+### Orchestration, flow view, and operations (this fork's evolution, phases 2–4)
+
+- Channel delivery reaches a live agent reliably — three fixes surfaced by the
+  pilot swarm run: injection writes a bracketed paste and submits with a
+  delayed Enter (so the TUI cannot swallow the return), delivery requires a
+  live transcript instead of a merely idle shell and marks delivered only
+  after a successful write, and a session-start handover replays the queued
+  backlog when a fresh agent starts in the same PTY. Agent PTYs also no longer
+  inherit the operator's Claude session environment markers.
+- The multi-agent workflow closed the loop on a live swarm run: pilot and
+  worker agents built this batch's features in worktrees and merged them back,
+  that run surfaced the channel-delivery bugs above, and the flow layout
+  engine is tested against the hierarchy shape the run produced.
+- New flow progress view: a pseudo-3D depth-staged scene of the whole fleet
+  (octoboss → tentacles → agents → swarm workers), with pan/zoom, hover cards,
+  click-to-pin, and completed agents rendered as calm dimmed dots. It is now
+  the first page (nav schema 2): the view order lives in one named map, and
+  persisted UI state without `navSchemaVersion: 2` has its saved view index
+  migrated so nobody reloads into the wrong view.
+- Each flow card narrates its node in both languages: a role line (fleet
+  commander, tentacle description, swarm coordinator with sub-agent count,
+  worker isolation mode) and a previous/current/next strip read from todos,
+  latest commits, live runtime state, and the lifecycle.
+- Claude usage source switch (`OCTOGENT_CLAUDE_USAGE_SOURCE`: auto/oauth/cli/
+  off, OAuth first by default), a systemd user-service deployment guide, and
+  `GET /api/health` for daemon and monitor probes.
 - Finished records auto-archive after a retention period
   (`OCTOGENT_TERMINAL_RETENTION_HOURS`, default 72h); archived worktrees whose
   work is merged are reclaimed (`octogent worktree gc`), and unmerged work is
   never deleted by any automated path.
-- Channel delivery reaches a live agent reliably (bracketed paste with delayed
-  Enter, live-transcript guard, backlog handover on session-start), and agent
-  PTYs no longer inherit the operator's Claude session markers.
-- New `GET /api/health`, Claude usage source switch
-  (`OCTOGENT_CLAUDE_USAGE_SOURCE`, OAuth first), and a systemd user-service
-  deployment guide.
 
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull
