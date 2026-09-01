@@ -53,14 +53,32 @@ describe("resolveBootstrapCommand", () => {
     expect(resolveBootstrapCommand("who-knows", {})).toBe("claude --permission-mode auto");
   });
 
-  it("opens the shared git dir to Codex so worktree commits clear the sandbox", () => {
-    expect(resolveBootstrapCommand("codex", {}, { gitSharedDirs: ["/repo/.git"] })).toBe(
-      'codex --sandbox workspace-write --ask-for-approval never --add-dir "/repo/.git"',
+  it("drops the sandbox for Codex worktree terminals so commits can reach .git", () => {
+    // workspace-write mounts .git read-only with no opt-out, which would
+    // strand every worktree agent at its final commit.
+    expect(resolveBootstrapCommand("codex", {}, { workspaceMode: "worktree" })).toBe(
+      "codex --sandbox danger-full-access --ask-for-approval never",
     );
   });
 
-  it("does not add sandbox dirs to Claude, which has no sandbox", () => {
-    expect(resolveBootstrapCommand("claude-code", {}, { gitSharedDirs: ["/repo/.git"] })).toBe(
+  it("keeps the sandbox for Codex shared-mode terminals", () => {
+    expect(resolveBootstrapCommand("codex", {}, { workspaceMode: "shared" })).toBe(
+      "codex --sandbox workspace-write --ask-for-approval never",
+    );
+  });
+
+  it("lets an explicit sandbox override win over the workspace-mode default", () => {
+    expect(
+      resolveBootstrapCommand(
+        "codex",
+        { OCTOGENT_CODEX_SANDBOX_MODE: "read-only" },
+        { workspaceMode: "worktree" },
+      ),
+    ).toBe("codex --sandbox read-only --ask-for-approval never");
+  });
+
+  it("ignores workspace mode for Claude, which has no sandbox", () => {
+    expect(resolveBootstrapCommand("claude-code", {}, { workspaceMode: "worktree" })).toBe(
       "claude --permission-mode auto",
     );
   });

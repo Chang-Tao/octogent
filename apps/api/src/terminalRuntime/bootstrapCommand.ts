@@ -32,9 +32,24 @@ export const resolveClaudePermissionMode = (env: BootstrapEnv): string => {
     : DEFAULT_CLAUDE_PERMISSION_MODE;
 };
 
-export const resolveCodexSandboxMode = (env: BootstrapEnv): string => {
+export const resolveCodexSandboxMode = (
+  env: BootstrapEnv,
+  workspaceMode?: "shared" | "worktree",
+): string => {
   const requested = env.OCTOGENT_CODEX_SANDBOX_MODE?.trim();
-  return requested && CODEX_SANDBOX_MODES.has(requested) ? requested : DEFAULT_CODEX_SANDBOX_MODE;
+  if (requested && CODEX_SANDBOX_MODES.has(requested)) {
+    return requested;
+  }
+  // Codex mounts every .git read-only under workspace-write with no opt-out
+  // (verified: "Unable to create .git/index.lock: Read-only file system"), so
+  // a worktree agent could never commit its work. Worktree terminals therefore
+  // run without the sandbox — the same posture Claude (which has no sandbox)
+  // always had — while shared-mode terminals keep it: they are told not to
+  // commit at all, so the .git protection costs them nothing.
+  if (workspaceMode === "worktree") {
+    return "danger-full-access";
+  }
+  return DEFAULT_CODEX_SANDBOX_MODE;
 };
 
 export const resolveCodexApprovalPolicy = (env: BootstrapEnv): string => {
@@ -54,13 +69,8 @@ export const resolveCodexApprovalPolicy = (env: BootstrapEnv): string => {
  * OCTOGENT_CODEX_APPROVAL_POLICY=on-request.
  */
 type BootstrapOptions = {
-  /**
-   * Directories the Codex sandbox must be able to write beyond the workspace.
-   * A git worktree keeps its index and refs under the main repo's .git, which
-   * sits outside the worktree — without opening it, `git add`/`git commit`
-   * fail silently inside the sandbox. Claude has no sandbox and ignores this.
-   */
-  gitSharedDirs?: string[];
+  /** Decides the Codex sandbox default; see resolveCodexSandboxMode. */
+  workspaceMode?: "shared" | "worktree";
 };
 
 export const resolveBootstrapCommand = (
@@ -69,8 +79,7 @@ export const resolveBootstrapCommand = (
   options: BootstrapOptions = {},
 ): string => {
   if (provider === "codex") {
-    const addDirFlags = (options.gitSharedDirs ?? []).map((dir) => ` --add-dir "${dir}"`).join("");
-    return `codex --sandbox ${resolveCodexSandboxMode(env)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}${addDirFlags}`;
+    return `codex --sandbox ${resolveCodexSandboxMode(env, options.workspaceMode)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}`;
   }
   return `claude --permission-mode ${resolveClaudePermissionMode(env)}`;
 };
