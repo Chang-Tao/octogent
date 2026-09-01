@@ -7,6 +7,7 @@ import {
   type TerminalAgentProvider,
   type TerminalNameOrigin,
 } from "../terminalRuntime";
+import type { EffortTier } from "../terminalRuntime/modelSelection";
 import type { ApiRouteHandler } from "./routeHelpers";
 import {
   readJsonBodyOrWriteError,
@@ -16,6 +17,7 @@ import {
 } from "./routeHelpers";
 import {
   parseTerminalAgentProvider,
+  parseTerminalModelSelection,
   parseTerminalName,
   parseTerminalNameOrigin,
   parseTerminalWorkspaceMode,
@@ -103,6 +105,12 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     return true;
   }
 
+  const modelSelectionResult = parseTerminalModelSelection(bodyReadResult.payload);
+  if (modelSelectionResult.error) {
+    writeJson(response, 400, { error: modelSelectionResult.error }, corsOrigin);
+    return true;
+  }
+
   try {
     const createTerminalInput: {
       terminalId?: string;
@@ -111,6 +119,8 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
       tentacleName?: string;
       workspaceMode: TentacleWorkspaceMode;
       agentProvider?: TerminalAgentProvider;
+      agentModel?: string;
+      agentEffort?: EffortTier;
       nameOrigin?: TerminalNameOrigin;
       initialPrompt?: string;
       initialInputDraft?: string;
@@ -124,6 +134,12 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     }
     if (agentProviderResult.agentProvider !== undefined) {
       createTerminalInput.agentProvider = agentProviderResult.agentProvider;
+    }
+    if (modelSelectionResult.agentModel !== undefined) {
+      createTerminalInput.agentModel = modelSelectionResult.agentModel;
+    }
+    if (modelSelectionResult.agentEffort !== undefined) {
+      createTerminalInput.agentEffort = modelSelectionResult.agentEffort;
     }
     if (nameOriginResult.nameOrigin !== undefined) {
       createTerminalInput.nameOrigin = nameOriginResult.nameOrigin;

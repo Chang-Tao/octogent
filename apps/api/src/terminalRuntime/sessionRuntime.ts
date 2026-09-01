@@ -499,6 +499,10 @@ export const createSessionRuntime = ({
 
     const bootstrapCommand = resolveBootstrapCommand(provider, process.env, {
       ...(terminal?.workspaceMode ? { workspaceMode: terminal.workspaceMode } : {}),
+      ...(terminal?.agentModel ? { agentModel: terminal.agentModel } : {}),
+      ...(terminal?.agentReasoningEffort
+        ? { codexReasoningEffort: terminal.agentReasoningEffort }
+        : {}),
     });
     appendDebugLog(session, `bootstrap session=${sessionId} command=${bootstrapCommand}`);
     session.pty?.write(`${bootstrapCommand}\r`);

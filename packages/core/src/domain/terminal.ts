@@ -49,6 +49,10 @@ export type TerminalSnapshot = {
   createdAt: string;
   hasUserPrompt?: boolean;
   parentTerminalId?: string;
+  /** Model requested at creation (explicitly or via an effort tier). */
+  agentModel?: string;
+  /** Difficulty tier the model was chosen from, when one was given. */
+  agentEffortTier?: string;
   agentRuntimeState?: AgentRuntimeState;
   lifecycleState?: TerminalLifecycleState;
   lifecycleReason?: string;

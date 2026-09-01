@@ -71,6 +71,9 @@ export const resolveCodexApprovalPolicy = (env: BootstrapEnv): string => {
 type BootstrapOptions = {
   /** Decides the Codex sandbox default; see resolveCodexSandboxMode. */
   workspaceMode?: "shared" | "worktree";
+  /** Validated at terminal creation by modelSelection; empty means default. */
+  agentModel?: string;
+  codexReasoningEffort?: string;
 };
 
 export const resolveBootstrapCommand = (
@@ -79,7 +82,11 @@ export const resolveBootstrapCommand = (
   options: BootstrapOptions = {},
 ): string => {
   if (provider === "codex") {
-    return `codex --sandbox ${resolveCodexSandboxMode(env, options.workspaceMode)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}`;
+    const modelFlags = options.agentModel
+      ? ` -m ${options.agentModel}${options.codexReasoningEffort ? ` -c model_reasoning_effort=${options.codexReasoningEffort}` : ""}`
+      : "";
+    return `codex --sandbox ${resolveCodexSandboxMode(env, options.workspaceMode)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}${modelFlags}`;
   }
-  return `claude --permission-mode ${resolveClaudePermissionMode(env)}`;
+  const modelFlag = options.agentModel ? ` --model ${options.agentModel}` : "";
+  return `claude --permission-mode ${resolveClaudePermissionMode(env)}${modelFlag}`;
 };

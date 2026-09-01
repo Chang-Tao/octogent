@@ -38,6 +38,7 @@ import {
 } from "./terminalRuntime/conversations";
 import { createGitOperations } from "./terminalRuntime/gitOperations";
 import { createHookProcessor } from "./terminalRuntime/hookProcessor";
+import { type EffortTier, resolveAgentModelSelection } from "./terminalRuntime/modelSelection";
 import {
   createTerminalRegistryPersistence,
   loadTerminalRegistry,
@@ -621,6 +622,8 @@ export const createTerminalRuntime = ({
       createdAt: terminal.createdAt,
       hasUserPrompt: isTerminalRecentlyActive(terminal),
       ...(terminal.parentTerminalId ? { parentTerminalId: terminal.parentTerminalId } : {}),
+      ...(terminal.agentModel ? { agentModel: terminal.agentModel } : {}),
+      ...(terminal.agentEffortTier ? { agentEffortTier: terminal.agentEffortTier } : {}),
       ...(terminal.completedAt ? { completedAt: terminal.completedAt } : {}),
       ...(terminal.completionSummary ? { completionSummary: terminal.completionSummary } : {}),
       ...(session ? { agentRuntimeState: session.agentState } : {}),
@@ -684,6 +687,8 @@ export const createTerminalRuntime = ({
     tentacleName,
     workspaceMode = "shared",
     agentProvider,
+    agentModel,
+    agentEffort,
     initialPrompt,
     initialInputDraft,
     baseRef,
@@ -697,6 +702,8 @@ export const createTerminalRuntime = ({
     tentacleName?: string;
     workspaceMode?: TentacleWorkspaceMode;
     agentProvider?: TerminalAgentProvider;
+    agentModel?: string;
+    agentEffort?: EffortTier;
     initialPrompt?: string;
     initialInputDraft?: string;
     baseRef?: string;
@@ -739,6 +746,13 @@ export const createTerminalRuntime = ({
     const worktreeId =
       requestedWorktreeId ?? (workspaceMode === "worktree" ? terminalId : undefined);
 
+    const effectiveProvider = agentProvider ?? DEFAULT_AGENT_PROVIDER;
+    const modelSelection = resolveAgentModelSelection({
+      provider: effectiveProvider,
+      ...(agentModel !== undefined ? { model: agentModel } : {}),
+      ...(agentEffort !== undefined ? { effort: agentEffort } : {}),
+    });
+
     const terminal: PersistedTerminal = {
       terminalId,
       tentacleId,
@@ -748,7 +762,12 @@ export const createTerminalRuntime = ({
       ...(autoRenamePromptContext ? { autoRenamePromptContext } : {}),
       createdAt: new Date().toISOString(),
       workspaceMode,
-      agentProvider: agentProvider ?? DEFAULT_AGENT_PROVIDER,
+      agentProvider: effectiveProvider,
+      ...(modelSelection ? { agentModel: modelSelection.model } : {}),
+      ...(modelSelection?.codexReasoningEffort
+        ? { agentReasoningEffort: modelSelection.codexReasoningEffort }
+        : {}),
+      ...(modelSelection?.effortTier ? { agentEffortTier: modelSelection.effortTier } : {}),
       lifecycleState: "registered",
       lifecycleUpdatedAt: new Date().toISOString(),
       ...(initialPrompt ? { initialPrompt } : {}),

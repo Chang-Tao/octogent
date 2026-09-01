@@ -82,4 +82,28 @@ describe("resolveBootstrapCommand", () => {
       "claude --permission-mode auto",
     );
   });
+
+  it("passes a requested model to Claude", () => {
+    expect(resolveBootstrapCommand("claude-code", {}, { agentModel: "opus" })).toBe(
+      "claude --permission-mode auto --model opus",
+    );
+  });
+
+  it("passes a requested model and reasoning effort to Codex", () => {
+    expect(
+      resolveBootstrapCommand(
+        "codex",
+        {},
+        { workspaceMode: "worktree", agentModel: "gpt-5.6-luna", codexReasoningEffort: "low" },
+      ),
+    ).toBe(
+      "codex --sandbox danger-full-access --ask-for-approval never -m gpt-5.6-luna -c model_reasoning_effort=low",
+    );
+  });
+
+  it("passes a Codex model without touching reasoning effort when none is set", () => {
+    expect(resolveBootstrapCommand("codex", {}, { agentModel: "gpt-5.4" })).toBe(
+      "codex --sandbox workspace-write --ask-for-approval never -m gpt-5.4",
+    );
+  });
 });
