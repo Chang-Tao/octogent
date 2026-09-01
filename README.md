@@ -64,12 +64,12 @@
 
 - **把触手当作上下文层来创建**，让代理使用作用域内的 markdown 文件工作，而不是宽泛混乱的聊天上下文
 - **把 `todo.md` 用作执行面**，让任务保持可见、可跟踪、随时可以委派
-- **同时运行多个 Claude Code 终端**，让一个开发者能协调多个编码会话
+- **同时运行多个 agent 终端（Claude Code 或 Codex）**，让一个开发者能协调多个编码会话
 - **从待办项生成子代理**，让并行工作有具体的事实来源
 - **支持代理间消息传递**，让工作代理与协调者能报告完成、阻塞和交接说明
 - **把面向代理的上下文保存在文件里**，让系统比单条提示词线程更持久
 - **提供本地 API 与 UI**，覆盖终端生命周期、持久化、WebSocket 传输和编排
-- **跟踪完成态生命周期**，由 Claude 的 Stop 钩子判定终端是已完成还是待审阅，并生成完成汇报卡（任务、提交、diff 统计、分支、是否合并、耗时）
+- **跟踪完成态生命周期**，由 agent 的 Stop 钩子判定终端是已完成还是待审阅，并生成完成汇报卡（任务、提交、diff 统计、分支、是否合并、耗时）
 - **打开即见进度全景页**，以伪 3D 把整个舰队按层级铺开，悬停卡讲述每个节点的角色与上一步/当前/下一步
 - **在保留期后自动归档收尾的终端**（`OCTOGENT_TERMINAL_RETENTION_HOURS`，默认 72 小时），并回收已合并的 worktree（`octogent worktree gc`）——未合并的工作绝不会被任何自动路径删除
 - **提供 `GET /api/health`**，供守护进程与监控探活
@@ -125,7 +125,7 @@ Octogent 把通常混在一堆终端里的三种关注点分开：
 2. **执行**位于本地 API 管理的终端记录与 PTY 会话中。终端可以挂载到已有触手，集群工作时多个终端可以共享一个触手。
 3. **隔离**是可选的。共享终端在主工作区运行；工作树终端在 `.octogent/worktrees/<worktree-id>/` 下的 `octogent/<worktree-id>` 分支上运行。
 
-Deck 直接读取触手文件，从 `todo.md` 解析复选框项，并用未完成项生成工作代理的提示词。Claude 钩子把代理状态、转录和空闲事件喂给 API，让 UI 能展示比原始终端输出更多的信息。
+Deck 直接读取触手文件，从 `todo.md` 解析复选框项，并用未完成项生成工作代理的提示词。代理钩子——Claude Code 自带的，或 Octogent 自动配置的 Codex 钩子——把代理状态、转录和空闲事件喂给 API，让 UI 能展示比原始终端输出更多的信息。
 
 ## 快速开始
 
@@ -173,12 +173,12 @@ octogent
 ## 环境要求
 
 - Node.js `22+`
-- 安装 `claude`（受支持的代理工作流）
+- `claude`（Claude Code 终端）和/或 `codex`（Codex 终端）——至少需要一个受支持的 agent 二进制
 - `git`（工作树终端）
 - `gh`（GitHub Pull Request 功能）
-- `curl`（当前的 Claude 钩子回调流程）
+- `curl`（agent 钩子回调流程）
 
-如果 `claude` 和其他受支持的提供方二进制都未安装，启动会失败。当前文档只覆盖 **Claude Code**。
+如果 `claude` 和 `codex` 都未安装，启动会失败。**Claude Code** 与 **Codex** 两种终端均受支持——用 `octogent terminal create --agent-provider` 按终端选择。Codex 终端开箱即可无人值守运行：Octogent 会自动写入 `.codex/hooks.json`，并在 Codex 的 `config.toml` 中预置项目信任与钩子信任哈希。Codex 的已知限制：对话页暂无转录回放（Codex 的 rollout 格式尚未接入），也没有 code-intel 事件。
 
 ## 什么会持久化
 
