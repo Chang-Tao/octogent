@@ -294,7 +294,11 @@ export const handleTerminalItemRoute: ApiRouteHandler = async (
   const terminalId = decodeURIComponent(renameMatch[1] ?? "");
   if (request.method === "DELETE") {
     try {
-      runtime.deleteTerminal(terminalId);
+      // The worktree directory survives a plain delete (record only); pass
+      // ?removeWorktree=true to reclaim it, which the caller does only after
+      // confirming any unmerged work is expendable.
+      const removeWorktree = requestUrl.searchParams.get("removeWorktree") === "true";
+      runtime.deleteTerminal(terminalId, { removeWorktree });
       writeNoContent(response, 204, corsOrigin);
       return true;
     } catch (error) {
@@ -329,6 +333,30 @@ export const handleTerminalItemRoute: ApiRouteHandler = async (
   }
 
   writeJson(response, 200, payload, corsOrigin);
+  return true;
+};
+
+const TERMINAL_DELETE_PREVIEW_PATTERN = /^\/api\/terminals\/([^/]+)\/delete-preview$/;
+
+export const handleTerminalDeletePreviewRoute: ApiRouteHandler = async (
+  { request, response, requestUrl, corsOrigin },
+  { runtime },
+) => {
+  const match = requestUrl.pathname.match(TERMINAL_DELETE_PREVIEW_PATTERN);
+  if (!match) {
+    return false;
+  }
+  if (request.method !== "GET") {
+    writeMethodNotAllowed(response, corsOrigin);
+    return true;
+  }
+  const terminalId = decodeURIComponent(match[1] ?? "");
+  const preview = runtime.previewTerminalDeletion(terminalId);
+  if (!preview.exists) {
+    writeJson(response, 404, { error: "Terminal not found." }, corsOrigin);
+    return true;
+  }
+  writeJson(response, 200, preview, corsOrigin);
   return true;
 };
 

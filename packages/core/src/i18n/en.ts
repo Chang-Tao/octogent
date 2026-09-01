@@ -16,6 +16,12 @@ export const en: TranslationMap = {
   "cli.killed.terminal": "Killed terminal {id}",
   "cli.stopped.terminal": "Stopped terminal {id}",
   "cli.archived.terminal": "Archived terminal {id}",
+  "cli.deleted.terminal": "Deleted terminal {id} (worktree kept on disk)",
+  "cli.deleted.terminalWithWorktree": "Deleted terminal {id} and its worktree",
+  "cli.delete.sharedWorktree":
+    "Error: this worktree is still shared by terminal(s) {ids}; delete those first.",
+  "cli.delete.unmergedWarning":
+    "Error: worktree branch {branch} has {count} unmerged commit(s) that would be lost. Re-run with --force to delete anyway.",
   "cli.archived.terminals": "Archived {count} completed terminals.",
   "cli.sent.message": "Message sent to terminal {to}",
   "cli.migrated.state": "Migrated state to {path}",

@@ -63,6 +63,7 @@ import {
 import {
   handleTerminalActionRoute,
   handleTerminalArchiveCompletedRoute,
+  handleTerminalDeletePreviewRoute,
   handleTerminalItemRoute,
   handleTerminalPruneRoute,
   handleTerminalSnapshotsRoute,
@@ -157,6 +158,7 @@ const API_ROUTE_MAP: ReadonlyMap<string, readonly ApiRouteHandler[]> = new Map([
       handleTerminalsCollectionRoute,
       handleTerminalPruneRoute,
       handleTerminalArchiveCompletedRoute,
+      handleTerminalDeletePreviewRoute,
       handleTerminalActionRoute,
       handleTerminalItemRoute,
     ],

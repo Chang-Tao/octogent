@@ -15,6 +15,11 @@ export const zhCN: TranslationMap = {
   "cli.killed.terminal": "已终止终端 {id}",
   "cli.stopped.terminal": "已停止终端 {id}",
   "cli.archived.terminal": "已归档终端 {id}",
+  "cli.deleted.terminal": "已删除终端 {id}（worktree 目录保留在磁盘）",
+  "cli.deleted.terminalWithWorktree": "已删除终端 {id} 及其 worktree",
+  "cli.delete.sharedWorktree": "错误：该 worktree 仍被终端 {ids} 共享，请先删除它们。",
+  "cli.delete.unmergedWarning":
+    "错误：worktree 分支 {branch} 有 {count} 个未合并提交将丢失。确认要删除请加 --force 重试。",
   "cli.archived.terminals": "已归档 {count} 个已完成终端。",
   "cli.sent.message": "消息已发送至终端 {to}",
   "cli.migrated.state": "已将状态迁移至 {path}",

@@ -116,6 +116,20 @@ octogent terminal archive --all-completed
 
 Archiving stamps `archivedAt` on the record so default listings hide it; transcripts and completion summaries are kept on disk. A running terminal cannot be archived. `--all-completed` archives every record whose lifecycle state is `completed`. Records in `completed`, `stopped`, or `exited` state are also archived automatically once `OCTOGENT_TERMINAL_RETENTION_HOURS` passes; `awaiting-review` records are never auto-archived so unmerged work stays visible.
 
+## Delete a terminal
+
+```bash
+octogent terminal delete <terminal-id>
+octogent terminal delete <terminal-id> --with-worktree [--force]
+```
+
+`delete` (alias `rm`) removes the terminal record. By default it removes only
+the record and **keeps the worktree directory on disk** (the iron rule: unmerged
+work is never auto-deleted). Pass `--with-worktree` to also remove the worktree
+directory and branch — before doing so it checks whether the worktree is still
+shared by another terminal (refuses if so) and whether the branch has unmerged
+commits (refuses and reports the count; add `--force` to delete anyway).
+
 ## Prune inactive terminal records
 
 ```bash

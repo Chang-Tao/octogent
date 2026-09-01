@@ -551,6 +551,70 @@ const terminalArchive = async () => {
   }
 };
 
+const terminalDelete = async () => {
+  const terminalId = args[2];
+  if (!terminalId || terminalId.startsWith("-")) {
+    console.error(t(locale, "cli.error.terminalIdRequired"));
+    process.exit(1);
+  }
+  const withWorktree = args.includes("--with-worktree");
+  const force = args.includes("--force");
+  const apiBase = resolveRuntimeApiBase();
+
+  try {
+    if (withWorktree) {
+      // Removing a worktree can destroy unmerged work, so confirm the cost
+      // first and refuse without --force when there are unmerged commits.
+      const previewResponse = await fetch(
+        `${apiBase}/api/terminals/${encodeURIComponent(terminalId)}/delete-preview`,
+        { headers: { Accept: "application/json" } },
+      );
+      const preview = (await previewResponse.json()) as {
+        error?: unknown;
+        sharedWithTerminalIds?: string[];
+        unmergedCommitCount?: number;
+        branch?: string | null;
+      };
+      if (!previewResponse.ok) {
+        console.error(`Error: ${preview.error ?? "Failed"}`);
+        process.exit(1);
+      }
+      const shared = preview.sharedWithTerminalIds ?? [];
+      if (shared.length > 0) {
+        console.error(t(locale, "cli.delete.sharedWorktree", { ids: shared.join(", ") }));
+        process.exit(1);
+      }
+      const unmerged = preview.unmergedCommitCount ?? 0;
+      if (unmerged > 0 && !force) {
+        console.error(
+          t(locale, "cli.delete.unmergedWarning", {
+            count: unmerged,
+            branch: preview.branch ?? "?",
+          }),
+        );
+        process.exit(1);
+      }
+    }
+
+    const response = await fetch(
+      `${apiBase}/api/terminals/${encodeURIComponent(terminalId)}${withWorktree ? "?removeWorktree=true" : ""}`,
+      { method: "DELETE", headers: { Accept: "application/json" } },
+    );
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      console.error(`Error: ${data.error ?? "Failed"}`);
+      process.exit(1);
+    }
+    console.log(
+      t(locale, withWorktree ? "cli.deleted.terminalWithWorktree" : "cli.deleted.terminal", {
+        id: terminalId,
+      }),
+    );
+  } catch {
+    apiError();
+  }
+};
+
 const terminalPrune = async () => {
   const apiBase = resolveRuntimeApiBase();
 
@@ -763,6 +827,9 @@ const main = async () => {
     }
     if (args[1] === "prune") {
       return terminalPrune();
+    }
+    if (args[1] === "delete" || args[1] === "rm") {
+      return terminalDelete();
     }
   }
 

@@ -9,7 +9,7 @@ import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
 import { ensureCodexDirectoryTrusted } from "./codexTrust";
-import { buildCompletionSummary } from "./completionSummary";
+import { buildCompletionSummary, collectCompletionGitFacts } from "./completionSummary";
 import { logVerbose } from "./logging";
 import {
   createAgentProviderAdapters,
@@ -438,17 +438,20 @@ export const createTerminalRuntime = ({
   };
 
   // The flow view's bottom shelf holds a round of finished, not-reused
-  // terminals; the next dispatch clears them. Archiving a dead husk hides it
+  // terminals; the next dispatch clears them. This covers completed agents too
+  // (including octoboss-direct ones that were never reused), so they do not
+  // pile up round after round. `awaiting-review` is deliberately absent —
+  // unmerged work waiting on a human is never swept. Archiving hides the record
   // from every listing (still on disk, `--archived` reaches it) and reclaims
-  // only merged worktrees — unmerged work is never touched.
-  const DEAD_HUSK_STATES = new Set(["stopped", "exited", "stale"]);
-  const archiveDeadTerminalsForNewBatch = () => {
+  // only merged worktrees; unmerged work is never touched.
+  const FINISHED_SHELF_STATES = new Set(["stopped", "exited", "stale", "completed"]);
+  const archiveFinishedTerminalsForNewBatch = () => {
     const nowMs = Date.now();
     const archivedTerminals: PersistedTerminal[] = [];
     for (const terminal of terminals.values()) {
       if (terminal.archivedAt) continue;
       if (sessions.has(terminal.terminalId)) continue;
-      if (!terminal.lifecycleState || !DEAD_HUSK_STATES.has(terminal.lifecycleState)) continue;
+      if (!terminal.lifecycleState || !FINISHED_SHELF_STATES.has(terminal.lifecycleState)) continue;
 
       terminal.archivedAt = new Date(nowMs).toISOString();
       archivedTerminals.push(terminal);
@@ -743,9 +746,9 @@ export const createTerminalRuntime = ({
       }
     } else {
       // A new top-level dispatch is the "next batch": clear the previous round
-      // of dead husks off the flow-view shelf. Swarm children (which carry a
-      // parentTerminalId) do not count as a new batch.
-      archiveDeadTerminalsForNewBatch();
+      // of finished terminals off the flow-view shelf. Swarm children (which
+      // carry a parentTerminalId) do not count as a new batch.
+      archiveFinishedTerminalsForNewBatch();
     }
 
     const terminalId =
@@ -1180,13 +1183,97 @@ export const createTerminalRuntime = ({
       return { dryRun, candidates, reclaimedWorktreeIds, failedWorktreeIds };
     },
 
-    deleteTerminal(terminalId: string): boolean {
+    // What deleting this terminal with its worktree would cost: how many
+    // commits on the branch are not yet merged into the workspace, and whether
+    // another terminal shares the worktree. The CLI shows this before removing.
+    previewTerminalDeletion(terminalId: string): {
+      exists: boolean;
+      workspaceMode?: TentacleWorkspaceMode;
+      worktreeId?: string;
+      sharedWithTerminalIds: string[];
+      unmergedCommitCount: number;
+      branch: string | null;
+    } {
+      const terminal = terminals.get(terminalId);
+      if (!terminal) {
+        return { exists: false, sharedWithTerminalIds: [], unmergedCommitCount: 0, branch: null };
+      }
+      if (terminal.workspaceMode !== "worktree") {
+        return {
+          exists: true,
+          workspaceMode: terminal.workspaceMode,
+          sharedWithTerminalIds: [],
+          unmergedCommitCount: 0,
+          branch: null,
+        };
+      }
+
+      const cascadeSet = new Set(collectTerminalCascade(terminalId));
+      const worktreeId = terminal.worktreeId ?? terminal.tentacleId;
+      const sharedWithTerminalIds = [...terminals.values()]
+        .filter(
+          (record) =>
+            !cascadeSet.has(record.terminalId) &&
+            record.workspaceMode === "worktree" &&
+            (record.worktreeId ?? record.tentacleId) === worktreeId,
+        )
+        .map((record) => record.terminalId);
+
+      let baseRef = "HEAD";
+      try {
+        const branch = runGit(workspaceCwd, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+        if (branch.length > 0) baseRef = branch;
+      } catch {
+        // Keep HEAD.
+      }
+      let unmergedCommitCount = 0;
+      let branch: string | null = null;
+      try {
+        const facts = collectCompletionGitFacts(
+          worktreeManager.getTentacleWorktreePath(worktreeId),
+          baseRef,
+          runGit,
+        );
+        if (facts && !facts.merged) {
+          unmergedCommitCount = facts.commits.length;
+          branch = facts.branch;
+        }
+      } catch {
+        // A missing/broken worktree simply reports no unmerged commits.
+      }
+
+      return {
+        exists: true,
+        workspaceMode: terminal.workspaceMode,
+        worktreeId,
+        sharedWithTerminalIds,
+        unmergedCommitCount,
+        branch,
+      };
+    },
+
+    deleteTerminal(terminalId: string, options?: { removeWorktree?: boolean }): boolean {
       const terminal = terminals.get(terminalId);
       if (!terminal) {
         return false;
       }
 
       const cascadeTerminalIds = collectTerminalCascade(terminalId);
+      const cascadeSet = new Set(cascadeTerminalIds);
+
+      // Worktrees are shared: several terminals can point at one worktreeId.
+      // Only a worktree that no surviving terminal still references may be
+      // removed, and only when the caller explicitly asked — otherwise the
+      // record goes and the directory stays on disk (the iron rule; reclaimed
+      // later by an explicit request once merged).
+      const survivingWorktreeIds = new Set<string>();
+      for (const record of terminals.values()) {
+        if (cascadeSet.has(record.terminalId) || record.workspaceMode !== "worktree") {
+          continue;
+        }
+        survivingWorktreeIds.add(record.worktreeId ?? record.tentacleId);
+      }
+
       for (const cascadeTerminalId of cascadeTerminalIds) {
         const cascadeTerminal = terminals.get(cascadeTerminalId);
         if (!cascadeTerminal) {
@@ -1194,10 +1281,11 @@ export const createTerminalRuntime = ({
         }
 
         sessionRuntime.closeSession(cascadeTerminalId);
-        if (cascadeTerminal.workspaceMode === "worktree") {
-          worktreeManager.removeTentacleWorktree(
-            cascadeTerminal.worktreeId ?? cascadeTerminal.tentacleId,
-          );
+        if (options?.removeWorktree && cascadeTerminal.workspaceMode === "worktree") {
+          const worktreeId = cascadeTerminal.worktreeId ?? cascadeTerminal.tentacleId;
+          if (!survivingWorktreeIds.has(worktreeId)) {
+            worktreeManager.removeTentacleWorktree(worktreeId);
+          }
         }
         terminals.delete(cascadeTerminalId);
       }

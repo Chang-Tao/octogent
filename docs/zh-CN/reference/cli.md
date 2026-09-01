@@ -116,6 +116,15 @@ octogent terminal archive --all-completed
 
 归档会在记录上写入 `archivedAt`，使默认列表隐藏它；转录与完成摘要仍保留在磁盘上。运行中的终端不能归档。`--all-completed` 归档所有生命周期状态为 `completed` 的记录。`completed`、`stopped`、`exited` 状态的记录在超过 `OCTOGENT_TERMINAL_RETENTION_HOURS` 后也会被自动归档；`awaiting-review` 记录永不自动归档，未合并的工作会一直醒目。
 
+## 删除终端
+
+```bash
+octogent terminal delete <terminal-id>
+octogent terminal delete <terminal-id> --with-worktree [--force]
+```
+
+`delete`（别名 `rm`）删除终端记录。默认**只删记录、保留 worktree 目录在磁盘**（遵循"未合并工作永不自动删"的原则）。加 `--with-worktree` 才会连同删除 worktree 目录与分支——删除前会检查该 worktree 是否仍被其他终端共享（是则拒绝），以及分支是否有未合并提交（有则拒绝并提示数量，需再加 `--force` 才会强删）。
+
 ## 清理不活跃的终端记录
 
 ```bash

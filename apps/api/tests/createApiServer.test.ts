@@ -2703,7 +2703,7 @@ describe("createApiServer", () => {
       }),
     );
 
-    const deleteResponse = await fetch(`${baseUrl}/api/terminals/terminal-1`, {
+    const deleteResponse = await fetch(`${baseUrl}/api/terminals/terminal-1?removeWorktree=true`, {
       method: "DELETE",
       headers: {
         Accept: "application/json",
@@ -2712,6 +2712,28 @@ describe("createApiServer", () => {
     expect(deleteResponse.status).toBe(204);
     expect(gitClient.getWorktree(expectedWorktreePath)).toBeNull();
     expect(gitClient.hasBranch("octogent/terminal-1")).toBe(false);
+  });
+
+  it("keeps the worktree on a plain delete and reclaims it only on request", async () => {
+    const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
+    temporaryDirectories.push(workspaceCwd);
+    const gitClient = new FakeGitClient();
+    const baseUrl = await startServer({ workspaceCwd, gitClient });
+
+    await fetch(`${baseUrl}/api/terminals`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceMode: "worktree" }),
+    });
+    const expectedWorktreePath = join(workspaceCwd, ".octogent", "worktrees", "terminal-1");
+
+    // Plain delete: record gone, worktree still on disk (the iron rule).
+    const plain = await fetch(`${baseUrl}/api/terminals/terminal-1`, {
+      method: "DELETE",
+      headers: { Accept: "application/json" },
+    });
+    expect(plain.status).toBe(204);
+    expect(gitClient.getWorktree(expectedWorktreePath)).not.toBeNull();
   });
 
   it("returns 409 and keeps tentacle state when worktree deletion fails", async () => {
@@ -2738,7 +2760,7 @@ describe("createApiServer", () => {
     const expectedWorktreePath = join(workspaceCwd, ".octogent", "worktrees", "terminal-1");
     gitClient.setFailRemoveWorktree(true);
 
-    const deleteResponse = await fetch(`${baseUrl}/api/terminals/terminal-1`, {
+    const deleteResponse = await fetch(`${baseUrl}/api/terminals/terminal-1?removeWorktree=true`, {
       method: "DELETE",
       headers: {
         Accept: "application/json",
