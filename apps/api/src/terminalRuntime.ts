@@ -17,7 +17,7 @@ import {
 } from "./terminalRuntime/agentProviders";
 import { resolveTerminalRetentionHours, shouldAutoArchive } from "./terminalRuntime/archivePolicy";
 import { createChannelMessaging } from "./terminalRuntime/channelMessaging";
-import { installCodexHooksInDirectory } from "./terminalRuntime/codexHooks";
+import { installCodexHooks } from "./terminalRuntime/codexHooks";
 import {
   evaluateCompletionOnStop,
   resolveSnapshotLifecycle,
@@ -549,12 +549,12 @@ export const createTerminalRuntime = ({
   const agentProviderAdapters = createAgentProviderAdapters({
     installClaudeHooks: hookProcessor.installHooksInDirectory,
     ensureClaudeTrusted: ensureDirectoryTrusted,
-    // Codex resolves a git worktree's project to the primary repo root (a
-    // worktree's .git is a file, and the walk-up lands on the main .git), so
-    // hooks placed inside a worktree are never loaded. Install them once at
-    // the workspace root instead — the hook commands identify the session via
-    // $OCTOGENT_SESSION_ID, so one shared hooks.json serves every terminal.
-    installCodexHooks: () => installCodexHooksInDirectory(workspaceCwd, getApiBaseUrl()),
+    // Codex's TUI only reliably loads hooks from the user-level layer
+    // (project-layer hooks are never loaded from git worktree sessions), so
+    // the hooks live in $CODEX_HOME/hooks.json guarded by $OCTOGENT_SESSION_ID
+    // and one shared install serves every terminal. Trust is seeded for the
+    // workspace root, which is where Codex resolves a worktree's project.
+    installCodexHooks: () => installCodexHooks(getApiBaseUrl()),
     ensureCodexTrusted: () => ensureCodexDirectoryTrusted(workspaceCwd),
   });
 

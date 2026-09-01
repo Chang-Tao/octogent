@@ -1,16 +1,20 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
+import { resolveCodexConfigPath } from "../codexTrust";
 import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
 
 /**
  * Codex feeds hook stdout back to the model as developer context, so unlike
  * the Claude hooks the API's JSON reply must be discarded with -o /dev/null.
- * Codex command hooks run through a shell, which is what makes the env var
- * expansion and stdin piping here work.
+ * Codex command hooks run through a shell, which is what makes the guard, the
+ * env var expansion, and the stdin piping here work. The leading guard makes
+ * the hook a no-op in Codex sessions that Octogent did not launch — required
+ * because these hooks live in the user-level layer (see below) where every
+ * Codex session loads them.
  */
 const codexHookCommand = (apiBaseUrl: string, hookPath: string): string =>
-  `curl -s -o /dev/null -X POST "${apiBaseUrl}/api/hooks/${hookPath}?octogent_session=$OCTOGENT_SESSION_ID" -H 'Content-Type: application/json' -d @- || true`;
+  `[ -n "$OCTOGENT_SESSION_ID" ] && curl -s -o /dev/null -X POST "${apiBaseUrl}/api/hooks/${hookPath}?octogent_session=$OCTOGENT_SESSION_ID" -H 'Content-Type: application/json' -d @- || true`;
 
 const codexHookEntry = (apiBaseUrl: string, hookPath: string, timeoutSeconds: number) => ({
   hooks: [
@@ -22,18 +26,26 @@ const codexHookEntry = (apiBaseUrl: string, hookPath: string, timeoutSeconds: nu
   ],
 });
 
+/** Where the runtime hooks live: next to the Codex config, in the user layer. */
+export const resolveCodexHooksPath = (env: NodeJS.ProcessEnv = process.env): string =>
+  join(dirname(resolveCodexConfigPath(env)), "hooks.json");
+
 /**
- * Writes the Octogent runtime hooks into `<targetCwd>/.codex/hooks.json`.
+ * Writes the Octogent runtime hooks into `$CODEX_HOME/hooks.json`.
  *
- * The event set mirrors the Claude install where Codex offers an equivalent;
- * PermissionRequest replaces Claude's Notification-based permission detection.
- * Codex only trusts a hook definition after the operator (or a seeded
- * hooks.state entry) approves its hash, so installing alone is not enough to
- * make these run — see codexTrust.
+ * The user layer is deliberate: Codex resolves a git worktree's project to the
+ * primary repo, and (verified live) its TUI does not load project-layer
+ * .codex/hooks.json from worktree sessions at all — the user layer is the only
+ * layer that fires everywhere. The event set mirrors the Claude install where
+ * Codex offers an equivalent; PermissionRequest replaces Claude's
+ * Notification-based permission detection. Codex only runs a hook definition
+ * after its hash is trusted — see codexTrust, which must run after this.
  */
-export const installCodexHooksInDirectory = (targetCwd: string, apiBaseUrl: string): void => {
-  const targetCodexDir = join(targetCwd, ".codex");
-  const targetHooksPath = join(targetCodexDir, "hooks.json");
+export const installCodexHooks = (
+  apiBaseUrl: string,
+  env: NodeJS.ProcessEnv = process.env,
+): void => {
+  const targetHooksPath = resolveCodexHooksPath(env);
 
   const hooksConfig: Record<string, unknown[]> = {
     SessionStart: [codexHookEntry(apiBaseUrl, "session-start", 5)],
@@ -44,7 +56,7 @@ export const installCodexHooksInDirectory = (targetCwd: string, apiBaseUrl: stri
   };
 
   try {
-    mkdirSync(targetCodexDir, { recursive: true });
+    mkdirSync(dirname(targetHooksPath), { recursive: true });
     const existingSettings = existsSync(targetHooksPath)
       ? parseSettingsObject(readFileSync(targetHooksPath, "utf8"))
       : null;

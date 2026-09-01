@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { installCodexHooksInDirectory } from "../src/terminalRuntime/codexHooks";
+import { installCodexHooks, resolveCodexHooksPath } from "../src/terminalRuntime/codexHooks";
 
 const API_BASE_URL = "http://127.0.0.1:8787";
 
@@ -16,25 +16,27 @@ const CODEX_HOOK_EVENTS = [
   "Stop",
 ] as const;
 
-describe("installCodexHooksInDirectory", () => {
-  let workspaceDir: string;
+describe("installCodexHooks", () => {
+  let codexHomeDir: string;
+  let env: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(join(tmpdir(), "octogent-codex-hooks-"));
+    codexHomeDir = mkdtempSync(join(tmpdir(), "octogent-codex-hooks-"));
+    env = { OCTOGENT_CODEX_CONFIG: join(codexHomeDir, "config.toml") };
   });
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true });
+    rmSync(codexHomeDir, { recursive: true, force: true });
   });
 
-  const readHooksFile = (): Record<string, unknown> =>
-    JSON.parse(readFileSync(join(workspaceDir, ".codex", "hooks.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
+  const hooksPath = () => join(codexHomeDir, "hooks.json");
 
-  it("writes a hooks.json covering the runtime lifecycle events", () => {
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
+  const readHooksFile = (): Record<string, unknown> =>
+    JSON.parse(readFileSync(hooksPath(), "utf8")) as Record<string, unknown>;
+
+  it("writes the user-layer hooks.json next to the Codex config", () => {
+    expect(resolveCodexHooksPath(env)).toBe(hooksPath());
+    installCodexHooks(API_BASE_URL, env);
 
     const parsed = readHooksFile();
     const hooks = parsed.hooks as Record<string, unknown[]>;
@@ -44,23 +46,25 @@ describe("installCodexHooksInDirectory", () => {
   });
 
   it("posts the stdin payload to the API and identifies the session via query param", () => {
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
+    installCodexHooks(API_BASE_URL, env);
 
-    const contents = readFileSync(join(workspaceDir, ".codex", "hooks.json"), "utf8");
+    const contents = readFileSync(hooksPath(), "utf8");
     expect(contents).toContain(`${API_BASE_URL}/api/hooks/permission-request`);
     expect(contents).toContain("octogent_session=$OCTOGENT_SESSION_ID");
     expect(contents).toContain("-d @-");
   });
 
-  it("silences the API response so Codex never feeds it back to the model", () => {
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
+  it("guards every hook so non-Octogent Codex sessions are untouched", () => {
+    // These hooks load for every session of the user's Codex, so they must be
+    // inert unless Octogent's PTY set the session marker.
+    installCodexHooks(API_BASE_URL, env);
 
     const parsed = readHooksFile();
     const hooks = parsed.hooks as Record<string, Array<{ hooks: Array<{ command: string }> }>>;
     for (const eventName of CODEX_HOOK_EVENTS) {
-      const entries = hooks[eventName] ?? [];
-      for (const entry of entries) {
+      for (const entry of hooks[eventName] ?? []) {
         for (const hook of entry.hooks) {
+          expect(hook.command, eventName).toContain('[ -n "$OCTOGENT_SESSION_ID" ] &&');
           expect(hook.command, eventName).toContain("-o /dev/null");
         }
       }
@@ -68,15 +72,14 @@ describe("installCodexHooksInDirectory", () => {
   });
 
   it("preserves hooks an operator added themselves and stays idempotent", () => {
-    const codexDir = join(workspaceDir, ".codex");
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
+    installCodexHooks(API_BASE_URL, env);
 
     const parsed = readHooksFile();
     const hooks = parsed.hooks as Record<string, unknown[]>;
     hooks.SessionEnd = [{ hooks: [{ type: "command", command: "echo bye", timeout: 3 }] }];
-    writeFileSync(join(codexDir, "hooks.json"), JSON.stringify(parsed), "utf8");
+    writeFileSync(hooksPath(), JSON.stringify(parsed), "utf8");
 
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
+    installCodexHooks(API_BASE_URL, env);
 
     const merged = readHooksFile();
     const mergedHooks = merged.hooks as Record<string, unknown[]>;
@@ -85,11 +88,10 @@ describe("installCodexHooksInDirectory", () => {
   });
 
   it("replaces an unparseable hooks.json instead of failing the install", () => {
-    const codexDir = join(workspaceDir, ".codex");
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
-    writeFileSync(join(codexDir, "hooks.json"), "{not json", "utf8");
+    installCodexHooks(API_BASE_URL, env);
+    writeFileSync(hooksPath(), "{not json", "utf8");
 
-    installCodexHooksInDirectory(workspaceDir, API_BASE_URL);
+    installCodexHooks(API_BASE_URL, env);
 
     const parsed = readHooksFile();
     const hooks = parsed.hooks as Record<string, unknown[]>;

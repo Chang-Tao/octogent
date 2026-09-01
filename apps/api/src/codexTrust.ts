@@ -368,7 +368,9 @@ export const ensureCodexDirectoryTrusted = (
   configPath: string = resolveCodexConfigPath(),
 ): boolean => {
   const projectPath = resolve(targetCwd);
-  const hooksJsonPath = resolve(projectPath, ".codex", "hooks.json");
+  // The runtime hooks live in the user layer next to the config (the only
+  // layer the Codex TUI loads from worktree sessions) — see codexHooks.
+  const hooksJsonPath = resolve(dirname(configPath), "hooks.json");
 
   const contents = existsSync(configPath) ? readFileSync(configPath, "utf-8") : "";
   const headerPaths = parseTomlHeaderPaths(contents);

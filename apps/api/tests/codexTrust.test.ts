@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -9,7 +9,7 @@ import {
   ensureCodexDirectoryTrusted,
   resolveCodexConfigPath,
 } from "../src/codexTrust";
-import { installCodexHooksInDirectory } from "../src/terminalRuntime/codexHooks";
+import { installCodexHooks } from "../src/terminalRuntime/codexHooks";
 
 const roots: string[] = [];
 const makeRoot = () => {
@@ -18,17 +18,22 @@ const makeRoot = () => {
   return root;
 };
 
-const makeWorkspace = (root: string, hooksJson?: unknown): string => {
+const makeWorkspace = (root: string): string => {
   const workspace = join(root, "workspace");
-  mkdirSync(join(workspace, ".codex"), { recursive: true });
-  if (hooksJson !== undefined) {
-    writeFileSync(
-      join(workspace, ".codex", "hooks.json"),
-      typeof hooksJson === "string" ? hooksJson : `${JSON.stringify(hooksJson, null, 2)}\n`,
-      "utf-8",
-    );
-  }
+  mkdirSync(workspace, { recursive: true });
   return workspace;
+};
+
+// The runtime hooks live in the user layer next to the Codex config.
+const writeHooksBeside = (configPath: string, hooksJson: unknown): string => {
+  const hooksJsonPath = join(dirname(configPath), "hooks.json");
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(
+    hooksJsonPath,
+    typeof hooksJson === "string" ? hooksJson : `${JSON.stringify(hooksJson, null, 2)}\n`,
+    "utf-8",
+  );
+  return hooksJsonPath;
 };
 
 afterEach(() => {
@@ -169,12 +174,13 @@ describe("ensureCodexDirectoryTrusted", () => {
     const root = makeRoot();
     const configPath = join(root, "codex", "config.toml");
     const workspace = makeWorkspace(root);
-    installCodexHooksInDirectory(workspace, "http://127.0.0.1:8787");
+    mkdirSync(dirname(configPath), { recursive: true });
+    installCodexHooks("http://127.0.0.1:8787", { OCTOGENT_CODEX_CONFIG: configPath });
 
     expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
 
     const config = readFileSync(configPath, "utf-8");
-    const hooksJsonPath = join(workspace, ".codex", "hooks.json");
+    const hooksJsonPath = join(dirname(configPath), "hooks.json");
     expect(config).toContain(`[projects."${workspace}"]\ntrust_level = "trusted"`);
     for (const label of [
       "session_start",
@@ -191,14 +197,12 @@ describe("ensureCodexDirectoryTrusted", () => {
 
   it("hashes a definition identically regardless of which hooks.json holds it", () => {
     const root = makeRoot();
-    const configA = join(root, "a-config.toml");
-    const configB = join(root, "b-config.toml");
-    const workspaceA = makeWorkspace(join(root, "a"), {
-      hooks: { Stop: [commandHook("echo hi", 15)] },
-    });
-    const workspaceB = makeWorkspace(join(root, "b"), {
-      hooks: { Stop: [commandHook("echo hi", 15)] },
-    });
+    const configA = join(root, "a", "config.toml");
+    const configB = join(root, "b", "config.toml");
+    const workspaceA = makeWorkspace(join(root, "a"));
+    const workspaceB = makeWorkspace(join(root, "b"));
+    writeHooksBeside(configA, { hooks: { Stop: [commandHook("echo hi", 15)] } });
+    writeHooksBeside(configB, { hooks: { Stop: [commandHook("echo hi", 15)] } });
 
     ensureCodexDirectoryTrusted(workspaceA, configA);
     ensureCodexDirectoryTrusted(workspaceB, configB);
@@ -211,7 +215,8 @@ describe("ensureCodexDirectoryTrusted", () => {
   it("indexes state keys by raw group and handler positions", () => {
     const root = makeRoot();
     const configPath = join(root, "config.toml");
-    const workspace = makeWorkspace(root, {
+    const workspace = makeWorkspace(root);
+    const hooksJsonPath = writeHooksBeside(configPath, {
       hooks: {
         PreToolUse: [
           { matcher: "Bash", hooks: [{ type: "command", command: "one" }] },
@@ -228,7 +233,6 @@ describe("ensureCodexDirectoryTrusted", () => {
     ensureCodexDirectoryTrusted(workspace, configPath);
 
     const config = readFileSync(configPath, "utf-8");
-    const hooksJsonPath = join(workspace, ".codex", "hooks.json");
     expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:0:0"`);
     expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:1:0"`);
     expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:1:1"`);
@@ -253,7 +257,7 @@ describe("ensureCodexDirectoryTrusted", () => {
     const root = makeRoot();
     const configPath = join(root, "config.toml");
     const workspace = makeWorkspace(root);
-    installCodexHooksInDirectory(workspace, "http://127.0.0.1:8787");
+    installCodexHooks("http://127.0.0.1:8787", { OCTOGENT_CODEX_CONFIG: configPath });
 
     expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
     const afterFirst = readFileSync(configPath, "utf-8");
@@ -264,7 +268,8 @@ describe("ensureCodexDirectoryTrusted", () => {
   it("only appends the entries that are missing", () => {
     const root = makeRoot();
     const configPath = join(root, "config.toml");
-    const workspace = makeWorkspace(root, { hooks: { Stop: [commandHook("echo hi", 15)] } });
+    const workspace = makeWorkspace(root);
+    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo hi", 15)] } });
     writeFileSync(configPath, `[projects."${workspace}"]\ntrust_level = "untrusted"\n`, "utf-8");
 
     expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
@@ -293,11 +298,13 @@ describe("ensureCodexDirectoryTrusted", () => {
   it("still trusts the folder when hooks.json is missing or malformed", () => {
     const root = makeRoot();
     const missing = makeWorkspace(join(root, "missing"));
-    const malformed = makeWorkspace(join(root, "malformed"), "{ not json");
+    const malformed = makeWorkspace(join(root, "malformed"));
+    const malformedConfig = join(root, "malformed", "config.toml");
+    writeHooksBeside(malformedConfig, "{ not json");
 
-    expect(ensureCodexDirectoryTrusted(missing, join(root, "m1.toml"))).toBe(true);
-    expect(ensureCodexDirectoryTrusted(malformed, join(root, "m2.toml"))).toBe(true);
-    expect(readFileSync(join(root, "m2.toml"), "utf-8")).not.toContain("hooks.state");
+    expect(ensureCodexDirectoryTrusted(missing, join(root, "missing", "config.toml"))).toBe(true);
+    expect(ensureCodexDirectoryTrusted(malformed, malformedConfig)).toBe(true);
+    expect(readFileSync(malformedConfig, "utf-8")).not.toContain("hooks.state");
   });
 
   it("escapes TOML special characters in seeded keys", () => {

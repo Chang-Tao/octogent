@@ -51,9 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The terminal runtime now runs agents through a provider adapter layer
   (`agentProviders.ts`), and Codex terminals run unattended out of the box:
-  Octogent auto-writes a shared `.codex/hooks.json` at the workspace root
-  (Codex resolves a git worktree's project to the primary repo, so worktree-local
-  hooks would never load) covering SessionStart, UserPromptSubmit,
+  Octogent auto-writes a shared, session-guarded `hooks.json` into the
+  user-level `$CODEX_HOME` (the only layer the Codex TUI reliably loads from
+  git worktree sessions; the guard makes the hooks inert outside Octogent
+  PTYs) covering SessionStart, UserPromptSubmit,
   PreToolUse, PermissionRequest, and Stop, all reporting to `/api/hooks/*`)
   and seeds Codex's `config.toml` with project trust and hook trust hashes
   (`codexTrust.ts`) so Codex accepts both without prompting.
