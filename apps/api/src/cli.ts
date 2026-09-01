@@ -249,7 +249,6 @@ const startServer = async () => {
     projectStateDir,
     promptsDir,
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
-    allowRemoteAccess: isRemoteAccessEnabled(process.env),
     accessToken,
   });
 

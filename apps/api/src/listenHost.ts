@@ -2,6 +2,7 @@ const LOOPBACK_HOST = "127.0.0.1";
 const WILDCARD_HOSTS = new Set(["0.0.0.0", "::", "[::]"]);
 
 type ListenHostEnv = {
+  [key: string]: string | undefined;
   HOST?: string;
   OCTOGENT_ALLOW_REMOTE_ACCESS?: string;
 };

@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 
 export const AUTH_COOKIE_NAME = "octogent_token";
+export const MIN_ACCESS_TOKEN_LENGTH = 32;
 
 export type RemoteAuthDecision =
   | { kind: "allow" }
@@ -42,7 +43,10 @@ type RemoteAuthInput = {
   remoteAddress: string | undefined;
   /** Request path including the query string. */
   url: string;
-  headers: { "x-octogent-token"?: string | string[]; cookie?: string | string[] };
+  headers: {
+    "x-octogent-token"?: string | string[] | undefined;
+    cookie?: string | string[] | undefined;
+  };
   accessToken: string | null;
 };
 
@@ -54,12 +58,12 @@ type RemoteAuthInput = {
  * httpOnly cookie; tools can send X-Octogent-Token per request instead.
  */
 export const evaluateRemoteAuth = (input: RemoteAuthInput): RemoteAuthDecision => {
-  if (!input.accessToken) {
+  if (isLoopbackAddress(input.remoteAddress)) {
     return { kind: "allow" };
   }
 
-  if (isLoopbackAddress(input.remoteAddress)) {
-    return { kind: "allow" };
+  if (!input.accessToken) {
+    return { kind: "deny" };
   }
 
   const headerToken =
@@ -92,9 +96,24 @@ export const evaluateRemoteAuth = (input: RemoteAuthInput): RemoteAuthDecision =
   return { kind: "deny" };
 };
 
-export const resolveAccessToken = (env: { OCTOGENT_ACCESS_TOKEN?: string }): string | null => {
+export const resolveAccessToken = (env: {
+  [key: string]: string | undefined;
+  OCTOGENT_ACCESS_TOKEN?: string;
+}): string | null => {
   const value = env.OCTOGENT_ACCESS_TOKEN?.trim();
   return value && value.length > 0 ? value : null;
+};
+
+export const assertSecureRemoteBinding = (address: string, accessToken: string | null): void => {
+  if (isLoopbackAddress(address)) {
+    return;
+  }
+
+  if (!accessToken || accessToken.length < MIN_ACCESS_TOKEN_LENGTH) {
+    throw new Error(
+      `Non-loopback API binding (${address}) requires a high-entropy access token of at least ${MIN_ACCESS_TOKEN_LENGTH} characters. Set OCTOGENT_ACCESS_TOKEN or use the CLI start command with remote access enabled to generate one automatically.`,
+    );
+  }
 };
 
 export const generateAccessToken = (): string => randomBytes(24).toString("base64url");

@@ -30,8 +30,12 @@ describe("isLoopbackAddress", () => {
 });
 
 describe("evaluateRemoteAuth", () => {
-  it("waves everything through when no token is configured", () => {
-    expect(evaluate({ accessToken: null }).kind).toBe("allow");
+  it("fails closed for remote callers when no token is configured", () => {
+    expect(evaluate({ accessToken: null }).kind).toBe("deny");
+  });
+
+  it("keeps loopback callers working when no token is configured", () => {
+    expect(evaluate({ accessToken: null, remoteAddress: "127.0.0.1" }).kind).toBe("allow");
   });
 
   it("always trusts loopback so the CLI and local tools keep working", () => {

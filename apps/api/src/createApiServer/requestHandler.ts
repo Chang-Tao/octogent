@@ -109,7 +109,7 @@ type CreateApiRequestHandlerOptions = {
   invalidateClaudeUsageCache: () => void;
   codeIntelStore: CodeIntelStore;
   readHealthSnapshot: () => HealthSnapshot;
-  allowRemoteAccess: boolean;
+  isRemoteBinding: () => boolean;
   accessToken: string | null;
 };
 
@@ -225,7 +225,7 @@ export const createApiRequestHandler = ({
   invalidateClaudeUsageCache,
   codeIntelStore,
   readHealthSnapshot,
-  allowRemoteAccess,
+  isRemoteBinding,
   accessToken,
 }: CreateApiRequestHandlerOptions) => {
   const resolvedWebDistDir = webDistDir && existsSync(webDistDir) ? webDistDir : null;
@@ -261,15 +261,16 @@ export const createApiRequestHandler = ({
 
     const originHeader = readHeaderValue(request.headers.origin);
     const hostHeader = readHeaderValue(request.headers.host);
-    const corsOrigin = getRequestCorsOrigin(originHeader, allowRemoteAccess);
+    const remoteBinding = isRemoteBinding();
+    const corsOrigin = getRequestCorsOrigin(originHeader, hostHeader, remoteBinding);
 
-    if (!isAllowedHostHeader(hostHeader, allowRemoteAccess)) {
+    if (!isAllowedHostHeader(hostHeader, remoteBinding)) {
       writeJson(response, 403, { error: "Host not allowed." }, null);
       logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
       return;
     }
 
-    if (!isAllowedOriginHeader(originHeader, allowRemoteAccess)) {
+    if (!isAllowedOriginHeader(originHeader, hostHeader, remoteBinding)) {
       writeJson(response, 403, { error: "Origin not allowed." }, null);
       logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
       return;
