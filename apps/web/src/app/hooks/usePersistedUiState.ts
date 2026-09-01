@@ -11,7 +11,11 @@ import {
 } from "../notificationSounds";
 import { retainActiveTerminalEntries, retainActiveTerminalIds } from "../terminalState";
 import type { FrontendUiStateSnapshot, TerminalView } from "../types";
-import { clampSidebarWidth, normalizeFrontendUiStateSnapshot } from "../uiStateNormalizers";
+import {
+  NAV_SCHEMA_VERSION,
+  clampSidebarWidth,
+  normalizeFrontendUiStateSnapshot,
+} from "../uiStateNormalizers";
 
 type UsePersistedUiStateOptions = {
   columns: TerminalView;
@@ -103,6 +107,9 @@ const buildPersistedUiStateSnapshot = ({
   canvasTerminalsPanelWidth: number | null;
 }): FrontendUiStateSnapshot => ({
   activePrimaryNav,
+  // Persist the schema stamp, or the server-side copy looks unmigrated and the
+  // nav index gets shifted again on every reload.
+  navSchemaVersion: NAV_SCHEMA_VERSION,
   isAgentsSidebarVisible,
   sidebarWidth: clampSidebarWidth(sidebarWidth),
   isActiveAgentsSectionExpanded,

@@ -235,14 +235,19 @@ export const project = (
 // Breathing room around the fitted scene: glyphs and labels render around each
 // node's anchor point, and the hover card opens to the side.
 const FIT_MARGIN_PX = 90;
+// The scene reads left-to-right (octoboss → tentacles → agents), so the fit
+// anchors its left edge here instead of centering horizontally — roughly where
+// the old fixed camera put the octoboss.
+const FIT_LEFT_PX = 280;
 const FIT_ZOOM_MIN = 0.45;
 const FIT_ZOOM_MAX = 1;
 const DEFAULT_PERSPECTIVE = 900;
 
 /**
- * Camera that centers the whole scene in the viewport, zooming out (never in)
- * when the fleet outgrows it. A fixed default camera clips nodes as soon as a
- * fleet fans wider than the hardcoded pan allowed for.
+ * Camera that frames the whole scene: left-anchored horizontally, centered
+ * vertically, zooming out (never in) when the fleet outgrows the viewport.
+ * A fixed default camera clips nodes as soon as a fleet fans wider than the
+ * hardcoded pan allowed for.
  */
 export const computeFitCamera = (
   nodes: ReadonlyArray<Pick<FlowNode, "x" | "y" | "z">>,
@@ -251,7 +256,7 @@ export const computeFitCamera = (
 ): FlowCamera => {
   if (nodes.length === 0 || viewport.width <= 0 || viewport.height <= 0) {
     return {
-      panX: Math.max(0, viewport.width / 2),
+      panX: FIT_LEFT_PX,
       panY: Math.max(0, viewport.height / 2),
       zoom: 1,
       perspective,
@@ -273,7 +278,7 @@ export const computeFitCamera = (
 
   const sceneWidth = maxX - minX;
   const sceneHeight = maxY - minY;
-  const availableWidth = Math.max(1, viewport.width - FIT_MARGIN_PX * 2);
+  const availableWidth = Math.max(1, viewport.width - FIT_LEFT_PX - FIT_MARGIN_PX);
   const availableHeight = Math.max(1, viewport.height - FIT_MARGIN_PX * 2);
   const zoomToFit = Math.min(
     FIT_ZOOM_MAX,
@@ -283,7 +288,7 @@ export const computeFitCamera = (
   const zoom = Math.max(FIT_ZOOM_MIN, zoomToFit);
 
   return {
-    panX: viewport.width / 2 - ((minX + maxX) / 2) * zoom,
+    panX: FIT_LEFT_PX - minX * zoom,
     panY: viewport.height / 2 - ((minY + maxY) / 2) * zoom,
     zoom,
     perspective,

@@ -5,7 +5,7 @@ import { computeFitCamera, project } from "../src/app/flow/layout";
 const VIEWPORT = { width: 1200, height: 700 };
 
 describe("computeFitCamera", () => {
-  it("centers a wide fleet so no node projects outside the viewport", () => {
+  it("frames a wide fleet so no node projects outside the viewport", () => {
     // Eight tentacles fanned vertically plus a deep agent chain to the right —
     // the shape that clipped the topmost octopus under the fixed camera.
     const nodes = [
@@ -29,7 +29,17 @@ describe("computeFitCamera", () => {
     }
   });
 
-  it("keeps the scene centered rather than anchored to a corner", () => {
+  it("anchors the leftmost node at the left margin instead of centering", () => {
+    const nodes = [
+      { x: 0, y: 0, z: 0 },
+      { x: 400, y: 0, z: 0 },
+    ];
+
+    const camera = computeFitCamera(nodes, VIEWPORT);
+    expect(project(nodes[0] ?? { x: 0, y: 0, z: 0 }, camera).sx).toBeCloseTo(280, 5);
+  });
+
+  it("centers the scene vertically", () => {
     const nodes = [
       { x: 0, y: -300, z: 0 },
       { x: 0, y: 300, z: 0 },
@@ -45,7 +55,6 @@ describe("computeFitCamera", () => {
   it("never zooms in past 1 for a small fleet", () => {
     const camera = computeFitCamera([{ x: 0, y: 0, z: 0 }], VIEWPORT);
     expect(camera.zoom).toBe(1);
-    expect(project({ x: 0, y: 0, z: 0 }, camera).sx).toBeCloseTo(VIEWPORT.width / 2, 5);
   });
 
   it("stops zooming out at the floor for an oversized fleet", () => {
@@ -59,6 +68,6 @@ describe("computeFitCamera", () => {
   it("falls back to a sane camera when there is nothing to frame", () => {
     const camera = computeFitCamera([], VIEWPORT);
     expect(camera.zoom).toBe(1);
-    expect(camera.panX).toBe(VIEWPORT.width / 2);
+    expect(camera.panX).toBe(280);
   });
 });

@@ -28,6 +28,22 @@ export const parseUiStatePatch = (
     patch.activePrimaryNav = record.activePrimaryNav;
   }
 
+  // Dropping this field replays the nav-index migration on every load, which
+  // shifts the restored page by one per refresh.
+  if (record.navSchemaVersion !== undefined) {
+    if (
+      typeof record.navSchemaVersion !== "number" ||
+      !Number.isInteger(record.navSchemaVersion) ||
+      record.navSchemaVersion < 1
+    ) {
+      return {
+        patch: null,
+        error: "navSchemaVersion must be a positive integer.",
+      };
+    }
+    patch.navSchemaVersion = record.navSchemaVersion;
+  }
+
   if (record.isAgentsSidebarVisible !== undefined) {
     if (typeof record.isAgentsSidebarVisible !== "boolean") {
       return {
