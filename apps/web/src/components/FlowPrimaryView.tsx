@@ -212,14 +212,14 @@ export const FlowPrimaryView = ({
           transform: `translate(-50%, -50%) translate(${p.sx}px, ${p.sy}px) scale(${p.scale})`,
           zIndex: 10 + Math.round(p.scale * 100),
         };
-        const isDimmed = node.agentState
+        const isShelved = node.agentState
           ? LIFECYCLE_SHELF_AGENT_STATES.has(node.agentState)
           : false;
         return (
           <button
             key={node.id}
             type="button"
-            className={`flow-node flow-node--${node.kind}${isDimmed ? " flow-node--dimmed" : ""}`}
+            className={`flow-node flow-node--${node.kind}${isShelved ? " flow-node--shelved" : ""}`}
             style={style}
             onPointerDown={(event) => event.stopPropagation()}
             onPointerEnter={() => setHoveredId(node.id)}
@@ -230,7 +230,12 @@ export const FlowPrimaryView = ({
             }}
           >
             {node.kind === "agent" ? (
-              <span className={`flow-agent-dot ${agentDotClass(node)}`} />
+              // Shelved agents keep their bright fleet color instead of the
+              // gray inactive dot, so a finished round stays legible.
+              <span
+                className={`flow-agent-dot ${agentDotClass(node)}`}
+                style={isShelved ? { background: node.color, color: node.color } : undefined}
+              />
             ) : (
               <OctopusGlyph
                 color={node.color}

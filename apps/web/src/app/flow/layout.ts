@@ -6,6 +6,7 @@ import type {
   TerminalCompletionSummary,
 } from "@octogent/core";
 
+import { tentacleColor } from "../fleetColors";
 import type { TerminalView } from "../types";
 
 export type FlowNodeKind = "octoboss" | "tentacle" | "agent";
@@ -62,7 +63,6 @@ const SHELF_GAP_Y = 150;
 const SHELF_SPACING_X = 150;
 
 const OCTOBOSS_COLOR = "#d4a017";
-const FALLBACK_AGENT_COLOR = "#9ca3af";
 
 const centeredOffset = (index: number, count: number, spacing: number): number =>
   (index - (count - 1) / 2) * spacing;
@@ -231,7 +231,7 @@ export const buildFlowLayout = ({
       kind: "agent",
       refId: record.terminalId,
       label: record.tentacleName || record.terminalId,
-      color: tentacleNodes.get(record.tentacleId)?.color ?? FALLBACK_AGENT_COLOR,
+      color: tentacleNodes.get(record.tentacleId)?.color ?? tentacleColor(record.tentacleId),
       level: anchor.level + 1,
       x: anchor.x + AGENT_FORWARD_X + LEVEL_SPACING_X * Math.max(0, depth),
       y,
@@ -270,7 +270,7 @@ export const buildFlowLayout = ({
         kind: "agent",
         refId: record.terminalId,
         label: record.tentacleName || record.terminalId,
-        color: tentacleNodes.get(record.tentacleId)?.color ?? FALLBACK_AGENT_COLOR,
+        color: tentacleNodes.get(record.tentacleId)?.color ?? tentacleColor(record.tentacleId),
         level: 1,
         x: SHELF_SPACING_X * index,
         y: shelfY,

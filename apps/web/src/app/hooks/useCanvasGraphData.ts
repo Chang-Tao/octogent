@@ -5,7 +5,7 @@ import { buildConversationsUrl, buildDeckTentaclesUrl } from "../../runtime/runt
 import type { GraphEdge, GraphNode } from "../canvas/types";
 import { normalizeConversationSessionSummary } from "../conversationNormalizers";
 import { normalizeDeckTentacleSummary } from "../deckNormalizers";
-import { LIFECYCLE_DEAD_AGENT_STATES } from "../flow/layout";
+import { tentacleColor } from "../fleetColors";
 import type { ConversationSessionSummary, TerminalView } from "../types";
 import type { AgentRuntimeStateInfo } from "./useAgentRuntimeStates";
 
@@ -21,33 +21,6 @@ const getAccentPrimary = (): string =>
   (typeof document !== "undefined"
     ? getComputedStyle(document.documentElement).getPropertyValue("--accent-primary").trim()
     : "") || "#d4a017";
-
-// Must match the Deck tab's OCTOPUS_COLORS for consistent tentacle colors
-const OCTOPUS_COLORS = [
-  "#ff6b2b",
-  "#ff2d6b",
-  "#00ffaa",
-  "#bf5fff",
-  "#00c8ff",
-  "#ffee00",
-  "#39ff14",
-  "#ff4df0",
-  "#00fff7",
-  "#ff9500",
-];
-
-function hashString(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-const tentacleColor = (tentacleId: string, deckColor: string | null | undefined) =>
-  deckColor && deckColor.length > 0
-    ? deckColor
-    : (OCTOPUS_COLORS[hashString(tentacleId) % OCTOPUS_COLORS.length] as string);
 
 type UseCanvasGraphDataOptions = {
   columns: TerminalView;
@@ -279,15 +252,14 @@ export const useCanvasGraphData = ({
     edges.push({ source: OCTOBOSS_NODE_ID, target: buildTentacleNodeId(tentacleId) });
   }
 
-  // Link active terminals belonging to octoboss, plus live terminals whose
-  // tentacle is not on the deck (CLI quick terminals get synthetic tentacles):
-  // a running or review-worthy agent must never be invisible on this page.
+  // Octoboss-direct terminals, plus any terminal whose tentacle is not on the
+  // deck (CLI quick terminals get synthetic tentacles). Finished ones are kept
+  // so this page shows the same fleet as the flow view; a new dispatch
+  // archives dead husks off both.
   for (const terminal of columns) {
-    const isNonDeckLiveTerminal =
-      !seenTentacleIds.has(terminal.tentacleId) &&
-      terminal.tentacleId !== OCTOBOSS_ID &&
-      (!terminal.state || !LIFECYCLE_DEAD_AGENT_STATES.has(terminal.state));
-    if (terminal.tentacleId !== OCTOBOSS_ID && !isNonDeckLiveTerminal) continue;
+    const isNonDeckTerminal =
+      !seenTentacleIds.has(terminal.tentacleId) && terminal.tentacleId !== OCTOBOSS_ID;
+    if (terminal.tentacleId !== OCTOBOSS_ID && !isNonDeckTerminal) continue;
     const sessionNodeId = buildActiveSessionNodeId(terminal.terminalId);
     const prevSession = prevNodes.get(sessionNodeId);
     const jitter = () => (Math.random() - 0.5) * 60;
