@@ -53,15 +53,20 @@ describe("buildFlowLayout", () => {
     expect(new Set(tentacleNodes.map((n) => n.y)).size).toBe(2);
   });
 
-  it("hides lifecycle-dead terminals so the fleet views agree", () => {
-    const dead = { ...terminal("t-dead", "api"), state: "stopped" } as AnyTerminal;
+  it("demotes finished, not-reused terminals to the bottom shelf", () => {
+    const stopped = { ...terminal("t-dead", "api"), state: "stopped" } as AnyTerminal;
     const { nodes } = buildFlowLayout({
       tentacles: [tentacle("api")],
-      terminals: [terminal("t-live", "api"), dead],
+      terminals: [terminal("t-live", "api"), stopped],
     });
 
-    const agentIds = nodes.filter((n) => n.kind === "agent").map((n) => n.refId);
-    expect(agentIds).toEqual(["t-live"]);
+    const agents = nodes.filter((n) => n.kind === "agent");
+    expect(agents.map((n) => n.refId).sort()).toEqual(["t-dead", "t-live"]);
+    const live = agents.find((n) => n.refId === "t-live");
+    const shelved = agents.find((n) => n.refId === "t-dead");
+    // The shelved node sits below the live one and is detached from the tree.
+    expect(shelved && live && shelved.y).toBeGreaterThan(live?.y ?? 0);
+    expect(shelved?.z).toBe(0);
   });
 
   it("fans agents out in front of their tentacle, one level deeper", () => {

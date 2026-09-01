@@ -54,6 +54,12 @@ const AGENT_FORWARD_Z = 70;
 const AGENT_FORWARD_X = 96;
 const SIBLING_SPACING_Y = 120;
 const AGENT_FAN_SPACING_Y = 78;
+// Octoboss-direct agents lead the scene above the tentacle fan instead of
+// fanning through its center, where they collided with the middle tentacles.
+const BOSS_DIRECT_GAP_Y = 96;
+// The bottom shelf for finished, not-reused terminals.
+const SHELF_GAP_Y = 150;
+const SHELF_SPACING_X = 150;
 
 const OCTOBOSS_COLOR = "#d4a017";
 const FALLBACK_AGENT_COLOR = "#9ca3af";
@@ -63,14 +69,25 @@ const centeredOffset = (index: number, count: number, spacing: number): number =
 
 /**
  * Lifecycle states whose terminals are dead husks: they carry no progress to
- * narrate and no work awaiting anyone. Both fleet views (flow and canvas)
- * hide them so the two pages tell the same story; the records themselves stay
- * reachable via `octogent terminal list`.
+ * narrate and no work awaiting anyone. The canvas hides them; `octogent
+ * terminal list` still reaches the records.
  */
 export const LIFECYCLE_DEAD_AGENT_STATES: ReadonlySet<string> = new Set([
   "stopped",
   "exited",
   "stale",
+]);
+
+/**
+ * Flow-view "shelf": terminals that finished and are not being reused. Instead
+ * of hiding them, the flow view demotes them to a bottom row so a round of
+ * work stays visible after it ends; the next dispatch archives them away.
+ */
+export const LIFECYCLE_SHELF_AGENT_STATES: ReadonlySet<string> = new Set([
+  "stopped",
+  "exited",
+  "stale",
+  "completed",
 ]);
 
 type FlowLayoutInput = {
@@ -130,13 +147,25 @@ export const buildFlowLayout = ({
     edges.push({ from: boss.id, to: node.id });
   });
 
-  const visibleTerminals = terminals.filter(
-    (t) => !t.state || !LIFECYCLE_DEAD_AGENT_STATES.has(t.state),
+  // Finished, not-reused terminals go to the bottom shelf; everything else
+  // (running, awaiting-review, registered) stays in the live scene.
+  const shelfTerminals = terminals.filter(
+    (t) => t.state && LIFECYCLE_SHELF_AGENT_STATES.has(t.state),
   );
+  const activeTerminals = terminals.filter(
+    (t) => !t.state || !LIFECYCLE_SHELF_AGENT_STATES.has(t.state),
+  );
+
+  // Where the octoboss-direct agents stack, just above the topmost tentacle.
+  const tentacleTopY = sortedTentacles.length
+    ? centeredOffset(0, sortedTentacles.length, SIBLING_SPACING_Y)
+    : 0;
+  const bossDirectBaseY = tentacleTopY - BOSS_DIRECT_GAP_Y;
+  let bossDirectPlaced = 0;
 
   // Resolve each terminal's chain depth via parentTerminalId; an unknown parent
   // falls back to the tentacle so the agent never silently disappears.
-  const byTerminalId = new Map(visibleTerminals.map((t) => [t.terminalId, t]));
+  const byTerminalId = new Map(activeTerminals.map((t) => [t.terminalId, t]));
   const depthCache = new Map<string, number>();
   const chainDepth = (terminalId: string, hops = 0): number => {
     if (hops > 8) {
@@ -156,7 +185,7 @@ export const buildFlowLayout = ({
   // Group agents by (anchor, depth) so siblings fan out together. The anchor is
   // the parent agent when it exists, otherwise the tentacle.
   const groups = new Map<string, TerminalView>();
-  for (const record of visibleTerminals) {
+  for (const record of activeTerminals) {
     const parentId = record.parentTerminalId;
     const anchorId =
       parentId && byTerminalId.has(parentId)
@@ -170,14 +199,14 @@ export const buildFlowLayout = ({
   // Materialize in chain-depth order so every anchor node exists before its
   // children are placed relative to it.
   const childCounts = new Map<string, number>();
-  for (const record of visibleTerminals) {
+  for (const record of activeTerminals) {
     const parentId = record.parentTerminalId;
     if (parentId && byTerminalId.has(parentId)) {
       childCounts.set(parentId, (childCounts.get(parentId) ?? 0) + 1);
     }
   }
 
-  const pending = [...visibleTerminals].sort(
+  const pending = [...activeTerminals].sort(
     (a, b) => chainDepth(a.terminalId) - chainDepth(b.terminalId),
   );
   const agentNodes = new Map<string, FlowNode>();
@@ -190,6 +219,13 @@ export const buildFlowLayout = ({
       boss;
     const siblings = groups.get(anchor.id)?.filter((t) => chainDepth(t.terminalId) === depth) ?? [];
     const index = siblings.findIndex((t) => t.terminalId === record.terminalId);
+    // Octoboss-direct agents lead above the tentacle fan; every other agent
+    // fans around its anchor as before.
+    const isBossDirect = anchor.id === boss.id;
+    const y = isBossDirect
+      ? bossDirectBaseY - bossDirectPlaced++ * AGENT_FAN_SPACING_Y
+      : anchor.y +
+        centeredOffset(Math.max(0, index), Math.max(1, siblings.length), AGENT_FAN_SPACING_Y);
     const node: FlowNode = {
       id: `flow:agent:${record.terminalId}`,
       kind: "agent",
@@ -198,9 +234,7 @@ export const buildFlowLayout = ({
       color: tentacleNodes.get(record.tentacleId)?.color ?? FALLBACK_AGENT_COLOR,
       level: anchor.level + 1,
       x: anchor.x + AGENT_FORWARD_X + LEVEL_SPACING_X * Math.max(0, depth),
-      y:
-        anchor.y +
-        centeredOffset(Math.max(0, index), Math.max(1, siblings.length), AGENT_FAN_SPACING_Y),
+      y,
       // In front of its anchor: one step back toward the viewer.
       z: anchor.z + AGENT_FORWARD_Z,
       role: (childCounts.get(record.terminalId) ?? 0) > 0 ? "coordinator" : "worker",
@@ -223,6 +257,30 @@ export const buildFlowLayout = ({
     nodes.push(node);
     edges.push({ from: anchor.id, to: node.id });
   }
+
+  // Bottom shelf: finished, not-reused terminals parked in a flat row, left to
+  // right, detached from the live tree (no edges) and dimmed by the view.
+  const sceneBottomY = nodes.reduce((max, n) => Math.max(max, n.y), 0);
+  const shelfY = sceneBottomY + SHELF_GAP_Y;
+  [...shelfTerminals]
+    .sort((a, b) => a.terminalId.localeCompare(b.terminalId))
+    .forEach((record, index) => {
+      nodes.push({
+        id: `flow:agent:${record.terminalId}`,
+        kind: "agent",
+        refId: record.terminalId,
+        label: record.tentacleName || record.terminalId,
+        color: tentacleNodes.get(record.tentacleId)?.color ?? FALLBACK_AGENT_COLOR,
+        level: 1,
+        x: SHELF_SPACING_X * index,
+        y: shelfY,
+        z: 0,
+        role: "worker",
+        ...(record.state ? { agentState: record.state } : {}),
+        ...(record.workspaceMode ? { workspaceMode: record.workspaceMode } : {}),
+        ...(record.completionSummary ? { completionSummary: record.completionSummary } : {}),
+      });
+    });
 
   const maxLevel = nodes.reduce((max, n) => Math.max(max, n.level), 0);
   return { nodes, edges, maxLevel };

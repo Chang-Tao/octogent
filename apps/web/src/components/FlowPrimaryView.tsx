@@ -5,6 +5,7 @@ import { normalizeDeckTentacleSummary } from "../app/deckNormalizers";
 import {
   type FlowCamera,
   type FlowNode,
+  LIFECYCLE_SHELF_AGENT_STATES,
   buildFlowLayout,
   computeFitCamera,
   project,
@@ -211,7 +212,9 @@ export const FlowPrimaryView = ({
           transform: `translate(-50%, -50%) translate(${p.sx}px, ${p.sy}px) scale(${p.scale})`,
           zIndex: 10 + Math.round(p.scale * 100),
         };
-        const isDimmed = node.agentState === "completed";
+        const isDimmed = node.agentState
+          ? LIFECYCLE_SHELF_AGENT_STATES.has(node.agentState)
+          : false;
         return (
           <button
             key={node.id}

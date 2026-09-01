@@ -395,6 +395,33 @@ export const createTerminalRuntime = ({
   const TERMINAL_RETENTION_HOURS = resolveTerminalRetentionHours(
     process.env.OCTOGENT_TERMINAL_RETENTION_HOURS,
   );
+  // Persist, broadcast and reclaim after a batch of records has been archived.
+  // Reclaim upholds the iron rule (shouldReclaimWorktree never deletes unmerged
+  // work); a failure only logs and the next sweep or `worktree gc` retries.
+  const finalizeArchivedTerminals = (archivedTerminals: PersistedTerminal[]) => {
+    if (archivedTerminals.length === 0) {
+      return;
+    }
+    persistRegistry();
+    for (const terminal of archivedTerminals) {
+      broadcastTerminalEvent({
+        type: "terminal-updated",
+        snapshot: toTerminalSnapshot(terminal),
+      });
+    }
+
+    const archivedWorktreeIds = new Set(
+      archivedTerminals
+        .filter((terminal) => terminal.workspaceMode === "worktree")
+        .map((terminal) => terminal.worktreeId ?? terminal.tentacleId),
+    );
+    for (const candidate of listReclaimableWorktreeCandidates()) {
+      if (archivedWorktreeIds.has(candidate.worktreeId)) {
+        reclaimWorktree(candidate.worktreeId);
+      }
+    }
+  };
+
   const archiveExpiredTerminals = () => {
     const nowMs = Date.now();
     const archivedTerminals: PersistedTerminal[] = [];
@@ -407,33 +434,26 @@ export const createTerminalRuntime = ({
       terminal.archivedAt = new Date(nowMs).toISOString();
       archivedTerminals.push(terminal);
     }
+    finalizeArchivedTerminals(archivedTerminals);
+  };
 
-    if (archivedTerminals.length === 0) {
-      return;
-    }
+  // The flow view's bottom shelf holds a round of finished, not-reused
+  // terminals; the next dispatch clears them. Archiving a dead husk hides it
+  // from every listing (still on disk, `--archived` reaches it) and reclaims
+  // only merged worktrees — unmerged work is never touched.
+  const DEAD_HUSK_STATES = new Set(["stopped", "exited", "stale"]);
+  const archiveDeadTerminalsForNewBatch = () => {
+    const nowMs = Date.now();
+    const archivedTerminals: PersistedTerminal[] = [];
+    for (const terminal of terminals.values()) {
+      if (terminal.archivedAt) continue;
+      if (sessions.has(terminal.terminalId)) continue;
+      if (!terminal.lifecycleState || !DEAD_HUSK_STATES.has(terminal.lifecycleState)) continue;
 
-    persistRegistry();
-    for (const terminal of archivedTerminals) {
-      broadcastTerminalEvent({
-        type: "terminal-updated",
-        snapshot: toTerminalSnapshot(terminal),
-      });
+      terminal.archivedAt = new Date(nowMs).toISOString();
+      archivedTerminals.push(terminal);
     }
-
-    // Records that just aged into the archive may leave a merged worktree
-    // behind; reclaim those now. shouldReclaimWorktree upholds the iron rule
-    // (unmerged work is never deleted), and a failure only logs — the next
-    // sweep or an explicit `octogent worktree gc` retries.
-    const archivedWorktreeIds = new Set(
-      archivedTerminals
-        .filter((terminal) => terminal.workspaceMode === "worktree")
-        .map((terminal) => terminal.worktreeId ?? terminal.tentacleId),
-    );
-    for (const candidate of listReclaimableWorktreeCandidates()) {
-      if (archivedWorktreeIds.has(candidate.worktreeId)) {
-        reclaimWorktree(candidate.worktreeId);
-      }
-    }
+    finalizeArchivedTerminals(archivedTerminals);
   };
   const archiveSweepInterval = setInterval(archiveExpiredTerminals, 60 * 60 * 1000);
   if (typeof archiveSweepInterval.unref === "function") {
@@ -721,6 +741,11 @@ export const createTerminalRuntime = ({
           `Parent terminal "${parentTerminalId}" already has ${MAX_CHILDREN_PER_PARENT} children (limit reached).`,
         );
       }
+    } else {
+      // A new top-level dispatch is the "next batch": clear the previous round
+      // of dead husks off the flow-view shelf. Swarm children (which carry a
+      // parentTerminalId) do not count as a new batch.
+      archiveDeadTerminalsForNewBatch();
     }
 
     const terminalId =
