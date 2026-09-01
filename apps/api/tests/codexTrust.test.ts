@@ -282,6 +282,26 @@ describe("ensureCodexDirectoryTrusted", () => {
     expect(config).toContain(":stop:0:0");
   });
 
+  it("refreshes a stale trusted_hash for Octogent's own hooks file", () => {
+    // Hook definitions change across Octogent versions; keeping the old hash
+    // would strand every Codex agent at the hooks-review dialog.
+    const root = makeRoot();
+    const configPath = join(root, "config.toml");
+    const workspace = makeWorkspace(root);
+    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo old", 15)] } });
+    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    const staleHash = readFileSync(configPath, "utf-8").match(/sha256:[0-9a-f]+/)?.[0];
+
+    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo new", 15)] } });
+    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+
+    const config = readFileSync(configPath, "utf-8");
+    expect(config).not.toContain(String(staleHash));
+    expect(config.match(/:stop:0:0/g), "the section is updated, not duplicated").toHaveLength(1);
+    // Idempotent again once refreshed.
+    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(false);
+  });
+
   it("refuses to modify a config it cannot safely tokenize", () => {
     const root = makeRoot();
     const workspace = makeWorkspace(root);

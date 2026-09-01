@@ -8,13 +8,14 @@ import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
  * Codex feeds hook stdout back to the model as developer context, so unlike
  * the Claude hooks the API's JSON reply must be discarded with -o /dev/null.
  * Codex command hooks run through a shell, which is what makes the guard, the
- * env var expansion, and the stdin piping here work. The leading guard makes
- * the hook a no-op in Codex sessions that Octogent did not launch — required
- * because these hooks live in the user-level layer (see below) where every
- * Codex session loads them.
+ * env var expansion, and the stdin piping here work. The leading guards make
+ * the hook a no-op in Codex sessions that Octogent did not launch, and — with
+ * several Octogent instances sharing this user-level file — in sessions owned
+ * by a different instance (terminal ids repeat across instances, so a
+ * cross-instance post could hit a colliding session).
  */
 const codexHookCommand = (apiBaseUrl: string, hookPath: string): string =>
-  `[ -n "$OCTOGENT_SESSION_ID" ] && curl -s -o /dev/null -X POST "${apiBaseUrl}/api/hooks/${hookPath}?octogent_session=$OCTOGENT_SESSION_ID" -H 'Content-Type: application/json' -d @- || true`;
+  `[ -n "$OCTOGENT_SESSION_ID" ] && [ "$OCTOGENT_API_BASE" = "${apiBaseUrl}" ] && curl -s -o /dev/null -X POST "${apiBaseUrl}/api/hooks/${hookPath}?octogent_session=$OCTOGENT_SESSION_ID" -H 'Content-Type: application/json' -d @- || true`;
 
 const codexHookEntry = (apiBaseUrl: string, hookPath: string, timeoutSeconds: number) => ({
   hooks: [

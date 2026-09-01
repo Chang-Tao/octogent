@@ -354,12 +354,14 @@ const samePath = (left: string[], right: string[]): boolean =>
  * installed by codexHooks (which must have written hooks.json already — see
  * the adapter ordering in agentProviders).
  *
- * The read-modify-write is append-only and conservative, in the spirit of
- * claudeTrust: an existing section is never rewritten (a duplicate table
- * header would make the whole config unparseable for Codex, and an operator's
- * explicit "untrusted" verdict deserves to stand), only missing sections are
- * appended, a config we cannot safely tokenize is left alone, and the write
- * goes through a sibling temp file so Codex never sees a torn config.
+ * The read-modify-write is conservative, in the spirit of claudeTrust: an
+ * operator's [projects] section is never rewritten (their explicit
+ * "untrusted" verdict deserves to stand), a config we cannot safely tokenize
+ * is left alone, and the write goes through a sibling temp file so Codex
+ * never sees a torn config. The one in-place edit allowed is the
+ * trusted_hash of Octogent's own hooks file: its definitions change across
+ * Octogent versions, and a stale hash strands every Codex agent at the
+ * hooks-review dialog.
  *
  * Returns whether the config changed.
  */
@@ -380,28 +382,67 @@ export const ensureCodexDirectoryTrusted = (
     return false;
   }
 
+  const hookSections = collectHookStateEntries(hooksJsonPath).map((entry) => ({
+    headerPath: ["hooks", "state", entry.key],
+    body: `trusted_hash = "${entry.hash}"`,
+  }));
   const sections: Array<{ headerPath: string[]; body: string }> = [
     { headerPath: ["projects", projectPath], body: 'trust_level = "trusted"' },
-    ...collectHookStateEntries(hooksJsonPath).map((entry) => ({
-      headerPath: ["hooks", "state", entry.key],
-      body: `trusted_hash = "${entry.hash}"`,
-    })),
+    ...hookSections,
   ];
+
+  // Refresh stale hashes for sections that already exist.
+  const lines = contents.split("\n");
+  let hasRefreshedHash = false;
+  for (const section of hookSections) {
+    const headerIndex = lines.findIndex((line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("[")) {
+        return false;
+      }
+      const parsedPath = parseTomlHeaderKeyPath(trimmed);
+      return parsedPath !== null && samePath(parsedPath, section.headerPath);
+    });
+    if (headerIndex === -1) {
+      continue;
+    }
+    for (let lineIndex = headerIndex + 1; lineIndex < lines.length; lineIndex++) {
+      const bodyLine = (lines[lineIndex] ?? "").trim();
+      if (bodyLine.startsWith("[")) {
+        break;
+      }
+      if (bodyLine.startsWith("trusted_hash")) {
+        if (bodyLine !== section.body) {
+          lines[lineIndex] = section.body;
+          hasRefreshedHash = true;
+        }
+        break;
+      }
+    }
+  }
 
   const missing = sections.filter(
     (section) => !headerPaths.some((headerPath) => samePath(headerPath, section.headerPath)),
   );
-  if (missing.length === 0) {
+  if (missing.length === 0 && !hasRefreshedHash) {
     return false;
   }
 
+  const baseContents = hasRefreshedHash ? lines.join("\n") : contents;
   const blocks = missing.map((section) => {
     const quotedLeaf = `"${escapeTomlBasicString(section.headerPath[section.headerPath.length - 1] ?? "")}"`;
     const prefix = section.headerPath.slice(0, -1).join(".");
     return `[${prefix}.${quotedLeaf}]\n${section.body}\n`;
   });
-  const separator = contents.length === 0 ? "" : contents.endsWith("\n") ? "\n" : "\n\n";
-  const nextContents = `${contents}${separator}${blocks.join("\n")}`;
+  const separator =
+    blocks.length === 0
+      ? ""
+      : baseContents.length === 0
+        ? ""
+        : baseContents.endsWith("\n")
+          ? "\n"
+          : "\n\n";
+  const nextContents = `${baseContents}${separator}${blocks.join("\n")}`;
 
   // Write through a sibling temp file so a concurrent Codex process never
   // observes a half-written config.

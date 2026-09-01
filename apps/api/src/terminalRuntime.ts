@@ -445,6 +445,7 @@ export const createTerminalRuntime = ({
     sessions,
     resolveTerminalSession,
     getTentacleWorkspaceCwd: worktreeManager.getTentacleWorkspaceCwd,
+    getApiBaseUrl,
     isDebugPtyLogsEnabled,
     ptyLogDir,
     transcriptDirectoryPath,
