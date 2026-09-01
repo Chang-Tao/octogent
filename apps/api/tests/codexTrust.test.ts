@@ -175,9 +175,11 @@ describe("ensureCodexDirectoryTrusted", () => {
     const configPath = join(root, "codex", "config.toml");
     const workspace = makeWorkspace(root);
     mkdirSync(dirname(configPath), { recursive: true });
-    installCodexHooks("http://127.0.0.1:8787", { OCTOGENT_CODEX_CONFIG: configPath });
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configPath,
+    });
 
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(true);
 
     const config = readFileSync(configPath, "utf-8");
     const hooksJsonPath = join(dirname(configPath), "hooks.json");
@@ -201,18 +203,22 @@ describe("ensureCodexDirectoryTrusted", () => {
     const configB = join(root, "b", "config.toml");
     const workspaceA = makeWorkspace(join(root, "a"));
     const workspaceB = makeWorkspace(join(root, "b"));
-    writeHooksBeside(configA, { hooks: { Stop: [commandHook("echo hi", 15)] } });
-    writeHooksBeside(configB, { hooks: { Stop: [commandHook("echo hi", 15)] } });
+    const installedA = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configA,
+    });
+    const installedB = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configB,
+    });
 
-    ensureCodexDirectoryTrusted(workspaceA, configA);
-    ensureCodexDirectoryTrusted(workspaceB, configB);
+    ensureCodexDirectoryTrusted(workspaceA, installedA, configA);
+    ensureCodexDirectoryTrusted(workspaceB, installedB, configB);
 
     const hashOf = (contents: string) => contents.match(/trusted_hash = "(sha256:[0-9a-f]+)"/)?.[1];
     expect(hashOf(readFileSync(configA, "utf-8"))).toBeDefined();
     expect(hashOf(readFileSync(configA, "utf-8"))).toBe(hashOf(readFileSync(configB, "utf-8")));
   });
 
-  it("indexes state keys by raw group and handler positions", () => {
+  it("indexes only Octogent handlers by their raw positions", () => {
     const root = makeRoot();
     const configPath = join(root, "config.toml");
     const workspace = makeWorkspace(root);
@@ -229,13 +235,47 @@ describe("ensureCodexDirectoryTrusted", () => {
         ],
       },
     });
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configPath,
+    });
 
-    ensureCodexDirectoryTrusted(workspace, configPath);
+    ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath);
 
     const config = readFileSync(configPath, "utf-8");
-    expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:0:0"`);
-    expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:1:0"`);
-    expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:1:1"`);
+    expect(config).not.toContain(`"${hooksJsonPath}:pre_tool_use:0:0"`);
+    expect(config).not.toContain(`"${hooksJsonPath}:pre_tool_use:1:0"`);
+    expect(config).not.toContain(`"${hooksJsonPath}:pre_tool_use:1:1"`);
+    expect(config).toContain(`"${hooksJsonPath}:pre_tool_use:2:0"`);
+  });
+
+  it("preserves third-party hooks without approving them", () => {
+    const root = makeRoot();
+    const configPath = join(root, "config.toml");
+    const workspace = makeWorkspace(root);
+    const thirdPartyStop = commandHook("curl https://example.test/third-party", 15);
+    writeHooksBeside(configPath, {
+      hooks: {
+        Stop: [thirdPartyStop],
+        SessionEnd: [commandHook("echo third-party", 3)],
+      },
+    });
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configPath,
+    });
+
+    ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath);
+
+    const hooksJsonPath = join(dirname(configPath), "hooks.json");
+    const hooksFile = JSON.parse(readFileSync(hooksJsonPath, "utf-8")) as {
+      hooks: Record<string, unknown[]>;
+    };
+    expect(hooksFile.hooks.Stop?.[0]).toEqual(thirdPartyStop);
+    expect(hooksFile.hooks.SessionEnd).toEqual([commandHook("echo third-party", 3)]);
+
+    const config = readFileSync(configPath, "utf-8");
+    expect(config).not.toContain(`"${hooksJsonPath}:stop:0:0"`);
+    expect(config).not.toContain(`"${hooksJsonPath}:session_end:0:0"`);
+    expect(config).toContain(`"${hooksJsonPath}:stop:1:0"`);
   });
 
   it("appends to an existing config without touching its content", () => {
@@ -246,7 +286,7 @@ describe("ensureCodexDirectoryTrusted", () => {
     writeFileSync(configPath, existing, "utf-8");
     const workspace = makeWorkspace(root);
 
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(workspace, [], configPath)).toBe(true);
 
     const config = readFileSync(configPath, "utf-8");
     expect(config.startsWith(existing)).toBe(true);
@@ -257,11 +297,13 @@ describe("ensureCodexDirectoryTrusted", () => {
     const root = makeRoot();
     const configPath = join(root, "config.toml");
     const workspace = makeWorkspace(root);
-    installCodexHooks("http://127.0.0.1:8787", { OCTOGENT_CODEX_CONFIG: configPath });
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configPath,
+    });
 
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(true);
     const afterFirst = readFileSync(configPath, "utf-8");
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(false);
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(false);
     expect(readFileSync(configPath, "utf-8")).toBe(afterFirst);
   });
 
@@ -269,10 +311,12 @@ describe("ensureCodexDirectoryTrusted", () => {
     const root = makeRoot();
     const configPath = join(root, "config.toml");
     const workspace = makeWorkspace(root);
-    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo hi", 15)] } });
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configPath,
+    });
     writeFileSync(configPath, `[projects."${workspace}"]\ntrust_level = "untrusted"\n`, "utf-8");
 
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(true);
 
     const config = readFileSync(configPath, "utf-8");
     // The operator's own decision for the folder stays untouched — no duplicate
@@ -282,24 +326,44 @@ describe("ensureCodexDirectoryTrusted", () => {
     expect(config).toContain(":stop:0:0");
   });
 
-  it("refreshes a stale trusted_hash for Octogent's own hooks file", () => {
+  it("refreshes a stale trusted_hash for an installed Octogent handler", () => {
     // Hook definitions change across Octogent versions; keeping the old hash
     // would strand every Codex agent at the hooks-review dialog.
     const root = makeRoot();
     const configPath = join(root, "config.toml");
     const workspace = makeWorkspace(root);
-    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo old", 15)] } });
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
-    const staleHash = readFileSync(configPath, "utf-8").match(/sha256:[0-9a-f]+/)?.[0];
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787", {
+      OCTOGENT_CODEX_CONFIG: configPath,
+    });
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(true);
+    const initial = readFileSync(configPath, "utf-8");
+    writeFileSync(configPath, initial.replace(/sha256:[0-9a-f]+/, "sha256:stale"), "utf-8");
 
-    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo new", 15)] } });
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(true);
 
     const config = readFileSync(configPath, "utf-8");
-    expect(config).not.toContain(String(staleHash));
-    expect(config.match(/:stop:0:0/g), "the section is updated, not duplicated").toHaveLength(1);
+    expect(config).not.toContain("sha256:stale");
+    expect(
+      config.match(/:session_start:0:0/g),
+      "the section is updated, not duplicated",
+    ).toHaveLength(1);
     // Idempotent again once refreshed.
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(false);
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(false);
+  });
+
+  it("does not trust a non-Octogent command even when the caller supplies it", () => {
+    const root = makeRoot();
+    const configPath = join(root, "config.toml");
+    const workspace = makeWorkspace(root);
+    writeHooksBeside(configPath, { hooks: { Stop: [commandHook("echo forged", 15)] } });
+
+    ensureCodexDirectoryTrusted(
+      workspace,
+      [{ eventName: "Stop", command: "echo forged" }],
+      configPath,
+    );
+
+    expect(readFileSync(configPath, "utf-8")).not.toContain("hooks.state");
   });
 
   it("refuses to modify a config it cannot safely tokenize", () => {
@@ -310,7 +374,7 @@ describe("ensureCodexDirectoryTrusted", () => {
     for (const [index, contents] of cases.entries()) {
       const configPath = join(root, `config-${index}.toml`);
       writeFileSync(configPath, contents, "utf-8");
-      expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(false);
+      expect(ensureCodexDirectoryTrusted(workspace, [], configPath)).toBe(false);
       expect(readFileSync(configPath, "utf-8")).toBe(contents);
     }
   });
@@ -322,8 +386,10 @@ describe("ensureCodexDirectoryTrusted", () => {
     const malformedConfig = join(root, "malformed", "config.toml");
     writeHooksBeside(malformedConfig, "{ not json");
 
-    expect(ensureCodexDirectoryTrusted(missing, join(root, "missing", "config.toml"))).toBe(true);
-    expect(ensureCodexDirectoryTrusted(malformed, malformedConfig)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(missing, [], join(root, "missing", "config.toml"))).toBe(
+      true,
+    );
+    expect(ensureCodexDirectoryTrusted(malformed, [], malformedConfig)).toBe(true);
     expect(readFileSync(malformedConfig, "utf-8")).not.toContain("hooks.state");
   });
 
@@ -332,7 +398,7 @@ describe("ensureCodexDirectoryTrusted", () => {
     const configPath = join(root, "config.toml");
     const workspace = makeWorkspace(join(root, 'odd "dir"'));
 
-    expect(ensureCodexDirectoryTrusted(workspace, configPath)).toBe(true);
+    expect(ensureCodexDirectoryTrusted(workspace, [], configPath)).toBe(true);
     expect(readFileSync(configPath, "utf-8")).toContain(
       `[projects."${workspace.replace(/"/g, '\\"')}"]`,
     );

@@ -653,7 +653,8 @@ export const createTerminalRuntime = ({
     // and one shared install serves every terminal. Trust is seeded for the
     // workspace root, which is where Codex resolves a worktree's project.
     installCodexHooks: () => installCodexHooks(getApiBaseUrl()),
-    ensureCodexTrusted: () => ensureCodexDirectoryTrusted(workspaceCwd),
+    ensureCodexTrusted: (_targetCwd, installedHandlers) =>
+      ensureCodexDirectoryTrusted(workspaceCwd, installedHandlers),
   });
 
   reconcilePersistedLifecycle();

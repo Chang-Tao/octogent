@@ -2,7 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { resolveCodexConfigPath } from "../codexTrust";
+import {
+  type InstalledCodexHookHandler,
+  OCTOGENT_CODEX_HOOK_DEFINITIONS,
+} from "./codexHookContract";
 import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
+
+export type { InstalledCodexHookHandler } from "./codexHookContract";
 
 /**
  * Codex feeds hook stdout back to the model as developer context, so unlike
@@ -17,11 +23,11 @@ import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
 const codexHookCommand = (apiBaseUrl: string, hookPath: string): string =>
   `[ -n "$OCTOGENT_SESSION_ID" ] && [ "$OCTOGENT_API_BASE" = "${apiBaseUrl}" ] && curl -s -o /dev/null -X POST "${apiBaseUrl}/api/hooks/${hookPath}?octogent_session=$OCTOGENT_SESSION_ID" -H 'Content-Type: application/json' -d @- || true`;
 
-const codexHookEntry = (apiBaseUrl: string, hookPath: string, timeoutSeconds: number) => ({
+const codexHookEntry = (command: string, timeoutSeconds: number) => ({
   hooks: [
     {
       type: "command",
-      command: codexHookCommand(apiBaseUrl, hookPath),
+      command,
       timeout: timeoutSeconds,
     },
   ],
@@ -45,16 +51,16 @@ export const resolveCodexHooksPath = (env: NodeJS.ProcessEnv = process.env): str
 export const installCodexHooks = (
   apiBaseUrl: string,
   env: NodeJS.ProcessEnv = process.env,
-): void => {
+): InstalledCodexHookHandler[] => {
   const targetHooksPath = resolveCodexHooksPath(env);
 
-  const hooksConfig: Record<string, unknown[]> = {
-    SessionStart: [codexHookEntry(apiBaseUrl, "session-start", 5)],
-    UserPromptSubmit: [codexHookEntry(apiBaseUrl, "user-prompt-submit", 5)],
-    PreToolUse: [codexHookEntry(apiBaseUrl, "pre-tool-use", 5)],
-    PermissionRequest: [codexHookEntry(apiBaseUrl, "permission-request", 5)],
-    Stop: [codexHookEntry(apiBaseUrl, "stop", 15)],
-  };
+  const hooksConfig: Record<string, unknown[]> = {};
+  const installedHandlers: InstalledCodexHookHandler[] = [];
+  for (const { eventName, hookPath, timeoutSeconds } of OCTOGENT_CODEX_HOOK_DEFINITIONS) {
+    const command = codexHookCommand(apiBaseUrl, hookPath);
+    hooksConfig[eventName] = [codexHookEntry(command, timeoutSeconds)];
+    installedHandlers.push({ eventName, command });
+  }
 
   try {
     mkdirSync(dirname(targetHooksPath), { recursive: true });
@@ -76,7 +82,9 @@ export const installCodexHooks = (
 
     mergedSettings.hooks = mergedHooks;
     writeFileSync(targetHooksPath, `${JSON.stringify(mergedSettings, null, 2)}\n`, "utf8");
+    return installedHandlers;
   } catch {
     // Best-effort: hook installation should not block terminal creation.
+    return [];
   }
 };

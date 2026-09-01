@@ -5,10 +5,12 @@ import {
   resolveAgentProviderAdapter,
 } from "../src/terminalRuntime/agentProviders";
 
+const installedCodexHandlers = [{ eventName: "Stop", command: "octogent-command" }];
+
 const buildDeps = () => ({
   installClaudeHooks: vi.fn(),
   ensureClaudeTrusted: vi.fn(),
-  installCodexHooks: vi.fn(),
+  installCodexHooks: vi.fn(() => installedCodexHandlers),
   ensureCodexTrusted: vi.fn(),
 });
 
@@ -31,7 +33,7 @@ describe("agent provider adapters", () => {
     adapters.codex.prepareWorkspace("/tmp/ws");
 
     expect(deps.installCodexHooks).toHaveBeenCalledWith("/tmp/ws");
-    expect(deps.ensureCodexTrusted).toHaveBeenCalledWith("/tmp/ws");
+    expect(deps.ensureCodexTrusted).toHaveBeenCalledWith("/tmp/ws", installedCodexHandlers);
     expect(deps.installClaudeHooks).not.toHaveBeenCalled();
   });
 
