@@ -26,6 +26,7 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`: Hours after which `completed`, `stopped`, and `exited` terminal records are auto-archived; `awaiting-review` records never expire (default: `72`, invalid values fall back to the default)
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`: Claude usage data source: `auto` (OAuth first, CLI PTY fallback), `oauth`, `cli`, or `off` to disable collection (default: `auto`)
 - `OCTOGENT_CODEX_SANDBOX_MODE`: Codex sandbox mode: `read-only`, `workspace-write`, or `danger-full-access`. When unset, worktree terminals default to `danger-full-access` and shared terminals to `workspace-write` — under `workspace-write` Codex mounts `.git` read-only, so a worktree agent could never commit its work; Claude runs without a sandbox, so this aligns the two providers
+- `OCTOGENT_EFFORT_MODELS`: JSON map overriding the effort-tier → model mapping per provider, e.g. `{"light":{"claude-code":"haiku","codex":"gpt-5.6-luna@low"}}`; codex entries pack the reasoning effort as `model@reasoning`. Defaults: `light` = haiku / gpt-5.6-luna@low, `standard` = sonnet / gpt-5.6-terra@medium, `heavy` = opus / gpt-5.5@high, `max` = fable / gpt-5.6-sol@high
 - `OCTOGENT_CODEX_APPROVAL_POLICY`: Codex approval policy: `on-request` or `never` (default: `never`, so unattended terminals are not stranded on approval prompts)
 - `OCTOGENT_CODEX_CONFIG`: Override the path of the Codex `config.toml` that Octogent seeds with project trust and hook trust hashes (mainly for test isolation)
 - `OCTOGENT_ACCESS_TOKEN`: Access token required from non-loopback clients when remote access is on; auto-generated per session (and printed with the LAN URL) when unset
@@ -84,6 +85,8 @@ Options:
 - `--worktree-id`: explicit worktree ID
 - `--parent-terminal-id`: parent terminal ID for child terminals
 - `--agent-provider`: agent provider, `claude-code` or `codex` (defaults to the server-side default)
+- `--model`: explicit agent model identifier (letters, digits, `.` `_` `-` only); wins over `--effort`
+- `--effort`: effort tier `light`, `standard`, `heavy`, or `max`; the server maps it to a per-provider model (see `OCTOGENT_EFFORT_MODELS`)
 - `--prompt-template`: prompt template name
 - `--prompt-variables`: JSON object of prompt template variables
 

@@ -29,6 +29,9 @@ export const zhCN: TranslationMap = {
   "cli.error.jsonFlag": "错误：{flag} 必须为 JSON 对象。",
   "cli.error.validJsonFlag": "错误：{flag} 必须为有效 JSON。",
   "cli.error.invalidAgentProvider": "错误：--agent-provider {value} 不合法，可选值：{allowed}。",
+  "cli.error.invalidAgentModel":
+    "错误：--model {value} 不合法，只能使用字母、数字与 . _ - 组成的模型标识符。",
+  "cli.error.invalidAgentEffort": "错误：--effort {value} 不合法，可选值：{allowed}。",
   "cli.empty.tentacles": "未找到触手。",
   "cli.empty.terminals": "未找到终端。",
   "cli.empty.stale": "没有需要清理的残留、已停止或已退出的终端。",

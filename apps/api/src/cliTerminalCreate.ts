@@ -1,5 +1,12 @@
 import { TERMINAL_AGENT_PROVIDERS, isTerminalAgentProvider } from "@octogent/core";
 
+import type { EffortTier } from "./terminalRuntime/modelSelection";
+import { isEffortTier, isValidModelToken } from "./terminalRuntime/modelSelection";
+
+// modelSelection keeps its tier list private; this mirror only feeds the error
+// message, and the EffortTier annotation keeps it from drifting to bad values.
+const EFFORT_TIERS: readonly EffortTier[] = ["light", "standard", "heavy", "max"];
+
 export type TerminalCreateParseResult =
   | { ok: true; body: Record<string, unknown> }
   | { ok: false; errorKey: string; params: Record<string, string> };
@@ -48,6 +55,8 @@ export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResu
   const autoRenamePromptContext = parseFlag(args, "--auto-rename-prompt-context");
   const promptTemplate = parseFlag(args, "--prompt-template");
   const agentProvider = parseFlag(args, "--agent-provider");
+  const agentModel = parseFlag(args, "--model");
+  const agentEffort = parseFlag(args, "--effort");
 
   // Reject unknown providers locally so a typo fails fast instead of round-tripping a 400.
   if (agentProvider !== undefined && !isTerminalAgentProvider(agentProvider)) {
@@ -55,6 +64,22 @@ export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResu
       ok: false,
       errorKey: "cli.error.invalidAgentProvider",
       params: { value: agentProvider, allowed: TERMINAL_AGENT_PROVIDERS.join(", ") },
+    };
+  }
+
+  if (agentModel !== undefined && !isValidModelToken(agentModel)) {
+    return {
+      ok: false,
+      errorKey: "cli.error.invalidAgentModel",
+      params: { value: agentModel },
+    };
+  }
+
+  if (agentEffort !== undefined && !isEffortTier(agentEffort)) {
+    return {
+      ok: false,
+      errorKey: "cli.error.invalidAgentEffort",
+      params: { value: agentEffort, allowed: EFFORT_TIERS.join(", ") },
     };
   }
 
@@ -77,6 +102,8 @@ export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResu
   if (promptTemplate) body.promptTemplate = promptTemplate;
   if (promptVariables) body.promptVariables = promptVariables;
   if (agentProvider) body.agentProvider = agentProvider;
+  if (agentModel) body.agentModel = agentModel;
+  if (agentEffort) body.agentEffort = agentEffort;
 
   return { ok: true, body };
 };

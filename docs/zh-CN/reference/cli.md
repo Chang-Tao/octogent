@@ -26,6 +26,7 @@ octogent
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`：`completed`、`stopped`、`exited` 终端记录在多少小时后被自动归档；`awaiting-review` 记录永不过期（默认 `72`，非法值回落默认）
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`：Claude 用量数据源：`auto`（OAuth 优先、CLI PTY 回退）、`oauth`、`cli`，或 `off` 禁用采集（默认 `auto`）
 - `OCTOGENT_CODEX_SANDBOX_MODE`：Codex 沙箱模式：`read-only`、`workspace-write` 或 `danger-full-access`。未设置时，worktree 终端默认 `danger-full-access`，shared 终端默认 `workspace-write`——在 `workspace-write` 下 Codex 会把 `.git` 挂载为只读，worktree 代理将永远无法提交自己的工作；而 Claude 本就没有沙箱，因此这样对齐了两种提供方的行为
+- `OCTOGENT_EFFORT_MODELS`：JSON 格式，按 provider 覆盖难度档位到模型的映射，例如 `{"light":{"claude-code":"haiku","codex":"gpt-5.6-luna@low"}}`；codex 条目用 `model@reasoning` 打包推理档位。默认映射：`light` = haiku / gpt-5.6-luna@low、`standard` = sonnet / gpt-5.6-terra@medium、`heavy` = opus / gpt-5.5@high、`max` = fable / gpt-5.6-sol@high
 - `OCTOGENT_CODEX_APPROVAL_POLICY`：Codex 审批策略：`on-request` 或 `never`（默认 `never`，避免无人值守的终端卡在审批提示上）
 - `OCTOGENT_CODEX_CONFIG`：覆盖 Octogent 用于预置项目信任与钩子信任哈希的 Codex `config.toml` 路径（主要用于测试隔离）
 - `OCTOGENT_ACCESS_TOKEN`：开启远程访问时非回环客户端必须携带的访问令牌；未设置时每次启动自动生成并随局域网地址打印
@@ -84,6 +85,8 @@ octogent terminal create [options]
 - `--worktree-id`：显式指定工作树 ID
 - `--parent-terminal-id`：子终端的父终端 ID
 - `--agent-provider`：agent 提供方，`claude-code` 或 `codex`（未传时沿用服务端默认）
+- `--model`：显式指定 agent 模型标识符（仅允许字母、数字与 `.` `_` `-`）；优先于 `--effort`
+- `--effort`：难度档位 `light`、`standard`、`heavy` 或 `max`；由服务端按 provider 映射到具体模型（见 `OCTOGENT_EFFORT_MODELS`）
 - `--prompt-template`：提示词模板名称
 - `--prompt-variables`：提示词模板变量的 JSON 对象
 

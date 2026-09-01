@@ -61,6 +61,51 @@ describe("parseTerminalCreateArgs", () => {
     });
   });
 
+  it("passes a valid --model through as agentModel", () => {
+    const result = parseTerminalCreateArgs(createArgs("--model", "gpt-5.6-luna"));
+    expect(result).toEqual({
+      ok: true,
+      body: { workspaceMode: "shared", agentModel: "gpt-5.6-luna" },
+    });
+  });
+
+  it("passes a valid --effort through as agentEffort", () => {
+    for (const effort of ["light", "standard", "heavy", "max"]) {
+      const result = parseTerminalCreateArgs(createArgs("--effort", effort));
+      expect(result).toEqual({
+        ok: true,
+        body: { workspaceMode: "shared", agentEffort: effort },
+      });
+    }
+  });
+
+  it("omits agentModel and agentEffort when the flags are not given", () => {
+    const result = parseTerminalCreateArgs(createArgs("--name", "docs"));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.body).not.toHaveProperty("agentModel");
+      expect(result.body).not.toHaveProperty("agentEffort");
+    }
+  });
+
+  it("rejects a --model with invalid characters instead of sending it to the API", () => {
+    const result = parseTerminalCreateArgs(createArgs("--model", "sonnet; rm -rf /"));
+    expect(result).toEqual({
+      ok: false,
+      errorKey: "cli.error.invalidAgentModel",
+      params: { value: "sonnet; rm -rf /" },
+    });
+  });
+
+  it("rejects an unknown --effort tier instead of sending it to the API", () => {
+    const result = parseTerminalCreateArgs(createArgs("--effort", "extreme"));
+    expect(result).toEqual({
+      ok: false,
+      errorKey: "cli.error.invalidAgentEffort",
+      params: { value: "extreme", allowed: "light, standard, heavy, max" },
+    });
+  });
+
   it("parses --prompt-variables as a JSON object of strings", () => {
     const result = parseTerminalCreateArgs(
       createArgs("--prompt-variables", '{"ticket":"OCT-12","extra":1}'),
