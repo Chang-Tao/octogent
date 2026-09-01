@@ -5,6 +5,7 @@ import { buildConversationsUrl, buildDeckTentaclesUrl } from "../../runtime/runt
 import type { GraphEdge, GraphNode } from "../canvas/types";
 import { normalizeConversationSessionSummary } from "../conversationNormalizers";
 import { normalizeDeckTentacleSummary } from "../deckNormalizers";
+import { LIFECYCLE_DEAD_AGENT_STATES } from "../flow/layout";
 import type { ConversationSessionSummary, TerminalView } from "../types";
 import type { AgentRuntimeStateInfo } from "./useAgentRuntimeStates";
 
@@ -278,9 +279,15 @@ export const useCanvasGraphData = ({
     edges.push({ source: OCTOBOSS_NODE_ID, target: buildTentacleNodeId(tentacleId) });
   }
 
-  // Link active terminals belonging to octoboss
+  // Link active terminals belonging to octoboss, plus live terminals whose
+  // tentacle is not on the deck (CLI quick terminals get synthetic tentacles):
+  // a running or review-worthy agent must never be invisible on this page.
   for (const terminal of columns) {
-    if (terminal.tentacleId !== OCTOBOSS_ID) continue;
+    const isNonDeckLiveTerminal =
+      !seenTentacleIds.has(terminal.tentacleId) &&
+      terminal.tentacleId !== OCTOBOSS_ID &&
+      (!terminal.state || !LIFECYCLE_DEAD_AGENT_STATES.has(terminal.state));
+    if (terminal.tentacleId !== OCTOBOSS_ID && !isNonDeckLiveTerminal) continue;
     const sessionNodeId = buildActiveSessionNodeId(terminal.terminalId);
     const prevSession = prevNodes.get(sessionNodeId);
     const jitter = () => (Math.random() - 0.5) * 60;

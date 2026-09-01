@@ -61,6 +61,18 @@ const FALLBACK_AGENT_COLOR = "#9ca3af";
 const centeredOffset = (index: number, count: number, spacing: number): number =>
   (index - (count - 1) / 2) * spacing;
 
+/**
+ * Lifecycle states whose terminals are dead husks: they carry no progress to
+ * narrate and no work awaiting anyone. Both fleet views (flow and canvas)
+ * hide them so the two pages tell the same story; the records themselves stay
+ * reachable via `octogent terminal list`.
+ */
+export const LIFECYCLE_DEAD_AGENT_STATES: ReadonlySet<string> = new Set([
+  "stopped",
+  "exited",
+  "stale",
+]);
+
 type FlowLayoutInput = {
   tentacles: DeckTentacleSummary[];
   terminals: TerminalView;
@@ -118,9 +130,13 @@ export const buildFlowLayout = ({
     edges.push({ from: boss.id, to: node.id });
   });
 
+  const visibleTerminals = terminals.filter(
+    (t) => !t.state || !LIFECYCLE_DEAD_AGENT_STATES.has(t.state),
+  );
+
   // Resolve each terminal's chain depth via parentTerminalId; an unknown parent
   // falls back to the tentacle so the agent never silently disappears.
-  const byTerminalId = new Map(terminals.map((t) => [t.terminalId, t]));
+  const byTerminalId = new Map(visibleTerminals.map((t) => [t.terminalId, t]));
   const depthCache = new Map<string, number>();
   const chainDepth = (terminalId: string, hops = 0): number => {
     if (hops > 8) {
@@ -140,7 +156,7 @@ export const buildFlowLayout = ({
   // Group agents by (anchor, depth) so siblings fan out together. The anchor is
   // the parent agent when it exists, otherwise the tentacle.
   const groups = new Map<string, TerminalView>();
-  for (const record of terminals) {
+  for (const record of visibleTerminals) {
     const parentId = record.parentTerminalId;
     const anchorId =
       parentId && byTerminalId.has(parentId)
@@ -154,14 +170,14 @@ export const buildFlowLayout = ({
   // Materialize in chain-depth order so every anchor node exists before its
   // children are placed relative to it.
   const childCounts = new Map<string, number>();
-  for (const record of terminals) {
+  for (const record of visibleTerminals) {
     const parentId = record.parentTerminalId;
     if (parentId && byTerminalId.has(parentId)) {
       childCounts.set(parentId, (childCounts.get(parentId) ?? 0) + 1);
     }
   }
 
-  const pending = [...terminals].sort(
+  const pending = [...visibleTerminals].sort(
     (a, b) => chainDepth(a.terminalId) - chainDepth(b.terminalId),
   );
   const agentNodes = new Map<string, FlowNode>();

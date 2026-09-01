@@ -53,6 +53,17 @@ describe("buildFlowLayout", () => {
     expect(new Set(tentacleNodes.map((n) => n.y)).size).toBe(2);
   });
 
+  it("hides lifecycle-dead terminals so the fleet views agree", () => {
+    const dead = { ...terminal("t-dead", "api"), state: "stopped" } as AnyTerminal;
+    const { nodes } = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [terminal("t-live", "api"), dead],
+    });
+
+    const agentIds = nodes.filter((n) => n.kind === "agent").map((n) => n.refId);
+    expect(agentIds).toEqual(["t-live"]);
+  });
+
   it("fans agents out in front of their tentacle, one level deeper", () => {
     const { nodes, edges } = buildFlowLayout({
       tentacles: [tentacle("api")],
