@@ -549,8 +549,13 @@ export const createTerminalRuntime = ({
   const agentProviderAdapters = createAgentProviderAdapters({
     installClaudeHooks: hookProcessor.installHooksInDirectory,
     ensureClaudeTrusted: ensureDirectoryTrusted,
-    installCodexHooks: (targetCwd) => installCodexHooksInDirectory(targetCwd, getApiBaseUrl()),
-    ensureCodexTrusted: ensureCodexDirectoryTrusted,
+    // Codex resolves a git worktree's project to the primary repo root (a
+    // worktree's .git is a file, and the walk-up lands on the main .git), so
+    // hooks placed inside a worktree are never loaded. Install them once at
+    // the workspace root instead — the hook commands identify the session via
+    // $OCTOGENT_SESSION_ID, so one shared hooks.json serves every terminal.
+    installCodexHooks: () => installCodexHooksInDirectory(workspaceCwd, getApiBaseUrl()),
+    ensureCodexTrusted: () => ensureCodexDirectoryTrusted(workspaceCwd),
   });
 
   reconcilePersistedLifecycle();
