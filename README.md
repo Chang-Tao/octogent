@@ -178,7 +178,7 @@ octogent
 - `gh`（GitHub Pull Request 功能）
 - `curl`（agent 钩子回调流程）
 
-如果 `claude` 和 `codex` 都未安装，启动会失败。**Claude Code** 与 **Codex** 两种终端均受支持——用 `octogent terminal create --agent-provider` 按终端选择。Codex 终端开箱即可无人值守运行：Octogent 会自动写入 `.codex/hooks.json`，并在 Codex 的 `config.toml` 中预置项目信任与钩子信任哈希。Codex 的已知限制：对话页暂无转录回放（Codex 的 rollout 格式尚未接入），也没有 code-intel 事件。
+如果 `claude` 和 `codex` 都未安装，启动会失败。**Claude Code** 与 **Codex** 两种终端均受支持——用 `octogent terminal create --agent-provider` 按终端选择。Codex 终端开箱即可无人值守运行：Octogent 会在工作区根目录自动写入共享的 `.codex/hooks.json`，并在 Codex 的 `config.toml` 中预置项目信任与钩子信任哈希。Codex 的已知限制：对话页暂无转录回放（Codex 的 rollout 格式尚未接入），也没有 code-intel 事件。
 
 ## 什么会持久化
 
