@@ -66,12 +66,12 @@ This repo is a personal exploration of what an AI coding environment might look 
 
 - **Creates tentacles as context layers** so agents can work with scoped markdown files instead of broad, messy chat context
 - **Uses `todo.md` as an execution surface** so tasks stay visible, trackable, and ready for delegation
-- **Runs multiple Claude Code terminals** so one developer can coordinate several coding sessions at once
+- **Runs multiple agent terminals (Claude Code or Codex)** so one developer can coordinate several coding sessions at once
 - **Spawns child agents from todo items** so parallel work has a concrete source of truth
 - **Supports inter-agent messaging** so workers and coordinators can report completion, blockers, and handoff notes
 - **Keeps agent-facing context in files** so the system is more durable than a single prompt thread
 - **Provides a local API and UI** for terminal lifecycle, persistence, websocket transport, and orchestration
-- **Tracks a completion lifecycle** so Claude's Stop hook decides whether a finished terminal is completed or awaiting review, and stamps a completion summary card (task, commits, diff stats, branch, merged flag, duration)
+- **Tracks a completion lifecycle** so the agent's Stop hook decides whether a finished terminal is completed or awaiting review, and stamps a completion summary card (task, commits, diff stats, branch, merged flag, duration)
 - **Opens on the flow progress view** — a pseudo-3D layered spread of the whole fleet, with hover cards narrating each node's role and its previous/current/next step
 - **Auto-archives finished terminals after a retention period** (`OCTOGENT_TERMINAL_RETENTION_HOURS`, default 72h) and reclaims merged worktrees (`octogent worktree gc`) — unmerged work is never deleted by any automated path
 - **Exposes `GET /api/health`** for daemon and monitor probes
@@ -127,7 +127,7 @@ Octogent separates three concerns that usually get mixed together in a pile of t
 2. **Execution** lives in terminal records and PTY sessions managed by the local API. A terminal can attach to an existing tentacle, and several terminals can share one tentacle during swarm work.
 3. **Isolation** is optional. Shared terminals run in the main workspace; worktree terminals run under `.octogent/worktrees/<worktree-id>/` on `octogent/<worktree-id>` branches.
 
-Deck reads the tentacle files directly, parses checkbox items from `todo.md`, and uses incomplete items to generate worker prompts. Claude hooks feed the API with agent state, transcript, and idle events so the UI can show more than raw terminal output.
+Deck reads the tentacle files directly, parses checkbox items from `todo.md`, and uses incomplete items to generate worker prompts. Agent hooks — Claude Code's, or the Codex hooks Octogent auto-provisions — feed the API with agent state, transcript, and idle events so the UI can show more than raw terminal output.
 
 ## Quick start
 
@@ -175,12 +175,12 @@ On first run, **Octogent** picks an available local API port starting at `8787` 
 ## Requirements
 
 - Node.js `22+`
-- `claude` installed for the supported agent workflow
+- `claude` (Claude Code terminals) and/or `codex` (Codex terminals) — at least one supported agent binary
 - `git` for worktree terminals
 - `gh` for GitHub pull request features
-- `curl` for the current Claude hook callback flow
+- `curl` for the agent hook callback flow
 
-Startup fails if neither `claude` nor another supported provider binary is installed. The current docs only cover **Claude Code**.
+Startup fails if neither `claude` nor `codex` is installed. Both **Claude Code** and **Codex** terminals are supported — pick per terminal with `octogent terminal create --agent-provider`. Codex terminals run unattended out of the box: Octogent auto-provisions `.codex/hooks.json` and seeds Codex's `config.toml` with project trust and hook trust hashes. Known Codex limitations: the conversation view has no transcript replay yet (Codex's rollout format is not wired in) and there are no code-intel events.
 
 ## What persists
 

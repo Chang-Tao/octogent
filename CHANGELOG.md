@@ -47,6 +47,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   work is merged are reclaimed (`octogent worktree gc`), and unmerged work is
   never deleted by any automated path.
 
+### Codex provider parity (this fork's evolution, phase 5)
+
+- The terminal runtime now runs agents through a provider adapter layer
+  (`agentProviders.ts`), and Codex terminals run unattended out of the box:
+  Octogent auto-writes `.codex/hooks.json` (SessionStart, UserPromptSubmit,
+  PreToolUse, PermissionRequest, and Stop, all reporting to `/api/hooks/*`)
+  and seeds Codex's `config.toml` with project trust and hook trust hashes
+  (`codexTrust.ts`) so Codex accepts both without prompting.
+- `octogent terminal create` gained `--agent-provider` (`claude-code` or
+  `codex`).
+- The hook processor understands Codex payloads: `permission-request` events,
+  a Stop branch that does not try to parse Codex's rollout transcript format,
+  and a forced return to idle once a turn ends.
+- Three new environment variables: `OCTOGENT_CODEX_SANDBOX_MODE` (`read-only`,
+  `workspace-write`, or `danger-full-access`; unset defaults to
+  `danger-full-access` for worktree terminals and `workspace-write` for shared
+  ones, because `workspace-write` mounts `.git` read-only and a worktree agent
+  could never commit — Claude has no sandbox, so this aligns the providers),
+  `OCTOGENT_CODEX_APPROVAL_POLICY` (`on-request` or `never`, default `never`),
+  and `OCTOGENT_CODEX_CONFIG` (overrides the Codex `config.toml` path, mainly
+  for test isolation).
+- Known Codex limitations: the conversation view has no transcript replay yet
+  (the rollout format is not wired in) and no code-intel events.
+- Web fixes landed alongside the batch: the events WebSocket reconnects
+  automatically after a server restart so live views no longer freeze, and the
+  flow progress view auto-fits the camera to the fleet on load.
+
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull
 requests and sets up the independent-maintenance baseline.
