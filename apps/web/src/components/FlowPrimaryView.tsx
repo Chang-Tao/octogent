@@ -96,6 +96,22 @@ export const FlowPrimaryView = ({
   );
   const viewRef = useRef<HTMLElement | null>(null);
   const hasUserAdjustedCameraRef = useRef(false);
+  const [viewSize, setViewSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    const measure = () => {
+      const rect = view.getBoundingClientRect();
+      setViewSize({ width: rect.width, height: rect.height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(view);
+    return () => observer.disconnect();
+  }, []);
 
   const agentRuntimeStates = useAgentRuntimeStates(runtimeStateStore, columns);
   const layout = useMemo(
@@ -131,6 +147,25 @@ export const FlowPrimaryView = ({
   // Nearer nodes render on top; the sort also keeps DOM order stable enough
   // for hover to feel consistent.
   const paintOrder = useMemo(() => [...layout.nodes].sort((a, b) => a.z - b.z), [layout]);
+
+  // Edges on a path down to a working agent flow with a traveling dot, so the
+  // flow view shows "who is busy" the way the canvas does. An agent counts as
+  // working when its dot is the live one (running, not shelved/awaiting).
+  const activeNodeIds = useMemo(() => {
+    const parentOf = new Map(layout.edges.map((edge) => [edge.to, edge.from]));
+    const active = new Set<string>();
+    for (const node of layout.nodes) {
+      if (node.kind !== "agent" || agentDotClass(node) !== "flow-agent-dot--live") {
+        continue;
+      }
+      let cursor: string | undefined = node.id;
+      while (cursor && !active.has(cursor)) {
+        active.add(cursor);
+        cursor = parentOf.get(cursor);
+      }
+    }
+    return active;
+  }, [layout]);
 
   const activeCardId = pinnedId ?? hoveredId;
   const activeNode = activeCardId
@@ -195,12 +230,17 @@ export const FlowPrimaryView = ({
           const to = projected.get(edge.to);
           if (!from || !to) return null;
           const midX = (from.sx + to.sx) / 2;
+          const d = `M ${from.sx} ${from.sy} C ${midX} ${from.sy}, ${midX} ${to.sy}, ${to.sx} ${to.sy}`;
+          const isActive = activeNodeIds.has(edge.to);
           return (
-            <path
-              key={`${edge.from}->${edge.to}`}
-              className="flow-link"
-              d={`M ${from.sx} ${from.sy} C ${midX} ${from.sy}, ${midX} ${to.sy}, ${to.sx} ${to.sy}`}
-            />
+            <g key={`${edge.from}->${edge.to}`}>
+              <path className={`flow-link${isActive ? " flow-link--active" : ""}`} d={d} />
+              {isActive && (
+                <circle className="flow-link-pulse" r={3.5}>
+                  <animateMotion dur="1.1s" repeatCount="indefinite" path={d} />
+                </circle>
+              )}
+            </g>
           );
         })}
       </svg>
@@ -250,17 +290,27 @@ export const FlowPrimaryView = ({
         );
       })}
 
-      {activeNode && activeProjection && (
-        <div
-          className="flow-card-anchor"
-          style={{
-            transform: `translate(${activeProjection.sx + 26}px, ${activeProjection.sy - 12}px)`,
-            zIndex: 400,
-          }}
-        >
-          <FlowNodeCard node={activeNode} onOpenTerminal={onOpenTerminal} />
-        </div>
-      )}
+      {activeNode &&
+        activeProjection &&
+        (() => {
+          // Open the card away from whichever viewport edge it would overflow —
+          // a shelf node near the bottom flips it upward instead of clipping.
+          const CARD_WIDTH = 240;
+          const CARD_HEIGHT = 260;
+          const openLeft =
+            viewSize.width > 0 && activeProjection.sx > viewSize.width - CARD_WIDTH - 40;
+          const openUp = viewSize.height > 0 && activeProjection.sy > viewSize.height - CARD_HEIGHT;
+          const tx = openLeft ? activeProjection.sx - CARD_WIDTH - 26 : activeProjection.sx + 26;
+          const ty = openUp ? activeProjection.sy - CARD_HEIGHT : activeProjection.sy - 12;
+          return (
+            <div
+              className="flow-card-anchor"
+              style={{ transform: `translate(${tx}px, ${ty}px)`, zIndex: 400 }}
+            >
+              <FlowNodeCard node={activeNode} onOpenTerminal={onOpenTerminal} />
+            </div>
+          );
+        })()}
 
       <p className="flow-hint">{t("web.flow.hint")}</p>
     </section>
