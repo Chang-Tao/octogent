@@ -440,7 +440,7 @@ export const createTerminalRuntime = ({
 
   const deleteTerminalInternal = (
     terminalId: string,
-    options?: { removeWorktree?: boolean },
+    options?: { removeWorktree?: boolean; bestEffortWorktree?: boolean },
   ): boolean => {
     const terminal = terminals.get(terminalId);
     if (!terminal) {
@@ -472,7 +472,11 @@ export const createTerminalRuntime = ({
       if (options?.removeWorktree && cascadeTerminal.workspaceMode === "worktree") {
         const worktreeId = cascadeTerminal.worktreeId ?? cascadeTerminal.tentacleId;
         if (!survivingWorktreeIds.has(worktreeId)) {
-          worktreeManager.removeTentacleWorktree(worktreeId);
+          // best-effort tolerates an already-removed worktree so the record is
+          // still deleted; the explicit delete stays strict and surfaces a 409.
+          worktreeManager.removeTentacleWorktree(worktreeId, {
+            bestEffort: options?.bestEffortWorktree ?? false,
+          });
         }
       }
       terminals.delete(cascadeTerminalId);
@@ -524,10 +528,11 @@ export const createTerminalRuntime = ({
       const cascade = collectTerminalCascade(terminalId);
       if (cascade.some((id) => sessions.has(id))) continue;
       try {
-        deleteTerminalInternal(terminalId, { removeWorktree: true });
+        // best-effort so an already-removed or stuck worktree never orphans the
+        // record — the whole point is that the throwaway leaves nothing behind.
+        deleteTerminalInternal(terminalId, { removeWorktree: true, bestEffortWorktree: true });
       } catch {
-        // A stuck worktree removal must not abort the sweep; the record stays
-        // and the next dispatch (or an explicit delete) retries.
+        // Any other failure must not abort the sweep of the remaining ones.
       }
     }
   };
