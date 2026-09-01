@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
@@ -437,26 +438,98 @@ export const createTerminalRuntime = ({
     finalizeArchivedTerminals(archivedTerminals);
   };
 
+  const deleteTerminalInternal = (
+    terminalId: string,
+    options?: { removeWorktree?: boolean },
+  ): boolean => {
+    const terminal = terminals.get(terminalId);
+    if (!terminal) {
+      return false;
+    }
+
+    const cascadeTerminalIds = collectTerminalCascade(terminalId);
+    const cascadeSet = new Set(cascadeTerminalIds);
+
+    // Worktrees are shared: several terminals can point at one worktreeId. Only
+    // a worktree that no surviving terminal still references may be removed, and
+    // only when the caller asked — otherwise the record goes and the directory
+    // stays on disk.
+    const survivingWorktreeIds = new Set<string>();
+    for (const record of terminals.values()) {
+      if (cascadeSet.has(record.terminalId) || record.workspaceMode !== "worktree") {
+        continue;
+      }
+      survivingWorktreeIds.add(record.worktreeId ?? record.tentacleId);
+    }
+
+    for (const cascadeTerminalId of cascadeTerminalIds) {
+      const cascadeTerminal = terminals.get(cascadeTerminalId);
+      if (!cascadeTerminal) {
+        continue;
+      }
+
+      sessionRuntime.closeSession(cascadeTerminalId);
+      if (options?.removeWorktree && cascadeTerminal.workspaceMode === "worktree") {
+        const worktreeId = cascadeTerminal.worktreeId ?? cascadeTerminal.tentacleId;
+        if (!survivingWorktreeIds.has(worktreeId)) {
+          worktreeManager.removeTentacleWorktree(worktreeId);
+        }
+      }
+      terminals.delete(cascadeTerminalId);
+    }
+
+    persistRegistry();
+    for (const cascadeTerminalId of cascadeTerminalIds) {
+      broadcastTerminalEvent({ type: "terminal-deleted", terminalId: cascadeTerminalId });
+    }
+    return true;
+  };
+
+  // A terminal is ephemeral when its tentacle is not a durable deck tentacle
+  // (no folder under .octogent/tentacles) — an octoboss-direct one-shot on a
+  // synthetic tentacle. Those are throwaway; deck tentacles are the context
+  // layers meant to persist and be reused across batches.
+  const isEphemeralTerminal = (terminal: PersistedTerminal): boolean =>
+    !existsSync(join(workspaceCwd, ".octogent", "tentacles", terminal.tentacleId));
+
   // The flow view's bottom shelf holds a round of finished, not-reused
-  // terminals; the next dispatch clears them. This covers completed agents too
-  // (including octoboss-direct ones that were never reused), so they do not
-  // pile up round after round. `awaiting-review` is deliberately absent —
-  // unmerged work waiting on a human is never swept. Archiving hides the record
-  // from every listing (still on disk, `--archived` reaches it) and reclaims
-  // only merged worktrees; unmerged work is never touched.
+  // terminals; the next dispatch clears them. A terminal is "reused" while it
+  // is still live (running or awaiting-review) — those are never touched here.
+  // Finished durable (deck) terminals are archived (record hidden, worktree
+  // kept unless merged — the iron rule). Finished ephemeral terminals were
+  // never reused this round, so they are removed outright, worktree and all
+  // (even unmerged): a throwaway one-shot leaves nothing behind.
   const FINISHED_SHELF_STATES = new Set(["stopped", "exited", "stale", "completed"]);
   const archiveFinishedTerminalsForNewBatch = () => {
     const nowMs = Date.now();
     const archivedTerminals: PersistedTerminal[] = [];
+    const ephemeralTerminalIds: string[] = [];
     for (const terminal of terminals.values()) {
       if (terminal.archivedAt) continue;
       if (sessions.has(terminal.terminalId)) continue;
+      if (terminal.parentTerminalId) continue; // handled with its top-level chain
       if (!terminal.lifecycleState || !FINISHED_SHELF_STATES.has(terminal.lifecycleState)) continue;
 
-      terminal.archivedAt = new Date(nowMs).toISOString();
-      archivedTerminals.push(terminal);
+      if (isEphemeralTerminal(terminal)) {
+        ephemeralTerminalIds.push(terminal.terminalId);
+      } else {
+        terminal.archivedAt = new Date(nowMs).toISOString();
+        archivedTerminals.push(terminal);
+      }
     }
     finalizeArchivedTerminals(archivedTerminals);
+
+    for (const terminalId of ephemeralTerminalIds) {
+      // A live child (unlikely for a finished parent) keeps the whole chain.
+      const cascade = collectTerminalCascade(terminalId);
+      if (cascade.some((id) => sessions.has(id))) continue;
+      try {
+        deleteTerminalInternal(terminalId, { removeWorktree: true });
+      } catch {
+        // A stuck worktree removal must not abort the sweep; the record stays
+        // and the next dispatch (or an explicit delete) retries.
+      }
+    }
   };
   const archiveSweepInterval = setInterval(archiveExpiredTerminals, 60 * 60 * 1000);
   if (typeof archiveSweepInterval.unref === "function") {
@@ -1253,51 +1326,7 @@ export const createTerminalRuntime = ({
     },
 
     deleteTerminal(terminalId: string, options?: { removeWorktree?: boolean }): boolean {
-      const terminal = terminals.get(terminalId);
-      if (!terminal) {
-        return false;
-      }
-
-      const cascadeTerminalIds = collectTerminalCascade(terminalId);
-      const cascadeSet = new Set(cascadeTerminalIds);
-
-      // Worktrees are shared: several terminals can point at one worktreeId.
-      // Only a worktree that no surviving terminal still references may be
-      // removed, and only when the caller explicitly asked — otherwise the
-      // record goes and the directory stays on disk (the iron rule; reclaimed
-      // later by an explicit request once merged).
-      const survivingWorktreeIds = new Set<string>();
-      for (const record of terminals.values()) {
-        if (cascadeSet.has(record.terminalId) || record.workspaceMode !== "worktree") {
-          continue;
-        }
-        survivingWorktreeIds.add(record.worktreeId ?? record.tentacleId);
-      }
-
-      for (const cascadeTerminalId of cascadeTerminalIds) {
-        const cascadeTerminal = terminals.get(cascadeTerminalId);
-        if (!cascadeTerminal) {
-          continue;
-        }
-
-        sessionRuntime.closeSession(cascadeTerminalId);
-        if (options?.removeWorktree && cascadeTerminal.workspaceMode === "worktree") {
-          const worktreeId = cascadeTerminal.worktreeId ?? cascadeTerminal.tentacleId;
-          if (!survivingWorktreeIds.has(worktreeId)) {
-            worktreeManager.removeTentacleWorktree(worktreeId);
-          }
-        }
-        terminals.delete(cascadeTerminalId);
-      }
-
-      persistRegistry();
-      for (const cascadeTerminalId of cascadeTerminalIds) {
-        broadcastTerminalEvent({
-          type: "terminal-deleted",
-          terminalId: cascadeTerminalId,
-        });
-      }
-      return true;
+      return deleteTerminalInternal(terminalId, options);
     },
 
     ...channelMessaging,

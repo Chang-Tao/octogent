@@ -187,6 +187,41 @@ describe("terminal archiving", () => {
     expect(byId.get("term-old-review")?.lifecycleState).toBe("awaiting-review");
   });
 
+  it("on a new dispatch, removes finished ephemeral terminals but only archives deck ones", async () => {
+    const baseUrl = await startServer([
+      seedTerminal("term-ephemeral", {
+        lifecycleState: "stopped",
+        lifecycleUpdatedAt: hoursAgo(1),
+      }),
+      seedTerminal("term-deck", {
+        tentacleId: "deck-tent",
+        lifecycleState: "completed",
+        lifecycleUpdatedAt: hoursAgo(1),
+      }),
+    ]);
+
+    // Make term-deck's tentacle a durable deck tentacle (a folder on disk);
+    // term-ephemeral keeps its synthetic tentacle and stays throwaway.
+    const cwd = temporaryDirectories[temporaryDirectories.length - 1];
+    if (cwd) {
+      mkdirSync(join(cwd, ".octogent", "tentacles", "deck-tent"), { recursive: true });
+    }
+
+    // A new top-level dispatch is the next batch and triggers the sweep.
+    await fetch(`${baseUrl}/api/terminals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const all = await fetchSnapshots(baseUrl, "?includeArchived=1");
+    const byId = new Map(all.map((snapshot) => [snapshot.terminalId, snapshot]));
+    // Ephemeral: gone outright (not even in the archived listing).
+    expect(byId.has("term-ephemeral")).toBe(false);
+    // Deck: archived (hidden by default) but still on disk — the iron rule.
+    expect(typeof byId.get("term-deck")?.archivedAt).toBe("string");
+  });
+
   it("archives a non-running terminal on demand and hides it from the default listing", async () => {
     const baseUrl = await startServer();
 
