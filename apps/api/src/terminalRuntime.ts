@@ -1024,6 +1024,12 @@ export const createTerminalRuntime = ({
       if (patch.navSchemaVersion !== undefined) {
         uiState.navSchemaVersion = patch.navSchemaVersion;
       }
+      if (patch.terminalInactivityThresholdMs !== undefined) {
+        uiState.terminalInactivityThresholdMs = patch.terminalInactivityThresholdMs;
+      }
+      if (patch.locale !== undefined) {
+        uiState.locale = patch.locale;
+      }
       if (patch.isAgentsSidebarVisible !== undefined) {
         uiState.isAgentsSidebarVisible = patch.isAgentsSidebarVisible;
       }
