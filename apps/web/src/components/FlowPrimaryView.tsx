@@ -1,8 +1,14 @@
 import type { DeckTentacleSummary } from "@octogent/core";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { normalizeDeckTentacleSummary } from "../app/deckNormalizers";
-import { type FlowCamera, type FlowNode, buildFlowLayout, project } from "../app/flow/layout";
+import {
+  type FlowCamera,
+  type FlowNode,
+  buildFlowLayout,
+  computeFitCamera,
+  project,
+} from "../app/flow/layout";
 import { useAgentRuntimeStates } from "../app/hooks/useAgentRuntimeStates";
 import { useT } from "../app/providers/LocaleProvider";
 import type { TerminalRuntimeStateStore } from "../app/terminalRuntimeStateStore";
@@ -87,12 +93,31 @@ export const FlowPrimaryView = ({
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(
     null,
   );
+  const viewRef = useRef<HTMLElement | null>(null);
+  const hasUserAdjustedCameraRef = useRef(false);
 
   const agentRuntimeStates = useAgentRuntimeStates(runtimeStateStore, columns);
   const layout = useMemo(
     () => buildFlowLayout({ tentacles, terminals: columns, agentRuntimeStates }),
     [tentacles, columns, agentRuntimeStates],
   );
+
+  // Keep the whole fleet framed and centered until the operator takes over the
+  // camera — the fixed default clipped the outermost octopus on larger fleets.
+  useLayoutEffect(() => {
+    if (hasUserAdjustedCameraRef.current || layout.nodes.length === 0) {
+      return;
+    }
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    const rect = view.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    setCamera(computeFitCamera(layout.nodes, { width: rect.width, height: rect.height }));
+  }, [layout]);
 
   const projected = useMemo(() => {
     const map = new Map<string, { sx: number; sy: number; scale: number }>();
@@ -129,6 +154,7 @@ export const FlowPrimaryView = ({
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
+    hasUserAdjustedCameraRef.current = true;
     setCamera((current) => ({
       ...current,
       panX: drag.panX + (event.clientX - drag.startX),
@@ -141,6 +167,7 @@ export const FlowPrimaryView = ({
   }, []);
 
   const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    hasUserAdjustedCameraRef.current = true;
     setCamera((current) => {
       const nextZoom = Math.min(
         ZOOM_MAX,
@@ -152,6 +179,7 @@ export const FlowPrimaryView = ({
 
   return (
     <section
+      ref={viewRef}
       className="flow-view"
       aria-label={t("web.a11y.flowView")}
       onWheel={handleWheel}

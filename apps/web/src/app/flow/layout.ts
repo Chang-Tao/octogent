@@ -231,3 +231,61 @@ export const project = (
     scale: scale * camera.zoom,
   };
 };
+
+// Breathing room around the fitted scene: glyphs and labels render around each
+// node's anchor point, and the hover card opens to the side.
+const FIT_MARGIN_PX = 90;
+const FIT_ZOOM_MIN = 0.45;
+const FIT_ZOOM_MAX = 1;
+const DEFAULT_PERSPECTIVE = 900;
+
+/**
+ * Camera that centers the whole scene in the viewport, zooming out (never in)
+ * when the fleet outgrows it. A fixed default camera clips nodes as soon as a
+ * fleet fans wider than the hardcoded pan allowed for.
+ */
+export const computeFitCamera = (
+  nodes: ReadonlyArray<Pick<FlowNode, "x" | "y" | "z">>,
+  viewport: { width: number; height: number },
+  perspective: number = DEFAULT_PERSPECTIVE,
+): FlowCamera => {
+  if (nodes.length === 0 || viewport.width <= 0 || viewport.height <= 0) {
+    return {
+      panX: Math.max(0, viewport.width / 2),
+      panY: Math.max(0, viewport.height / 2),
+      zoom: 1,
+      perspective,
+    };
+  }
+
+  const base: FlowCamera = { panX: 0, panY: 0, zoom: 1, perspective };
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const node of nodes) {
+    const { sx, sy } = project(node, base);
+    minX = Math.min(minX, sx);
+    maxX = Math.max(maxX, sx);
+    minY = Math.min(minY, sy);
+    maxY = Math.max(maxY, sy);
+  }
+
+  const sceneWidth = maxX - minX;
+  const sceneHeight = maxY - minY;
+  const availableWidth = Math.max(1, viewport.width - FIT_MARGIN_PX * 2);
+  const availableHeight = Math.max(1, viewport.height - FIT_MARGIN_PX * 2);
+  const zoomToFit = Math.min(
+    FIT_ZOOM_MAX,
+    sceneWidth > 0 ? availableWidth / sceneWidth : FIT_ZOOM_MAX,
+    sceneHeight > 0 ? availableHeight / sceneHeight : FIT_ZOOM_MAX,
+  );
+  const zoom = Math.max(FIT_ZOOM_MIN, zoomToFit);
+
+  return {
+    panX: viewport.width / 2 - ((minX + maxX) / 2) * zoom,
+    panY: viewport.height / 2 - ((minY + maxY) / 2) * zoom,
+    zoom,
+    perspective,
+  };
+};
