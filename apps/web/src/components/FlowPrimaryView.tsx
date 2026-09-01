@@ -19,6 +19,9 @@ type FlowPrimaryViewProps = {
 };
 
 const INITIAL_CAMERA: FlowCamera = { panX: 320, panY: 300, zoom: 1, perspective: 900 };
+// Tentacle todo progress changes on disk without any server broadcast, so the
+// card narration needs a low-cost fallback poll on top of deck events.
+const TENTACLES_POLL_INTERVAL_MS = 30_000;
 const ZOOM_MIN = 0.45;
 const ZOOM_MAX = 2.2;
 
@@ -70,8 +73,12 @@ export const FlowPrimaryView = ({
       }
     };
     void load();
+    const pollTimer = window.setInterval(() => {
+      void load();
+    }, TENTACLES_POLL_INTERVAL_MS);
     return () => {
       disposed = true;
+      window.clearInterval(pollTimer);
     };
   }, [deckRevision]);
   const [camera, setCamera] = useState<FlowCamera>(INITIAL_CAMERA);

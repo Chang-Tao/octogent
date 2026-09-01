@@ -12,6 +12,7 @@ import { useGithubSummaryPolling } from "./app/hooks/useGithubSummaryPolling";
 import { useInitialColumnsHydration } from "./app/hooks/useInitialColumnsHydration";
 import { useMonitorRuntime } from "./app/hooks/useMonitorRuntime";
 import { usePersistedUiState } from "./app/hooks/usePersistedUiState";
+import { useReconnectingSocket } from "./app/hooks/useReconnectingSocket";
 import { useTentacleGitLifecycle } from "./app/hooks/useTentacleGitLifecycle";
 import { useTerminalCompletionNotification } from "./app/hooks/useTerminalCompletionNotification";
 import { useTerminalMutations } from "./app/hooks/useTerminalMutations";
@@ -212,16 +213,10 @@ export const App = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const socket = new WebSocket(buildTerminalEventsSocketUrl());
-
-    socket.addEventListener("message", (event) => {
-      if (typeof event.data !== "string") {
-        return;
-      }
-
+  const handleTerminalEventsMessage = useCallback(
+    (data: string) => {
       try {
-        const payload = JSON.parse(event.data) as
+        const payload = JSON.parse(data) as
           | {
               type?: unknown;
               snapshot?: TerminalSnapshot;
@@ -296,16 +291,23 @@ export const App = () => {
         terminalEventsRefreshTimerRef.current = null;
         void refreshColumns();
       }, 100);
-    });
+    },
+    [refreshColumns, runtimeStateStore, sortTerminalSnapshots],
+  );
 
-    return () => {
-      if (terminalEventsRefreshTimerRef.current !== null) {
-        window.clearTimeout(terminalEventsRefreshTimerRef.current);
-        terminalEventsRefreshTimerRef.current = null;
-      }
-      socket.close();
-    };
-  }, [refreshColumns, runtimeStateStore, sortTerminalSnapshots]);
+  const handleTerminalEventsReconnect = useCallback(() => {
+    // The socket may have missed create/update/state/deck events while the
+    // server was away; refetch terminals and force deck consumers (canvas,
+    // flow) to refetch too.
+    void refreshColumns();
+    setDeckRevision((current) => current + 1);
+  }, [refreshColumns]);
+
+  useReconnectingSocket({
+    buildUrl: buildTerminalEventsSocketUrl,
+    onMessage: handleTerminalEventsMessage,
+    onReconnect: handleTerminalEventsReconnect,
+  });
 
   const { codexUsageSnapshot, refreshCodexUsage } = useCodexUsagePolling();
   const { claudeUsageSnapshot, isRefreshingClaudeUsage, refreshClaudeUsage } =
