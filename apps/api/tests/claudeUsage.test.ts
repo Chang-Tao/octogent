@@ -31,6 +31,46 @@ const usageResponseBody = JSON.stringify({
   seven_day_sonnet: { used_percent: 33, reset_at: 1_772_711_999 },
 });
 
+// Newer OAuth payload shape: a top-level `limits` array alongside legacy
+// windows. The legacy values are deliberately different so tests can prove
+// which shape the parser preferred.
+const limitsUsageResponseBody = JSON.stringify({
+  plan_type: "max",
+  five_hour: { utilization: 99, resets_at: "2026-03-01T00:00:00.000Z" },
+  seven_day: { utilization: 98, resets_at: "2026-03-01T00:00:00.000Z" },
+  seven_day_opus: null,
+  seven_day_sonnet: null,
+  limits: [
+    {
+      kind: "session",
+      group: "session",
+      percent: 14,
+      severity: "normal",
+      resets_at: "2026-03-03T15:00:00+00:00",
+      scope: null,
+      is_active: true,
+    },
+    {
+      kind: "weekly_all",
+      group: "weekly",
+      percent: 52,
+      severity: "normal",
+      resets_at: "2026-03-06T09:00:00+00:00",
+      scope: null,
+      is_active: false,
+    },
+    {
+      kind: "weekly_scoped",
+      group: "weekly",
+      percent: 45,
+      severity: "normal",
+      resets_at: "2026-03-06T09:00:00+00:00",
+      scope: { model: { id: null, display_name: "Fable" }, surface: null },
+      is_active: false,
+    },
+  ],
+});
+
 const cliUsageOutput = [
   "Current session",
   "  2% used",
@@ -425,6 +465,129 @@ describe("readClaudeUsageSnapshot", () => {
         }),
       }),
     );
+  });
+
+  it("prefers the limits array over legacy windows and maps the scoped weekly limit", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(limitsUsageResponseBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage: noCliPty,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot).toEqual(
+      expect.objectContaining({
+        status: "ok",
+        source: "oauth-api",
+        planType: "max",
+        primaryUsedPercent: 14,
+        primaryResetAt: "2026-03-03T15:00:00.000Z",
+        secondaryUsedPercent: 52,
+        secondaryResetAt: "2026-03-06T09:00:00.000Z",
+        scopedUsedPercent: 45,
+        scopedResetAt: "2026-03-06T09:00:00.000Z",
+        scopedLabel: "Fable",
+      }),
+    );
+    expect(snapshot.sonnetUsedPercent).toBeNull();
+  });
+
+  it("falls back to a legacy window when the limits array lacks that kind", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          five_hour: { utilization: 14, resets_at: "2026-03-03T15:00:00.000Z" },
+          seven_day: { utilization: 52, resets_at: "2026-03-06T09:00:00.000Z" },
+          limits: [
+            {
+              kind: "weekly_scoped",
+              group: "weekly",
+              percent: 45,
+              severity: "normal",
+              resets_at: "2026-03-06T09:00:00+00:00",
+              scope: { model: { id: null, display_name: "Fable" }, surface: null },
+              is_active: false,
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage: noCliPty,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("ok");
+    expect(snapshot.primaryUsedPercent).toBe(14);
+    expect(snapshot.secondaryUsedPercent).toBe(52);
+    expect(snapshot.scopedUsedPercent).toBe(45);
+    expect(snapshot.scopedLabel).toBe("Fable");
+  });
+
+  it("falls back to legacy windows when the limits array is empty", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          plan_type: "pro",
+          five_hour: { utilization: 14, resets_at: "2026-03-03T15:00:00.000Z" },
+          seven_day: { utilization: 52, resets_at: "2026-03-06T09:00:00.000Z" },
+          limits: [],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage: noCliPty,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("ok");
+    expect(snapshot.primaryUsedPercent).toBe(14);
+    expect(snapshot.secondaryUsedPercent).toBe(52);
+    expect(snapshot.scopedUsedPercent).toBeNull();
+    expect(snapshot.scopedLabel).toBeNull();
+  });
+
+  it("tolerates a weekly_scoped limit without a model display name", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          limits: [
+            { kind: "session", group: "session", percent: 5, resets_at: null, scope: null },
+            { kind: "weekly_all", group: "weekly", percent: 10, resets_at: null, scope: null },
+            { kind: "weekly_scoped", group: "weekly", percent: 45, resets_at: null, scope: null },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const snapshot = await readClaudeUsageSnapshot({
+      now: () => new Date("2026-03-03T12:00:00.000Z"),
+      spawnCliUsage: noCliPty,
+      readCredentialsJson: async () => validCredentials(),
+      fetchImpl: fetchMock,
+    });
+
+    expect(snapshot.status).toBe("ok");
+    expect(snapshot.primaryUsedPercent).toBe(5);
+    expect(snapshot.secondaryUsedPercent).toBe(10);
+    expect(snapshot.scopedUsedPercent).toBe(45);
+    expect(snapshot.scopedLabel).toBeNull();
   });
 
   it("returns unavailable on oauth unauthorized response", async () => {

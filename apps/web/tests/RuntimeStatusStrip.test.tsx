@@ -33,6 +33,49 @@ describe("RuntimeStatusStrip", () => {
     expect(within(usage).getByText("52%")).toBeInTheDocument();
   });
 
+  it("shows a scoped weekly row when the snapshot carries a scoped limit", () => {
+    renderWithLocale(
+      <RuntimeStatusStrip
+        sparklinePoints=""
+        usageData={null}
+        claudeUsage={{
+          status: "ok",
+          source: "oauth-api",
+          fetchedAt: "2026-04-09T10:00:00.000Z",
+          primaryUsedPercent: 14,
+          secondaryUsedPercent: 52,
+          scopedUsedPercent: 45,
+          scopedResetAt: "2026-04-13T09:00:00.000Z",
+          scopedLabel: "Fable",
+        }}
+      />,
+    );
+
+    const usage = screen.getByLabelText("Claude usage limits");
+    expect(within(usage).getByText("Week (Fable)")).toBeInTheDocument();
+    expect(within(usage).getByText("45%")).toBeInTheDocument();
+  });
+
+  it("hides the scoped weekly row when the snapshot has no scoped limit", () => {
+    renderWithLocale(
+      <RuntimeStatusStrip
+        sparklinePoints=""
+        usageData={null}
+        claudeUsage={{
+          status: "ok",
+          source: "oauth-api",
+          fetchedAt: "2026-04-09T10:00:00.000Z",
+          primaryUsedPercent: 14,
+          secondaryUsedPercent: 52,
+        }}
+      />,
+    );
+
+    const usage = screen.getByLabelText("Claude usage limits");
+    expect(within(usage).queryByText(/Week \(Fable\)/)).toBeNull();
+    expect(within(usage).getAllByText(/%$/)).toHaveLength(2);
+  });
+
   it("shows unavailable values instead of a permanent loading state", () => {
     renderWithLocale(
       <RuntimeStatusStrip
