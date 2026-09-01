@@ -180,7 +180,7 @@ On first run, **Octogent** picks an available local API port starting at `8787` 
 - `gh` for GitHub pull request features
 - `curl` for the agent hook callback flow
 
-Startup fails if neither `claude` nor `codex` is installed. Both **Claude Code** and **Codex** terminals are supported — pick per terminal with `octogent terminal create --agent-provider`. Codex terminals run unattended out of the box: Octogent auto-provisions `.codex/hooks.json` and seeds Codex's `config.toml` with project trust and hook trust hashes. Known Codex limitations: the conversation view has no transcript replay yet (Codex's rollout format is not wired in) and there are no code-intel events.
+Startup fails if neither `claude` nor `codex` is installed. Both **Claude Code** and **Codex** terminals are supported — pick per terminal with `octogent terminal create --agent-provider`. Codex terminals run unattended out of the box: Octogent auto-provisions a shared `.codex/hooks.json` at the workspace root and seeds Codex's `config.toml` with project trust and hook trust hashes. Known Codex limitations: the conversation view has no transcript replay yet (Codex's rollout format is not wired in) and there are no code-intel events.
 
 ## What persists
 
