@@ -5,6 +5,11 @@ import { dirname, join, resolve } from "node:path";
 
 import { asRecord } from "@octogent/core";
 
+import {
+  type InstalledCodexHookHandler,
+  OCTOGENT_CODEX_HOOK_DEFINITIONS,
+} from "./terminalRuntime/codexHookContract";
+
 /**
  * Pre-seeds Codex trust for a workspace directory so an unattended agent does
  * not stall on the folder-trust or hooks-review dialog — the Codex counterpart
@@ -165,13 +170,62 @@ export const computeCodexHookHash = (
 
 type HookStateEntry = { key: string; hash: string };
 
+const OCTOGENT_HOOK_COMMAND_PATTERN =
+  /^\[ -n "\$OCTOGENT_SESSION_ID" \] && \[ "\$OCTOGENT_API_BASE" = "([^"\r\n]+)" \] && curl -s -o \/dev\/null -X POST "\1\/api\/hooks\/([a-z-]+)\?octogent_session=\$OCTOGENT_SESSION_ID" -H 'Content-Type: application\/json' -d @- \|\| true$/;
+
+const isOctogentHookCommand = (eventName: string, command: string): boolean => {
+  const match = OCTOGENT_HOOK_COMMAND_PATTERN.exec(command);
+  const definition = OCTOGENT_CODEX_HOOK_DEFINITIONS.find(
+    (candidate) => candidate.eventName === eventName,
+  );
+  return match !== null && match[2] === definition?.hookPath;
+};
+
+const hasOnlyKeys = (record: Record<string, unknown>, expectedKeys: string[]): boolean => {
+  const actualKeys = Object.keys(record).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  return (
+    actualKeys.length === expectedKeys.length &&
+    sortedExpectedKeys.every((expectedKey, index) => expectedKey === actualKeys[index])
+  );
+};
+
+const isInstalledOctogentEntry = (
+  eventName: string,
+  command: string,
+  group: Record<string, unknown>,
+): group is { hooks: [Record<string, unknown>] } => {
+  const definition = OCTOGENT_CODEX_HOOK_DEFINITIONS.find(
+    (candidate) => candidate.eventName === eventName,
+  );
+  const hooks = group.hooks;
+  if (
+    !definition ||
+    !hasOnlyKeys(group, ["hooks"]) ||
+    !Array.isArray(hooks) ||
+    hooks.length !== 1
+  ) {
+    return false;
+  }
+  const handler = asRecord(hooks[0]);
+  return (
+    handler !== null &&
+    hasOnlyKeys(handler, ["type", "command", "timeout"]) &&
+    handler.type === "command" &&
+    handler.command === command &&
+    handler.timeout === definition.timeoutSeconds
+  );
+};
+
 /**
- * Collects the `[hooks.state]` entries for every hashable handler in a
- * hooks.json file. Group and handler positions come from the raw arrays —
- * codex numbers skipped handlers too — so unhashable neighbors do not shift
- * the keys of the entries we can seed.
+ * Collects `[hooks.state]` entries only for the exact handlers that the hook
+ * installer just wrote or confirmed. Raw group positions are retained because
+ * Codex includes them in state keys; unrelated user hooks are never hashed.
  */
-const collectHookStateEntries = (hooksJsonPath: string): HookStateEntry[] => {
+const collectHookStateEntries = (
+  hooksJsonPath: string,
+  installedHandlers: readonly InstalledCodexHookHandler[],
+): HookStateEntry[] => {
   if (!existsSync(hooksJsonPath)) {
     return [];
   }
@@ -186,25 +240,40 @@ const collectHookStateEntries = (hooksJsonPath: string): HookStateEntry[] => {
     return [];
   }
 
+  const approvedCommands = new Map<string, Set<string>>();
+  for (const { eventName, command } of installedHandlers) {
+    if (!isOctogentHookCommand(eventName, command)) {
+      continue;
+    }
+    const commands = approvedCommands.get(eventName) ?? new Set<string>();
+    commands.add(command);
+    approvedCommands.set(eventName, commands);
+  }
+
   const entries: HookStateEntry[] = [];
-  for (const [eventName, eventLabel] of Object.entries(CODEX_HOOK_EVENT_LABELS)) {
+  for (const [eventName, commands] of approvedCommands) {
+    const eventLabel = CODEX_HOOK_EVENT_LABELS[eventName];
+    if (!eventLabel) {
+      continue;
+    }
     const groups = events[eventName];
     if (!Array.isArray(groups)) {
       continue;
     }
     for (const [groupIndex, groupValue] of groups.entries()) {
       const group = asRecord(groupValue);
-      const matcher = typeof group?.matcher === "string" ? group.matcher : undefined;
-      const handlers = Array.isArray(group?.hooks) ? group.hooks : [];
-      for (const [handlerIndex, handlerValue] of handlers.entries()) {
-        const handler = asRecord(handlerValue);
-        const hash = handler && computeCodexHookHash(eventName, matcher, handler);
-        if (hash) {
-          entries.push({
-            key: `${hooksJsonPath}:${eventLabel}:${groupIndex}:${handlerIndex}`,
-            hash,
-          });
-        }
+      if (!group) {
+        continue;
+      }
+      const command = [...commands].find((candidate) =>
+        isInstalledOctogentEntry(eventName, candidate, group),
+      );
+      if (!command || !isInstalledOctogentEntry(eventName, command, group)) {
+        continue;
+      }
+      const hash = computeCodexHookHash(eventName, undefined, group.hooks[0]);
+      if (hash) {
+        entries.push({ key: `${hooksJsonPath}:${eventLabel}:${groupIndex}:0`, hash });
       }
     }
   }
@@ -367,6 +436,7 @@ const samePath = (left: string[], right: string[]): boolean =>
  */
 export const ensureCodexDirectoryTrusted = (
   targetCwd: string,
+  installedHandlers: readonly InstalledCodexHookHandler[],
   configPath: string = resolveCodexConfigPath(),
 ): boolean => {
   const projectPath = resolve(targetCwd);
@@ -382,7 +452,7 @@ export const ensureCodexDirectoryTrusted = (
     return false;
   }
 
-  const hookSections = collectHookStateEntries(hooksJsonPath).map((entry) => ({
+  const hookSections = collectHookStateEntries(hooksJsonPath, installedHandlers).map((entry) => ({
     headerPath: ["hooks", "state", entry.key],
     body: `trusted_hash = "${entry.hash}"`,
   }));

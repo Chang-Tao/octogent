@@ -1,6 +1,7 @@
 import { type TerminalAgentProvider, isTerminalAgentProvider } from "@octogent/core";
 
 import { resolveBootstrapCommand } from "./bootstrapCommand";
+import type { InstalledCodexHookHandler } from "./codexHookContract";
 import { DEFAULT_AGENT_PROVIDER } from "./constants";
 
 type BootstrapEnv = {
@@ -29,8 +30,11 @@ export type AgentProviderAdapter = {
 type AgentProviderAdapterDeps = {
   installClaudeHooks: (targetCwd: string) => void;
   ensureClaudeTrusted: (targetCwd: string) => void;
-  installCodexHooks: (targetCwd: string) => void;
-  ensureCodexTrusted: (targetCwd: string) => void;
+  installCodexHooks: (targetCwd: string) => InstalledCodexHookHandler[];
+  ensureCodexTrusted: (
+    targetCwd: string,
+    installedHandlers: readonly InstalledCodexHookHandler[],
+  ) => void;
 };
 
 export const createAgentProviderAdapters = (
@@ -48,8 +52,8 @@ export const createAgentProviderAdapters = (
     id: "codex",
     resolveBootstrapCommand: (env) => resolveBootstrapCommand("codex", env ?? process.env),
     prepareWorkspace: (targetCwd) => {
-      deps.installCodexHooks(targetCwd);
-      deps.ensureCodexTrusted(targetCwd);
+      const installedHandlers = deps.installCodexHooks(targetCwd);
+      deps.ensureCodexTrusted(targetCwd, installedHandlers);
     },
   },
 });

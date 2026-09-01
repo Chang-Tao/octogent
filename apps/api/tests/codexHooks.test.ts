@@ -36,13 +36,19 @@ describe("installCodexHooks", () => {
 
   it("writes the user-layer hooks.json next to the Codex config", () => {
     expect(resolveCodexHooksPath(env)).toBe(hooksPath());
-    installCodexHooks(API_BASE_URL, env);
+    const installedHandlers = installCodexHooks(API_BASE_URL, env);
 
     const parsed = readHooksFile();
-    const hooks = parsed.hooks as Record<string, unknown[]>;
+    const hooks = parsed.hooks as Record<string, Array<{ hooks: Array<{ command: string }> }>>;
     for (const eventName of CODEX_HOOK_EVENTS) {
       expect(hooks[eventName], eventName).toHaveLength(1);
     }
+    expect(installedHandlers).toEqual(
+      CODEX_HOOK_EVENTS.map((eventName) => ({
+        eventName,
+        command: hooks[eventName]?.[0]?.hooks[0]?.command,
+      })),
+    );
   });
 
   it("posts the stdin payload to the API and identifies the session via query param", () => {
