@@ -58,6 +58,8 @@ const usageState = (
   loading: boolean;
   sessionPercent: number | null | undefined;
   weekPercent: number | null | undefined;
+  scopedPercent?: number | null;
+  scopedLabel?: string | null;
   message?: string;
 } => {
   if (claudeUsage === null) {
@@ -77,6 +79,8 @@ const usageState = (
       loading: false,
       sessionPercent: claudeUsage.primaryUsedPercent,
       weekPercent: claudeUsage.secondaryUsedPercent,
+      scopedPercent: claudeUsage.scopedUsedPercent ?? null,
+      scopedLabel: claudeUsage.scopedLabel ?? null,
     };
   }
 
@@ -278,6 +282,17 @@ export const RuntimeStatusStrip = ({
             t={t}
             {...(claudeUsageState.message ? { title: claudeUsageState.message } : {})}
           />
+          {claudeUsageState.scopedPercent != null ? (
+            <UsageRail
+              label={t("web.status.weekScoped", {
+                model: claudeUsageState.scopedLabel ?? "—",
+              })}
+              percent={claudeUsageState.scopedPercent}
+              loading={claudeUsageState.loading}
+              t={t}
+              {...(claudeUsageState.message ? { title: claudeUsageState.message } : {})}
+            />
+          ) : null}
         </div>
       </div>
     </section>

@@ -172,6 +172,54 @@ const readWindowPercent = (window: Record<string, unknown> | null): number | nul
 const readWindowResetAt = (window: Record<string, unknown> | null): string | null =>
   toResetIso(window?.reset_at ?? window?.resetAt ?? window?.resets_at);
 
+type ParsedLimitWindow = { percent: number | null; resetAt: string | null };
+
+type ParsedUsageLimits = {
+  session: ParsedLimitWindow | null;
+  weekly: ParsedLimitWindow | null;
+  scoped: (ParsedLimitWindow & { label: string | null }) | null;
+};
+
+const readScopedModelLabel = (entry: Record<string, unknown>): string | null => {
+  const scope = asRecord(entry.scope);
+  const model = asRecord(scope?.model);
+  return asTrimmedString(model?.display_name ?? model?.displayName);
+};
+
+/**
+ * Parses the newer top-level `limits` array (kind: session | weekly_all |
+ * weekly_scoped). Returns null when the array is missing, empty, or holds no
+ * recognized kind, so callers can fall back to the legacy window objects.
+ */
+const parseUsageLimits = (usagePayload: Record<string, unknown>): ParsedUsageLimits | null => {
+  const limits = usagePayload.limits;
+  if (!Array.isArray(limits) || limits.length === 0) {
+    return null;
+  }
+
+  const parsed: ParsedUsageLimits = { session: null, weekly: null, scoped: null };
+  for (const item of limits) {
+    const entry = asRecord(item);
+    if (!entry) continue;
+
+    const kind = asTrimmedString(entry.kind);
+    const window: ParsedLimitWindow = {
+      percent: asNumber(entry.percent),
+      resetAt: toResetIso(entry.resets_at ?? entry.resetsAt),
+    };
+
+    if (kind === "session" && !parsed.session) {
+      parsed.session = window;
+    } else if (kind === "weekly_all" && !parsed.weekly) {
+      parsed.weekly = window;
+    } else if (kind === "weekly_scoped" && !parsed.scoped) {
+      parsed.scoped = { ...window, label: readScopedModelLabel(entry) };
+    }
+  }
+
+  return parsed.session || parsed.weekly || parsed.scoped ? parsed : null;
+};
+
 const inferPlanType = (rateLimitTier: string | null): string | null => {
   const tier = rateLimitTier?.toLowerCase() ?? "";
   if (tier.includes("max")) return "Claude Max";
@@ -190,6 +238,10 @@ const mapUsageSnapshot = (
   if (!usagePayload) {
     throw new Error("invalid_usage_payload");
   }
+
+  // Newer payloads carry a top-level `limits` array; each window falls back
+  // to its legacy object when the array lacks that kind (or is absent).
+  const limits = parseUsageLimits(usagePayload);
 
   const primaryWindow = resolveUsageWindow(usagePayload, "five_hour");
   const weeklyWindow =
@@ -216,12 +268,15 @@ const mapUsageSnapshot = (
     planType:
       asTrimmedString(usagePayload.plan_type ?? usagePayload.planType) ??
       inferPlanType(rateLimitTier),
-    primaryUsedPercent: readWindowPercent(primaryWindow),
-    primaryResetAt: readWindowResetAt(primaryWindow),
-    secondaryUsedPercent: readWindowPercent(weeklyWindow),
-    secondaryResetAt: readWindowResetAt(weeklyWindow),
+    primaryUsedPercent: limits?.session ? limits.session.percent : readWindowPercent(primaryWindow),
+    primaryResetAt: limits?.session ? limits.session.resetAt : readWindowResetAt(primaryWindow),
+    secondaryUsedPercent: limits?.weekly ? limits.weekly.percent : readWindowPercent(weeklyWindow),
+    secondaryResetAt: limits?.weekly ? limits.weekly.resetAt : readWindowResetAt(weeklyWindow),
     sonnetUsedPercent: readWindowPercent(sonnetWindow),
     sonnetResetAt: readWindowResetAt(sonnetWindow),
+    scopedUsedPercent: limits?.scoped?.percent ?? null,
+    scopedResetAt: limits?.scoped?.resetAt ?? null,
+    scopedLabel: limits?.scoped?.label ?? null,
     extraUsageCostUsed,
     extraUsageCostLimit,
   };
@@ -444,6 +499,9 @@ const normalizePersistedSnapshot = (value: unknown): ClaudeUsageSnapshot | null 
     secondaryResetAt: asTrimmedString(record.secondaryResetAt),
     sonnetUsedPercent: asNumber(record.sonnetUsedPercent),
     sonnetResetAt: asTrimmedString(record.sonnetResetAt),
+    scopedUsedPercent: asNumber(record.scopedUsedPercent),
+    scopedResetAt: asTrimmedString(record.scopedResetAt),
+    scopedLabel: asTrimmedString(record.scopedLabel),
     extraUsageCostUsed: asNumber(record.extraUsageCostUsed),
     extraUsageCostLimit: asNumber(record.extraUsageCostLimit),
   };

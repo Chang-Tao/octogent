@@ -497,6 +497,7 @@ export const en: TranslationMap = {
   "web.status.session": "Session",
   "web.status.fiveHours": "5h",
   "web.status.weekAll": "Week (all)",
+  "web.status.weekScoped": "Week ({model})",
   "web.status.refreshUsage": "Refresh Claude usage",
   "web.status.usageUnavailable": "Claude usage unavailable",
   "web.status.na": "NA",

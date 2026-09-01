@@ -485,6 +485,7 @@ export const zhCN: TranslationMap = {
   "web.status.session": "会话",
   "web.status.fiveHours": "5小时",
   "web.status.weekAll": "本周 (全部)",
+  "web.status.weekScoped": "本周 ({model})",
   "web.status.refreshUsage": "刷新 Claude 用量",
   "web.status.usageUnavailable": "Claude 用量不可用",
   "web.status.na": "无",
