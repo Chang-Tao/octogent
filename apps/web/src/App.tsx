@@ -444,6 +444,18 @@ export const App = () => {
     [runWorkspaceSetupStep],
   );
 
+  // Rendering before /api/ui-state hydrates would flash the default page (and
+  // its nav highlight) for a beat on every reload of any other page; an empty
+  // shell for those few milliseconds is invisible instead. The flag is set
+  // even when hydration fails, so this can never blank the app permanently.
+  if (!isUiStateHydrated) {
+    return (
+      <LocaleProvider locale={locale} setLocale={setLocale}>
+        <div className="page console-shell" />
+      </LocaleProvider>
+    );
+  }
+
   return (
     <LocaleProvider locale={locale} setLocale={setLocale}>
       <div className="page console-shell">
