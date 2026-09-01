@@ -892,6 +892,11 @@ export const createTerminalRuntime = ({
       if (patch.activePrimaryNav !== undefined) {
         uiState.activePrimaryNav = patch.activePrimaryNav;
       }
+      // Without this stamp the client replays the nav-index migration on every
+      // load and the restored page shifts by one per refresh.
+      if (patch.navSchemaVersion !== undefined) {
+        uiState.navSchemaVersion = patch.navSchemaVersion;
+      }
       if (patch.isAgentsSidebarVisible !== undefined) {
         uiState.isAgentsSidebarVisible = patch.isAgentsSidebarVisible;
       }

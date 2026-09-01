@@ -1257,6 +1257,32 @@ describe("createApiServer", () => {
     expect(response.status).toBe(405);
   });
 
+  it("round-trips navSchemaVersion through /api/ui-state", async () => {
+    // If any layer strips this field, the client replays the nav-index
+    // migration on every load and the restored page shifts by one per refresh.
+    const baseUrl = await startServer();
+
+    const patchResponse = await fetch(`${baseUrl}/api/ui-state`, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ activePrimaryNav: 1, navSchemaVersion: 2 }),
+    });
+    expect(patchResponse.status).toBe(200);
+
+    const readResponse = await fetch(`${baseUrl}/api/ui-state`, {
+      headers: { Accept: "application/json" },
+    });
+    const payload = (await readResponse.json()) as {
+      activePrimaryNav?: number;
+      navSchemaVersion?: number;
+    };
+    expect(payload.activePrimaryNav).toBe(1);
+    expect(payload.navSchemaVersion).toBe(2);
+  });
+
   it("reports file-backed workspace setup status and updates it through setup actions", async () => {
     const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
     temporaryDirectories.push(workspaceCwd);
