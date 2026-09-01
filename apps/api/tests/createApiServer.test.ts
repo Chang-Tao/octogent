@@ -1257,7 +1257,7 @@ describe("createApiServer", () => {
     expect(response.status).toBe(405);
   });
 
-  it("round-trips navSchemaVersion through /api/ui-state", async () => {
+  it("round-trips persisted fields through /api/ui-state", async () => {
     // If any layer strips this field, the client replays the nav-index
     // migration on every load and the restored page shifts by one per refresh.
     const baseUrl = await startServer();
@@ -1268,7 +1268,12 @@ describe("createApiServer", () => {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ activePrimaryNav: 1, navSchemaVersion: 2 }),
+      body: JSON.stringify({
+        activePrimaryNav: 1,
+        navSchemaVersion: 2,
+        locale: "zh-CN",
+        terminalInactivityThresholdMs: 120_000,
+      }),
     });
     expect(patchResponse.status).toBe(200);
 
@@ -1278,9 +1283,13 @@ describe("createApiServer", () => {
     const payload = (await readResponse.json()) as {
       activePrimaryNav?: number;
       navSchemaVersion?: number;
+      locale?: string;
+      terminalInactivityThresholdMs?: number;
     };
     expect(payload.activePrimaryNav).toBe(1);
     expect(payload.navSchemaVersion).toBe(2);
+    expect(payload.locale).toBe("zh-CN");
+    expect(payload.terminalInactivityThresholdMs).toBe(120_000);
   });
 
   it("reports file-backed workspace setup status and updates it through setup actions", async () => {
