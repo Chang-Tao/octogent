@@ -16,11 +16,18 @@ export const isEffortTier = (value: unknown): value is EffortTier =>
 /** Codex entries pack the reasoning effort as `model@effort`. */
 type EffortModelMap = Partial<Record<EffortTier, Partial<Record<TerminalAgentProvider, string>>>>;
 
+// Claude entries are family aliases so they track each new generation without
+// a code change (as of 2026-09: haiku → Haiku 4.5, sonnet → Sonnet 5,
+// opus → Opus 5, fable → Fable 5.1). Codex has no aliases, so the top two
+// tiers share the current strongest model and let the reasoning level do the
+// work — gpt-5.5 was demoted to "previous-generation" and is deliberately not
+// used. Codex's `ultra` level ("automatic task delegation") is left out of the
+// defaults: it spawns its own sub-agents, which fights Octogent's orchestration.
 const DEFAULT_EFFORT_MODELS: EffortModelMap = {
   light: { "claude-code": "haiku", codex: "gpt-5.6-luna@low" },
   standard: { "claude-code": "sonnet", codex: "gpt-5.6-terra@medium" },
-  heavy: { "claude-code": "opus", codex: "gpt-5.5@high" },
-  max: { "claude-code": "fable", codex: "gpt-5.6-sol@high" },
+  heavy: { "claude-code": "opus", codex: "gpt-5.6-sol@high" },
+  max: { "claude-code": "fable", codex: "gpt-5.6-sol@xhigh" },
 };
 
 // These strings end up inside the PTY bootstrap command line, so only accept

@@ -17,9 +17,16 @@ describe("resolveAgentModelSelection", () => {
       codexReasoningEffort: "medium",
       effortTier: "standard",
     });
-    expect(resolveAgentModelSelection({ provider: "codex", effort: "max" }, {})).toEqual({
+    // Top two Codex tiers share the strongest current model; reasoning level
+    // separates them (gpt-5.5 is previous-generation and no longer used).
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "heavy" }, {})).toEqual({
       model: "gpt-5.6-sol",
       codexReasoningEffort: "high",
+      effortTier: "heavy",
+    });
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "max" }, {})).toEqual({
+      model: "gpt-5.6-sol",
+      codexReasoningEffort: "xhigh",
       effortTier: "max",
     });
   });
@@ -37,7 +44,7 @@ describe("resolveAgentModelSelection", () => {
   it("honors the OCTOGENT_EFFORT_MODELS env override", () => {
     const env = {
       OCTOGENT_EFFORT_MODELS: JSON.stringify({
-        light: { "claude-code": "haiku-4-5", codex: "gpt-5.4-mini@low" },
+        light: { "claude-code": "haiku-4-5", codex: "gpt-5.3-codex-spark@low" },
       }),
     };
     expect(resolveAgentModelSelection({ provider: "claude-code", effort: "light" }, env)).toEqual({
@@ -45,7 +52,7 @@ describe("resolveAgentModelSelection", () => {
       effortTier: "light",
     });
     expect(resolveAgentModelSelection({ provider: "codex", effort: "light" }, env)).toEqual({
-      model: "gpt-5.4-mini",
+      model: "gpt-5.3-codex-spark",
       codexReasoningEffort: "low",
       effortTier: "light",
     });

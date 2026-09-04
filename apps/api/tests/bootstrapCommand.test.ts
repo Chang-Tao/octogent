@@ -102,8 +102,8 @@ describe("resolveBootstrapCommand", () => {
   });
 
   it("passes a Codex model without touching reasoning effort when none is set", () => {
-    expect(resolveBootstrapCommand("codex", {}, { agentModel: "gpt-5.4" })).toBe(
-      "codex --sandbox workspace-write --ask-for-approval never -m gpt-5.4",
+    expect(resolveBootstrapCommand("codex", {}, { agentModel: "gpt-5.6-terra" })).toBe(
+      "codex --sandbox workspace-write --ask-for-approval never -m gpt-5.6-terra",
     );
   });
 });

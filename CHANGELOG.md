@@ -77,6 +77,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   automatically after a server restart so live views no longer freeze, and the
   flow progress view auto-fits the camera to the fleet on load.
 
+### Model selection (this fork's evolution, phase 6)
+
+- `octogent terminal create` gained `--model` (explicit identifier, wins) and
+  `--effort` (`light` / `standard` / `heavy` / `max`), which the server maps
+  to a per-provider model via `OCTOGENT_EFFORT_MODELS`; Codex entries pack the
+  reasoning level as `model@reasoning`.
+- Defaults re-based on the September 2026 model generation: Claude tiers stay
+  on family aliases (haiku → Haiku 4.5, sonnet → Sonnet 5, opus → Opus 5,
+  fable → Fable 5.1) so they follow new releases without a code change; Codex
+  `heavy` moved from `gpt-5.5@high` (now "previous-generation") to
+  `gpt-5.6-sol@high`, and `max` from `gpt-5.6-sol@high` to `gpt-5.6-sol@xhigh`
+  so the top two tiers are separated by reasoning level. Codex's `ultra` level
+  is intentionally not a default because it delegates to its own sub-agents.
+  Retired `gpt-5.4` / `gpt-5.4-mini` no longer appear anywhere.
+
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull
 requests and sets up the independent-maintenance baseline.

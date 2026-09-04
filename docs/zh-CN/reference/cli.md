@@ -26,7 +26,7 @@ octogent
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`：`completed`、`stopped`、`exited` 终端记录在多少小时后被自动归档；`awaiting-review` 记录永不过期（默认 `72`，非法值回落默认）
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`：Claude 用量数据源：`auto`（OAuth 优先、CLI PTY 回退）、`oauth`、`cli`，或 `off` 禁用采集（默认 `auto`）
 - `OCTOGENT_CODEX_SANDBOX_MODE`：Codex 沙箱模式：`read-only`、`workspace-write` 或 `danger-full-access`。未设置时，worktree 终端默认 `danger-full-access`，shared 终端默认 `workspace-write`——在 `workspace-write` 下 Codex 会把 `.git` 挂载为只读，worktree 代理将永远无法提交自己的工作；而 Claude 本就没有沙箱，因此这样对齐了两种提供方的行为
-- `OCTOGENT_EFFORT_MODELS`：JSON 格式，按 provider 覆盖难度档位到模型的映射，例如 `{"light":{"claude-code":"haiku","codex":"gpt-5.6-luna@low"}}`；codex 条目用 `model@reasoning` 打包推理档位。默认映射：`light` = haiku / gpt-5.6-luna@low、`standard` = sonnet / gpt-5.6-terra@medium、`heavy` = opus / gpt-5.5@high、`max` = fable / gpt-5.6-sol@high
+- `OCTOGENT_EFFORT_MODELS`：JSON 格式，按 provider 覆盖难度档位到模型的映射，例如 `{"light":{"claude-code":"haiku","codex":"gpt-5.6-luna@low"}}`；codex 条目用 `model@reasoning` 打包推理档位。默认映射：`light` = haiku / gpt-5.6-luna@low、`standard` = sonnet / gpt-5.6-terra@medium、`heavy` = opus / gpt-5.6-sol@high、`max` = fable / gpt-5.6-sol@xhigh。Claude 侧用家族别名，会自动跟随新一代模型（当前 haiku→Haiku 4.5、sonnet→Sonnet 5、opus→Opus 5、fable→Fable 5.1）。注意：只用 `--model` 显式指定 codex 模型而不带 `--effort` 时，推理档位沿用 codex 自身默认（如 gpt-5.6-sol 默认为 `low`）；只有 `--effort` 档位会显式设定推理档
 - `OCTOGENT_CODEX_APPROVAL_POLICY`：Codex 审批策略：`on-request` 或 `never`（默认 `never`，避免无人值守的终端卡在审批提示上）
 - `OCTOGENT_CODEX_CONFIG`：覆盖 Octogent 用于预置项目信任与钩子信任哈希的 Codex `config.toml` 路径（主要用于测试隔离）
 - `OCTOGENT_ACCESS_TOKEN`：开启远程访问时非回环客户端必须携带的访问令牌；未设置时每次启动自动生成并随局域网地址打印
