@@ -92,6 +92,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is intentionally not a default because it delegates to its own sub-agents.
   Retired `gpt-5.4` / `gpt-5.4-mini` no longer appear anywhere.
 
+### Trial-run fixes (this fork's evolution, phase 7)
+
+- Flow view links kept flowing after agents had finished: the animation was
+  gated on lifecycle alone, and a PTY stays open after the turn ends. The
+  flow view now uses the canvas rule — runtime state known and not idle — via
+  `computeActiveNodeIds`, and never flows toward a settled (awaiting-review,
+  stalled, shelved) agent.
+- A `stalled` verdict was masked back to `running` by the live-PTY snapshot
+  mirror, so reloads and `/api/health` showed silent agents as busy. `stalled`
+  now survives the mirror like `completed` / `awaiting-review`, and the health
+  lifecycle counters use the same resolution as the terminal snapshots.
+
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull
 requests and sets up the independent-maintenance baseline.

@@ -90,6 +90,36 @@ export const LIFECYCLE_SHELF_AGENT_STATES: ReadonlySet<string> = new Set([
   "completed",
 ]);
 
+/** Lifecycle states whose agents are not doing anything, whatever the PTY says. */
+const LIFECYCLE_SETTLED_AGENT_STATES: ReadonlySet<string> = new Set([
+  ...LIFECYCLE_SHELF_AGENT_STATES,
+  "awaiting-review",
+  "stalled",
+]);
+
+/**
+ * Node ids on a path from a busy agent up to the octoboss — the edges the flow
+ * view animates. "Busy" is the same test the canvas uses for its traveling
+ * dots: the agent's runtime state is known and not idle. Lifecycle alone is
+ * not enough — the PTY stays open after an agent finishes its turn, so a
+ * lifecycle-only test kept links flowing long after the work stopped.
+ */
+export const computeActiveNodeIds = (layout: FlowLayout): Set<string> => {
+  const parentOf = new Map(layout.edges.map((edge) => [edge.to, edge.from]));
+  const active = new Set<string>();
+  for (const node of layout.nodes) {
+    if (node.kind !== "agent") continue;
+    if (node.agentState && LIFECYCLE_SETTLED_AGENT_STATES.has(node.agentState)) continue;
+    if (node.runtimeState === undefined || node.runtimeState === "idle") continue;
+    let cursor: string | undefined = node.id;
+    while (cursor && !active.has(cursor)) {
+      active.add(cursor);
+      cursor = parentOf.get(cursor);
+    }
+  }
+  return active;
+};
+
 type FlowLayoutInput = {
   tentacles: DeckTentacleSummary[];
   terminals: TerminalView;

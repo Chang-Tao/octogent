@@ -7,6 +7,7 @@ import {
   type FlowNode,
   LIFECYCLE_SHELF_AGENT_STATES,
   buildFlowLayout,
+  computeActiveNodeIds,
   computeFitCamera,
   project,
 } from "../app/flow/layout";
@@ -149,23 +150,8 @@ export const FlowPrimaryView = ({
   const paintOrder = useMemo(() => [...layout.nodes].sort((a, b) => a.z - b.z), [layout]);
 
   // Edges on a path down to a working agent flow with a traveling dot, so the
-  // flow view shows "who is busy" the way the canvas does. An agent counts as
-  // working when its dot is the live one (running, not shelved/awaiting).
-  const activeNodeIds = useMemo(() => {
-    const parentOf = new Map(layout.edges.map((edge) => [edge.to, edge.from]));
-    const active = new Set<string>();
-    for (const node of layout.nodes) {
-      if (node.kind !== "agent" || agentDotClass(node) !== "flow-agent-dot--live") {
-        continue;
-      }
-      let cursor: string | undefined = node.id;
-      while (cursor && !active.has(cursor)) {
-        active.add(cursor);
-        cursor = parentOf.get(cursor);
-      }
-    }
-    return active;
-  }, [layout]);
+  // flow view shows "who is busy" the way the canvas does.
+  const activeNodeIds = useMemo(() => computeActiveNodeIds(layout), [layout]);
 
   const activeCardId = pinnedId ?? hoveredId;
   const activeNode = activeCardId

@@ -62,9 +62,15 @@ export const evaluateCompletionOnStop = (input: {
   return { outcome: "awaiting-review", gitFacts };
 };
 
+// Verdicts that must survive the live-PTY mirror. `stalled` belongs here too:
+// the stall detector only ever fires while the PTY is alive, so mirroring it
+// back to "running" hid every stall from snapshots (a reload showed four busy
+// agents that had been silent for minutes). Activity already flips a stalled
+// terminal back to running, so nothing else has to change.
 const LIVE_SESSION_EXEMPT_STATES: ReadonlySet<TerminalLifecycleState> = new Set([
   "completed",
   "awaiting-review",
+  "stalled",
 ]);
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFlowLayout, project } from "../src/app/flow/layout";
+import { buildFlowLayout, computeActiveNodeIds, project } from "../src/app/flow/layout";
 import type { FlowCamera } from "../src/app/flow/layout";
 
 type AnyTentacle = Parameters<typeof buildFlowLayout>[0]["tentacles"][number];
@@ -28,6 +28,57 @@ const terminal = (id: string, tentacleId: string, parentTerminalId?: string): An
     createdAt: "2026-08-31T00:00:00.000Z",
     ...(parentTerminalId ? { parentTerminalId } : {}),
   }) as AnyTerminal;
+
+describe("computeActiveNodeIds", () => {
+  const runtime = (entries: Record<string, "idle" | "processing">) =>
+    new Map(Object.entries(entries).map(([id, state]) => [id, { state }]));
+
+  it("lights the path from a processing agent up to the octoboss", () => {
+    const layout = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [terminal("t-1", "api")],
+      agentRuntimeStates: runtime({ "t-1": "processing" }),
+    });
+
+    const active = computeActiveNodeIds(layout);
+    expect(active.has("flow:agent:t-1")).toBe(true);
+    expect(active.has(layout.nodes.find((n) => n.kind === "tentacle")?.id ?? "")).toBe(true);
+    expect(active.has(layout.nodes[0]?.id ?? "")).toBe(true);
+  });
+
+  it("stops flowing once the agent goes idle, even though its PTY is still live", () => {
+    // The agent finished its turn; lifecycle still says "live" because the
+    // terminal is open. The canvas already treats this as quiet.
+    const layout = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [terminal("t-1", "api")],
+      agentRuntimeStates: runtime({ "t-1": "idle" }),
+    });
+
+    expect(computeActiveNodeIds(layout).size).toBe(0);
+  });
+
+  it("does not flow for an agent whose runtime state is unknown", () => {
+    const layout = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [terminal("t-1", "api")],
+    });
+
+    expect(computeActiveNodeIds(layout).size).toBe(0);
+  });
+
+  it("never flows toward a settled agent, whatever the runtime store says", () => {
+    const review = { ...terminal("t-1", "api"), state: "awaiting-review" } as AnyTerminal;
+    const stalled = { ...terminal("t-2", "api"), state: "stalled" } as AnyTerminal;
+    const layout = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [review, stalled],
+      agentRuntimeStates: runtime({ "t-1": "processing", "t-2": "processing" }),
+    });
+
+    expect(computeActiveNodeIds(layout).size).toBe(0);
+  });
+});
 
 describe("buildFlowLayout", () => {
   it("always roots the layout at the octoboss on level 0", () => {

@@ -963,10 +963,11 @@ export const createTerminalRuntime = ({
         completed: 0,
       };
       for (const terminal of terminals.values()) {
-        // Mirror toTerminalSnapshot: a live session always reports as running.
-        const lifecycleState: TerminalLifecycleState = sessions.has(terminal.terminalId)
-          ? "running"
-          : (terminal.lifecycleState ?? "registered");
+        // Mirror toTerminalSnapshot so health counts agree with what the UI shows.
+        const lifecycleState: TerminalLifecycleState = resolveSnapshotLifecycle(
+          sessions.has(terminal.terminalId),
+          terminal.lifecycleState,
+        );
         terminalCounts[lifecycleState] += 1;
       }
 

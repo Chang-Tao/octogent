@@ -163,6 +163,12 @@ describe("resolveSnapshotLifecycle", () => {
     expect(resolveSnapshotLifecycle(true, "awaiting-review")).toBe("awaiting-review");
   });
 
+  it("lets a stall verdict survive the live-session mirror", () => {
+    // Stalls are only ever detected on live PTYs; masking them as running made
+    // a silent agent look busy on every reload.
+    expect(resolveSnapshotLifecycle(true, "stalled")).toBe("stalled");
+  });
+
   it("falls back to the persisted state without a session", () => {
     expect(resolveSnapshotLifecycle(false, "stopped")).toBe("stopped");
     expect(resolveSnapshotLifecycle(false, undefined)).toBe("registered");
