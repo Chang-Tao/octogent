@@ -25,8 +25,6 @@
   pointer-events: none;
 }
 
-/* Structure lines are plain white like the canvas; motion is carried only by
-   the glowing dots that travel down edges leading to a working agent. */
 /* Links inherit `color` from their <g> (the owning tentacle's color), so one
    branch — octoboss → tentacle → agents — reads as a single colored path. */
 .flow-link {
@@ -262,6 +260,18 @@
   font-size: 11px;
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.65);
+}
+
+.flow-card-agent {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.flow-card-agent-label {
+  margin-right: 6px;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .flow-card-steps {

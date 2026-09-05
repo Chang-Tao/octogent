@@ -607,6 +607,7 @@ export const zhCN: TranslationMap = {
   "common.remove": "移除",
   "common.name": "名称",
   "common.id": "ID",
+  "common.agent": "代理",
   "common.description": "描述",
   "common.actions": "操作",
   "common.progress": "进度",

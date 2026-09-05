@@ -736,6 +736,7 @@ export const createTerminalRuntime = ({
       createdAt: terminal.createdAt,
       hasUserPrompt: isTerminalRecentlyActive(terminal),
       ...(terminal.parentTerminalId ? { parentTerminalId: terminal.parentTerminalId } : {}),
+      ...(terminal.agentProvider ? { agentProvider: terminal.agentProvider } : {}),
       ...(terminal.agentModel ? { agentModel: terminal.agentModel } : {}),
       ...(terminal.agentEffortTier ? { agentEffortTier: terminal.agentEffortTier } : {}),
       ...(terminal.completedAt ? { completedAt: terminal.completedAt } : {}),

@@ -19,6 +19,38 @@ const base: FlowNode = {
   workspaceMode: "worktree",
 };
 
+describe("FlowNodeCard agent provider line", () => {
+  it("names the agent CLI and model behind an agent node", () => {
+    renderWithLocale(
+      <FlowNodeCard node={{ ...base, agentProvider: "claude-code", agentModel: "opus" }} />,
+    );
+
+    expect(screen.getByText("Claude Code · opus")).toBeInTheDocument();
+  });
+
+  it("lists the distinct agent CLIs a tentacle is running", () => {
+    renderWithLocale(
+      <FlowNodeCard
+        node={{
+          ...base,
+          id: "flow:tentacle:mini",
+          kind: "tentacle",
+          role: "tentacle",
+          agentProviders: ["codex", "claude-code"],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Codex · Claude Code")).toBeInTheDocument();
+  });
+
+  it("stays silent when the provider is unknown", () => {
+    renderWithLocale(<FlowNodeCard node={base} />);
+
+    expect(screen.queryByText(/Claude Code|Codex/)).toBeNull();
+  });
+});
+
 describe("FlowNodeCard", () => {
   it("shows the tentacle's三步 from its todo list", () => {
     renderWithLocale(

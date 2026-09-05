@@ -125,6 +125,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the fan below, and the traveling dot glows in the same color, so each
   branch reads as one path instead of the octoboss appearing wired straight
   to terminals.
+- Flow view cards name the agent behind a node: an agent card shows its CLI
+  and model ("Claude Code · opus", "Codex · gpt-5.6-sol"), a tentacle card
+  lists the distinct CLIs its agents run. Terminal snapshots now carry
+  `agentProvider` for this.
 
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull

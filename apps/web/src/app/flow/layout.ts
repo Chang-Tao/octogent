@@ -3,6 +3,7 @@ import type {
   AgentState,
   DeckTentacleSummary,
   TentacleWorkspaceMode,
+  TerminalAgentProvider,
   TerminalCompletionSummary,
 } from "@octogent/core";
 
@@ -36,6 +37,11 @@ export type FlowNode = {
   runtimeState?: AgentRuntimeState;
   runtimeToolName?: string;
   completionSummary?: TerminalCompletionSummary;
+  /** Agents: which agent CLI runs the terminal, and the model it was given. */
+  agentProvider?: TerminalAgentProvider;
+  agentModel?: string;
+  /** Tentacles: distinct providers across their agents, live ones first. */
+  agentProviders?: TerminalAgentProvider[];
 };
 
 export type FlowEdge = { from: string; to: string };
@@ -131,6 +137,26 @@ export const computeActiveNodeIds = (layout: FlowLayout): Set<string> => {
   return active;
 };
 
+/**
+ * Which agent CLIs a tentacle is running, deduplicated, live terminals before
+ * shelved ones so the card leads with what is active now.
+ */
+const distinctProvidersByTentacle = (
+  terminals: TerminalView,
+): Map<string, TerminalAgentProvider[]> => {
+  const isSettled = (record: TerminalView[number]) =>
+    Boolean(record.state && LIFECYCLE_SHELF_AGENT_STATES.has(record.state));
+  const ordered = [...terminals.filter((r) => !isSettled(r)), ...terminals.filter(isSettled)];
+  const byTentacle = new Map<string, TerminalAgentProvider[]>();
+  for (const record of ordered) {
+    if (!record.agentProvider) continue;
+    const list = byTentacle.get(record.tentacleId) ?? [];
+    if (!list.includes(record.agentProvider)) list.push(record.agentProvider);
+    byTentacle.set(record.tentacleId, list);
+  }
+  return byTentacle;
+};
+
 type FlowLayoutInput = {
   tentacles: DeckTentacleSummary[];
   terminals: TerminalView;
@@ -165,8 +191,10 @@ export const buildFlowLayout = ({
   nodes.push(boss);
 
   const tentacleNodes = new Map<string, FlowNode>();
+  const providersByTentacle = distinctProvidersByTentacle(terminals);
   const sortedTentacles = [...tentacles].sort((a, b) => a.tentacleId.localeCompare(b.tentacleId));
   sortedTentacles.forEach((entry, index) => {
+    const providers = providersByTentacle.get(entry.tentacleId);
     const node: FlowNode = {
       id: `flow:tentacle:${entry.tentacleId}`,
       kind: "tentacle",
@@ -185,6 +213,7 @@ export const buildFlowLayout = ({
       todoDone: entry.todoDone,
       ...(entry.description ? { description: entry.description } : {}),
       ...(entry.todoItems?.length ? { todoItems: entry.todoItems } : {}),
+      ...(providers ? { agentProviders: providers } : {}),
     };
     tentacleNodes.set(entry.tentacleId, node);
     nodes.push(node);
@@ -285,6 +314,8 @@ export const buildFlowLayout = ({
       agentState: record.state,
       childCount: childCounts.get(record.terminalId) ?? 0,
       ...(record.workspaceMode ? { workspaceMode: record.workspaceMode } : {}),
+      ...(record.agentProvider ? { agentProvider: record.agentProvider } : {}),
+      ...(record.agentModel ? { agentModel: record.agentModel } : {}),
       ...(record.completionSummary ? { completionSummary: record.completionSummary } : {}),
       ...(() => {
         const info = agentRuntimeStates?.get(record.terminalId);
@@ -322,6 +353,8 @@ export const buildFlowLayout = ({
         role: "worker",
         ...(record.state ? { agentState: record.state } : {}),
         ...(record.workspaceMode ? { workspaceMode: record.workspaceMode } : {}),
+        ...(record.agentProvider ? { agentProvider: record.agentProvider } : {}),
+        ...(record.agentModel ? { agentModel: record.agentModel } : {}),
         ...(record.completionSummary ? { completionSummary: record.completionSummary } : {}),
       });
     });

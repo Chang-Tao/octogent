@@ -1,3 +1,4 @@
+import { agentProviderLabel, agentProviderSummary } from "../../app/agentProviderLabel";
 import type { FlowNode } from "../../app/flow/layout";
 import { useT } from "../../app/providers/LocaleProvider";
 
@@ -16,6 +17,17 @@ const roleLine = (node: FlowNode, t: Translate): string => {
         ? t("web.flow.role.worker.worktree")
         : t("web.flow.role.worker.shared");
   }
+};
+
+/** Which agent CLI(s) sit behind the node: one for an agent, the distinct set for a tentacle. */
+const agentLine = (node: FlowNode): string | null => {
+  if (node.kind === "agent" && node.agentProvider) {
+    return agentProviderSummary(node.agentProvider, node.agentModel);
+  }
+  if (node.kind === "tentacle" && node.agentProviders && node.agentProviders.length > 0) {
+    return node.agentProviders.map(agentProviderLabel).join(" · ");
+  }
+  return null;
 };
 
 type StepTexts = { prev: string; now: string; next: string };
@@ -100,6 +112,13 @@ export const FlowNodeCard = ({
       </div>
 
       <p className="flow-card-role">{roleLine(node, t)}</p>
+
+      {agentLine(node) && (
+        <p className="flow-card-agent">
+          <span className="flow-card-agent-label">{t("common.agent")}</span>
+          {agentLine(node)}
+        </p>
+      )}
 
       {node.kind === "tentacle" && node.todoTotal !== undefined && (
         <div className="flow-card-progress">

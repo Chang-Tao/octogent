@@ -78,6 +78,39 @@ describe("flow colors", () => {
   });
 });
 
+describe("flow agent providers", () => {
+  it("carries each agent's provider and model onto its node", () => {
+    const codex = { ...terminal("t-1", "api"), agentProvider: "codex", agentModel: "gpt-5.6-sol" };
+    const claude = { ...terminal("t-2", "api"), agentProvider: "claude-code" };
+    const { nodes } = buildFlowLayout({
+      tentacles: [tentacle("api")],
+      terminals: [codex as AnyTerminal, claude as AnyTerminal],
+    });
+
+    expect(nodes.find((n) => n.refId === "t-1")).toMatchObject({
+      agentProvider: "codex",
+      agentModel: "gpt-5.6-sol",
+    });
+    expect(nodes.find((n) => n.refId === "t-2")).toMatchObject({ agentProvider: "claude-code" });
+    expect(nodes.find((n) => n.refId === "t-2")?.agentModel).toBeUndefined();
+  });
+
+  it("lists the distinct providers of a tentacle's agents, live ones first", () => {
+    const live1 = { ...terminal("t-1", "api"), agentProvider: "codex" };
+    const live2 = { ...terminal("t-2", "api"), agentProvider: "codex" };
+    const shelved = { ...terminal("t-3", "api"), state: "stopped", agentProvider: "claude-code" };
+    const { nodes } = buildFlowLayout({
+      tentacles: [tentacle("api"), tentacle("web")],
+      terminals: [live1 as AnyTerminal, live2 as AnyTerminal, shelved as AnyTerminal],
+    });
+
+    const api = nodes.find((n) => n.kind === "tentacle" && n.refId === "api");
+    const web = nodes.find((n) => n.kind === "tentacle" && n.refId === "web");
+    expect(api?.agentProviders).toEqual(["codex", "claude-code"]);
+    expect(web?.agentProviders).toBeUndefined();
+  });
+});
+
 describe("computeActiveNodeIds", () => {
   const runtime = (entries: Record<string, "idle" | "processing">) =>
     new Map(Object.entries(entries).map(([id, state]) => [id, { state }]));

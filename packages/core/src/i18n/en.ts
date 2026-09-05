@@ -623,6 +623,7 @@ export const en: TranslationMap = {
   "common.remove": "Remove",
   "common.name": "Name",
   "common.id": "ID",
+  "common.agent": "Agent",
   "common.description": "Description",
   "common.actions": "Actions",
   "common.progress": "Progress",

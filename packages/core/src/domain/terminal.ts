@@ -1,4 +1,4 @@
-import type { AgentRuntimeState } from "./agentRuntime";
+import type { AgentRuntimeState, TerminalAgentProvider } from "./agentRuntime";
 
 export type AgentState =
   | "live"
@@ -49,6 +49,8 @@ export type TerminalSnapshot = {
   createdAt: string;
   hasUserPrompt?: boolean;
   parentTerminalId?: string;
+  /** Which agent CLI runs in this terminal. */
+  agentProvider?: TerminalAgentProvider;
   /** Model requested at creation (explicitly or via an effort tier). */
   agentModel?: string;
   /** Difficulty tier the model was chosen from, when one was given. */
