@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFlowLayout, computeActiveNodeIds, project } from "../src/app/flow/layout";
+import { tentacleColor } from "../src/app/fleetColors";
+import {
+  buildFlowLayout,
+  computeActiveNodeIds,
+  flowEdgeColor,
+  isFlowTrunkEdge,
+  project,
+} from "../src/app/flow/layout";
 import type { FlowCamera } from "../src/app/flow/layout";
 
 type AnyTentacle = Parameters<typeof buildFlowLayout>[0]["tentacles"][number];
@@ -28,6 +35,48 @@ const terminal = (id: string, tentacleId: string, parentTerminalId?: string): An
     createdAt: "2026-08-31T00:00:00.000Z",
     ...(parentTerminalId ? { parentTerminalId } : {}),
   }) as AnyTerminal;
+
+describe("flow colors", () => {
+  it("colors tentacles the way the canvas does: deck color, else a per-id palette color", () => {
+    const uncolored = (id: string) => ({ ...tentacle(id), color: null }) as AnyTentacle;
+    const { nodes } = buildFlowLayout({
+      tentacles: [uncolored("api"), uncolored("web"), tentacle("ops")],
+      terminals: [],
+    });
+
+    const colorOf = (id: string) => nodes.find((n) => n.refId === id)?.color;
+    expect(colorOf("api")).toBe(tentacleColor("api"));
+    expect(colorOf("web")).toBe(tentacleColor("web"));
+    expect(colorOf("api")).not.toBe(colorOf("web"));
+    expect(colorOf("ops")).toBe("#00c8ff");
+    // None of them borrow the octoboss color.
+    for (const id of ["api", "web", "ops"]) {
+      expect(colorOf(id)).not.toBe(nodes[0]?.color);
+    }
+  });
+
+  it("gives every link the color of its tentacle, trunk links included", () => {
+    const layout = buildFlowLayout({
+      tentacles: [{ ...tentacle("api"), color: null } as AnyTentacle],
+      terminals: [terminal("t-1", "api")],
+    });
+    const byId = new Map(layout.nodes.map((n) => [n.id, n]));
+    const expected = tentacleColor("api");
+
+    for (const edge of layout.edges) {
+      const from = byId.get(edge.from);
+      const to = byId.get(edge.to);
+      if (!from || !to) throw new Error("dangling edge");
+      expect(flowEdgeColor(from, to)).toBe(expected);
+      expect(isFlowTrunkEdge(from)).toBe(from.kind === "octoboss");
+    }
+    const trunkCount = layout.edges.filter((e) => {
+      const from = byId.get(e.from);
+      return from !== undefined && isFlowTrunkEdge(from);
+    }).length;
+    expect(trunkCount).toBe(1);
+  });
+});
 
 describe("computeActiveNodeIds", () => {
   const runtime = (entries: Record<string, "idle" | "processing">) =>

@@ -9,6 +9,8 @@ import {
   buildFlowLayout,
   computeActiveNodeIds,
   computeFitCamera,
+  flowEdgeColor,
+  isFlowTrunkEdge,
   project,
 } from "../app/flow/layout";
 import { useAgentRuntimeStates } from "../app/hooks/useAgentRuntimeStates";
@@ -152,6 +154,10 @@ export const FlowPrimaryView = ({
   // Edges on a path down to a working agent flow with a traveling dot, so the
   // flow view shows "who is busy" the way the canvas does.
   const activeNodeIds = useMemo(() => computeActiveNodeIds(layout), [layout]);
+  const nodesById = useMemo(
+    () => new Map(layout.nodes.map((node) => [node.id, node] as const)),
+    [layout],
+  );
 
   const activeCardId = pinnedId ?? hoveredId;
   const activeNode = activeCardId
@@ -214,13 +220,23 @@ export const FlowPrimaryView = ({
         {layout.edges.map((edge) => {
           const from = projected.get(edge.from);
           const to = projected.get(edge.to);
-          if (!from || !to) return null;
+          const fromNode = nodesById.get(edge.from);
+          const toNode = nodesById.get(edge.to);
+          if (!from || !to || !fromNode || !toNode) return null;
           const midX = (from.sx + to.sx) / 2;
           const d = `M ${from.sx} ${from.sy} C ${midX} ${from.sy}, ${midX} ${to.sy}, ${to.sx} ${to.sy}`;
           const isActive = activeNodeIds.has(edge.to);
+          const color = flowEdgeColor(fromNode, toNode);
+          const className = [
+            "flow-link",
+            isFlowTrunkEdge(fromNode) ? "flow-link--trunk" : "",
+            isActive ? "flow-link--active" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
-            <g key={`${edge.from}->${edge.to}`}>
-              <path className={`flow-link${isActive ? " flow-link--active" : ""}`} d={d} />
+            <g key={`${edge.from}->${edge.to}`} style={{ color }}>
+              <path className={className} d={d} />
               {isActive && (
                 <circle className="flow-link-pulse" r={3.5}>
                   <animateMotion dur="1.1s" repeatCount="indefinite" path={d} />

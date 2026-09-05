@@ -27,21 +27,29 @@
 
 /* Structure lines are plain white like the canvas; motion is carried only by
    the glowing dots that travel down edges leading to a working agent. */
+/* Links inherit `color` from their <g> (the owning tentacle's color), so one
+   branch — octoboss → tentacle → agents — reads as a single colored path. */
 .flow-link {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.85);
-  stroke-width: 1.5;
-  opacity: 0.5;
+  stroke: currentcolor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+.flow-link--trunk {
+  stroke-width: 3.5;
+  opacity: 0.75;
 }
 
 .flow-link--active {
-  stroke: rgba(255, 255, 255, 0.95);
-  opacity: 0.85;
+  opacity: 1;
+  filter: drop-shadow(0 0 4px currentcolor);
 }
 
 .flow-link-pulse {
-  fill: #eaffff;
-  filter: drop-shadow(0 0 6px #7ff0ff) drop-shadow(0 0 10px #00c8ff);
+  fill: #ffffff;
+  filter: drop-shadow(0 0 5px currentcolor) drop-shadow(0 0 10px currentcolor);
 }
 
 .flow-node {

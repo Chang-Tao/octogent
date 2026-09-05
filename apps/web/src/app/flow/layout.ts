@@ -40,6 +40,17 @@ export type FlowNode = {
 
 export type FlowEdge = { from: string; to: string };
 
+/**
+ * Every link carries the color of the tentacle it belongs to, so the path
+ * octoboss → tentacle → agents reads as one colored branch instead of a web of
+ * identical lines that looked like the octoboss wired straight to terminals.
+ */
+export const flowEdgeColor = (from: FlowNode, to: FlowNode): string =>
+  from.kind === "octoboss" ? to.color : from.color;
+
+/** Trunk links (octoboss → tentacle) are drawn heavier than the fan below them. */
+export const isFlowTrunkEdge = (from: FlowNode): boolean => from.kind === "octoboss";
+
 export type FlowLayout = { nodes: FlowNode[]; edges: FlowEdge[]; maxLevel: number };
 
 export type FlowCamera = { panX: number; panY: number; zoom: number; perspective: number };
@@ -161,7 +172,10 @@ export const buildFlowLayout = ({
       kind: "tentacle",
       refId: entry.tentacleId,
       label: entry.displayName || entry.tentacleId,
-      color: entry.color ?? OCTOBOSS_COLOR,
+      // Same rule as the canvas: deck color when set, else a palette color
+      // from the id — tentacles created without a color used to all fall
+      // back to the octoboss gold here and became indistinguishable.
+      color: tentacleColor(entry.tentacleId, entry.color),
       level: 1,
       x: LEVEL_SPACING_X,
       y: centeredOffset(index, sortedTentacles.length, SIBLING_SPACING_Y),
