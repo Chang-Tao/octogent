@@ -422,6 +422,11 @@ const terminalCreate = async () => {
         tentacleId: String(data.tentacleId ?? tentacleId ?? ""),
       }),
     );
+    if (!tentacleId) {
+      // Orchestrators keep creating a tentacle and then forgetting to attach
+      // terminals to it; say where the terminal actually landed.
+      console.log(t(locale, "cli.created.terminalOctobossHint"));
+    }
   } catch {
     apiError();
   }

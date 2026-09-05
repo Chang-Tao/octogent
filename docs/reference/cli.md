@@ -82,7 +82,7 @@ Options:
 - `--workspace-mode`, `-w`: `shared` or `worktree`
 - `--initial-prompt`, `-p`: raw initial prompt text
 - `--terminal-id`: explicit terminal ID
-- `--tentacle-id`: existing tentacle ID to attach to
+- `--tentacle-id`: existing tentacle ID to attach to. Omit it and the terminal reports directly to the octoboss (its tentacle ID equals its own terminal ID); creating a tentacle first does not attach later terminals to it by itself
 - `--worktree-id`: explicit worktree ID
 - `--parent-terminal-id`: parent terminal ID for child terminals
 - `--agent-provider`: agent provider, `claude-code` or `codex` (defaults to the server-side default)

@@ -35,6 +35,8 @@ export const createHookProcessor = (deps: {
   reviveSessionTranscript: (terminalId: string) => boolean;
   evaluateSessionCompletion: (terminalId: string) => void;
   recordToolUse?: (terminalId: string, toolName: string) => void;
+  /** Push a fresh snapshot to UI clients after a hook changed the record outside a lifecycle event. */
+  onTerminalUpdated?: (terminalId: string) => void;
   onStateChange?: (
     terminalId: string,
     state: TerminalSession["agentState"],
@@ -52,6 +54,7 @@ export const createHookProcessor = (deps: {
     reviveSessionTranscript,
     evaluateSessionCompletion,
     recordToolUse,
+    onTerminalUpdated,
     onStateChange,
   } = deps;
 
@@ -72,6 +75,9 @@ export const createHookProcessor = (deps: {
     if (model) {
       terminal.agentModelObserved = model;
       persistRegistry();
+      // No lifecycle event accompanies this, so the flow card would otherwise
+      // keep saying "default model" until the next unrelated update.
+      onTerminalUpdated?.(terminalId);
     }
   };
 

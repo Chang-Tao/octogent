@@ -142,7 +142,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transcript (`agentModelObserved`); the flow card shows it, or "default
   model" until known. The registry also reads `agentModel` /
   `agentEffortTier` back on load — they were written but never restored, so
-  a restart forgot every terminal's model.
+  a restart forgot every terminal's model. Learning the model pushes a
+  snapshot to the UI immediately instead of waiting for the next lifecycle
+  event.
+- `octogent terminal create` without `--tentacle-id` now says so: the
+  terminal reports directly to the octoboss, and creating a tentacle first
+  does not attach later terminals to it by itself (an orchestrator kept
+  wondering why its workers hung off the big octopus).
 
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull

@@ -70,6 +70,7 @@ const makeHarness = (
   const reviveSessionTranscript = vi.fn(() => false);
   const evaluateSessionCompletion = vi.fn();
   const recordToolUse = vi.fn();
+  const onTerminalUpdated = vi.fn();
   const persistRegistry = vi.fn();
   const onStateChange = vi.fn();
 
@@ -84,6 +85,7 @@ const makeHarness = (
     reviveSessionTranscript,
     evaluateSessionCompletion,
     recordToolUse,
+    onTerminalUpdated,
     onStateChange,
   });
 
@@ -98,6 +100,7 @@ const makeHarness = (
     releaseSessionKeepAlive,
     evaluateSessionCompletion,
     recordToolUse,
+    onTerminalUpdated,
     onStateChange,
   };
 };
@@ -373,7 +376,7 @@ describe("tool-use heartbeat and observed model", () => {
   });
 
   it("learns the model from the Claude transcript when none was requested", () => {
-    const { processor, terminal, transcriptDirectoryPath } = makeHarness();
+    const { processor, terminal, transcriptDirectoryPath, onTerminalUpdated } = makeHarness();
     const transcriptPath = writeClaudeTranscriptWithModel(
       transcriptDirectoryPath,
       "claude-sonnet-5",
@@ -386,6 +389,16 @@ describe("tool-use heartbeat and observed model", () => {
     );
 
     expect(terminal.agentModelObserved).toBe("claude-sonnet-5");
+    // The UI learns about it right away, not at the next lifecycle event.
+    expect(onTerminalUpdated).toHaveBeenCalledWith(TERMINAL_ID);
+
+    onTerminalUpdated.mockClear();
+    processor.handleHook(
+      "pre-tool-use",
+      { tool_name: "Read", cwd: "/tmp", transcript_path: transcriptPath },
+      TERMINAL_ID,
+    );
+    expect(onTerminalUpdated).not.toHaveBeenCalled();
   });
 
   it("keeps the first observed model and leaves codex terminals alone", () => {

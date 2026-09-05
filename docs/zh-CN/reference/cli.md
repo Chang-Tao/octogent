@@ -82,7 +82,7 @@ octogent terminal create [options]
 - `--workspace-mode`、`-w`：`shared` 或 `worktree`
 - `--initial-prompt`、`-p`：初始提示词原文
 - `--terminal-id`：显式指定终端 ID
-- `--tentacle-id`：要挂载到的已有触手 ID
+- `--tentacle-id`：要挂载到的已有触手 ID。不传则终端直属 octoboss（触手 ID 等于它自己的终端 ID）；先建了触手并不会让之后的终端自动挂上去
 - `--worktree-id`：显式指定工作树 ID
 - `--parent-terminal-id`：子终端的父终端 ID
 - `--agent-provider`：agent 提供方，`claude-code` 或 `codex`（未传时沿用服务端默认）

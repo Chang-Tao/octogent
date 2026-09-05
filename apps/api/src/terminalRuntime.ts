@@ -668,6 +668,15 @@ export const createTerminalRuntime = ({
     deliverChannelMessages: channelMessaging.deliverChannelMessages,
     evaluateSessionCompletion,
     reviveSessionTranscript: (terminalId) => sessionRuntime.reviveSessionTranscript(terminalId),
+    onTerminalUpdated: (terminalId) => {
+      const terminal = terminals.get(terminalId);
+      if (terminal) {
+        broadcastTerminalEvent({
+          type: "terminal-updated",
+          snapshot: toTerminalSnapshot(terminal),
+        });
+      }
+    },
     recordToolUse: (terminalId, toolName) => {
       touchTerminalActivity(terminalId);
       sessionRuntime.appendSessionTranscriptEvent(terminalId, {

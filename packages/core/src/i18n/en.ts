@@ -13,6 +13,8 @@ export const en: TranslationMap = {
     "Other devices sign in once via the ?token= link above; a cookie keeps them signed in.",
   "cli.created.tentacle": "Created tentacle {id}",
   "cli.created.terminal": "Created terminal {id} on tentacle {tentacleId}",
+  "cli.created.terminalOctobossHint":
+    "No --tentacle-id given, so this terminal reports directly to the octoboss. Pass --tentacle-id <id> to place it under a tentacle.",
   "cli.killed.terminal": "Killed terminal {id}",
   "cli.stopped.terminal": "Stopped terminal {id}",
   "cli.archived.terminal": "Archived terminal {id}",

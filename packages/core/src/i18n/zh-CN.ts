@@ -12,6 +12,8 @@ export const zhCN: TranslationMap = {
   "cli.server.tokenHint": "其他设备通过上面的 ?token= 链接首次访问即可；之后由 Cookie 保持登录。",
   "cli.created.tentacle": "已创建触手 {id}",
   "cli.created.terminal": "已在触手 {tentacleId} 上创建终端 {id}",
+  "cli.created.terminalOctobossHint":
+    "未指定 --tentacle-id，该终端直属 octoboss；要挂到某个触手（小章鱼）下，请加 --tentacle-id <触手ID>。",
   "cli.killed.terminal": "已终止终端 {id}",
   "cli.stopped.terminal": "已停止终端 {id}",
   "cli.archived.terminal": "已归档终端 {id}",
