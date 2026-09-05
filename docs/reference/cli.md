@@ -23,6 +23,7 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_LOCALE`: UI/CLI locale (`en` or `zh-CN`)
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`: Cap on concurrently running terminal sessions
 - `OCTOGENT_TERMINAL_STALL_MS`: Milliseconds without transcript activity before a running terminal is marked `stalled` (default: `120000`)
+- `OCTOGENT_TERMINAL_IDLE_GRACE_MS`: Milliseconds a PTY with no browser attached stays open after its agent finishes a turn before the runtime closes it (default: `300000`, five minutes; invalid values fall back). Terminals in `awaiting-review` are exempt — they stay open for the reviewer until an operator stops them
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`: Hours after which `completed`, `stopped`, and `exited` terminal records are auto-archived; `awaiting-review` records never expire (default: `72`, invalid values fall back to the default)
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`: Claude usage data source: `auto` (OAuth first, CLI PTY fallback), `oauth`, `cli`, or `off` to disable collection (default: `auto`)
 - `OCTOGENT_CODEX_SANDBOX_MODE`: Codex sandbox mode: `read-only`, `workspace-write`, or `danger-full-access`. When unset, worktree terminals default to `danger-full-access` and shared terminals to `workspace-write` — under `workspace-write` Codex mounts `.git` read-only, so a worktree agent could never commit its work; Claude runs without a sandbox, so this aligns the two providers
@@ -145,7 +146,7 @@ octogent worktree gc
 octogent worktree gc --dry-run
 ```
 
-Removes the worktree directory and branch of every archived worktree terminal whose work is proven merged — the record's lifecycle state is `completed`, or its completion summary says `merged`. Unmerged work (including `awaiting-review`) is never reclaimed, and a worktree shared by several terminal records is only reclaimed when every record qualifies. `--dry-run` lists the reclaimable worktrees without removing anything. The server also reclaims eligible worktrees automatically when the archive sweep archives their records. Terminal records stay in place either way — that is what `octogent terminal prune` is for.
+Removes the worktree directory and branch of every archived worktree terminal whose work is proven merged. Git is asked at gc time: a worktree whose HEAD is already an ancestor of the operator's branch (and has nothing uncommitted) counts as merged even if its record never learned of the merge, and a branch git says is unmerged is kept even if its record claims otherwise. Only when git cannot answer do the recorded signals decide — a `completed` lifecycle state, or a completion summary that says `merged`. Unmerged work (including `awaiting-review`) is never reclaimed, and a worktree shared by several terminal records is only reclaimed when every record qualifies. `--dry-run` lists the reclaimable worktrees without removing anything. The server also reclaims eligible worktrees automatically when the archive sweep archives their records. Terminal records stay in place either way — that is what `octogent terminal prune` is for.
 
 ## Send a message
 

@@ -298,6 +298,48 @@ describe("stop hook for codex sessions", () => {
   });
 });
 
+describe("stop hook and awaiting-review terminals", () => {
+  it("keeps an awaiting-review terminal alive instead of starting the idle-close grace", () => {
+    const {
+      processor,
+      terminal,
+      transcriptDirectoryPath,
+      releaseSessionKeepAlive,
+      evaluateSessionCompletion,
+    } = makeHarness({ agentProvider: "codex" });
+    // The verdict lands during evaluation, before the keep-alive decision.
+    evaluateSessionCompletion.mockImplementation(() => {
+      terminal.lifecycleState = "awaiting-review";
+    });
+    const transcriptPath = writeCodexRolloutTranscript(transcriptDirectoryPath);
+
+    processor.handleHook(
+      "stop",
+      { session_id: "codex-1", cwd: "/tmp", transcript_path: transcriptPath },
+      TERMINAL_ID,
+    );
+
+    expect(evaluateSessionCompletion).toHaveBeenCalledWith(TERMINAL_ID);
+    expect(releaseSessionKeepAlive).not.toHaveBeenCalled();
+  });
+
+  it("still releases keep-alive when the stop did not finish the work", () => {
+    const { processor, terminal, transcriptDirectoryPath, releaseSessionKeepAlive } = makeHarness({
+      agentProvider: "codex",
+    });
+    terminal.lifecycleState = "running";
+    const transcriptPath = writeCodexRolloutTranscript(transcriptDirectoryPath);
+
+    processor.handleHook(
+      "stop",
+      { session_id: "codex-1", cwd: "/tmp", transcript_path: transcriptPath },
+      TERMINAL_ID,
+    );
+
+    expect(releaseSessionKeepAlive).toHaveBeenCalledWith(TERMINAL_ID);
+  });
+});
+
 describe("stop hook for claude-code sessions", () => {
   it("keeps parsing the Claude transcript and does not force idle", () => {
     const {

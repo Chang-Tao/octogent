@@ -3,7 +3,9 @@ import { join } from "node:path";
 
 import { logVerbose } from "../logging";
 import { parseClaudeTranscript } from "./claudeTranscript";
+import { OCTOGENT_MANAGED_WORKTREE_PATHS } from "./completionDetection";
 import { storeClaudeTranscriptTurns } from "./conversations";
+import { ensureGitExcludeEntries } from "./gitExclude";
 import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
 import { broadcastMessage } from "./protocol";
 import type { PersistedTerminal, TerminalSession } from "./types";
@@ -160,6 +162,12 @@ export const createHookProcessor = (deps: {
 
       mergedSettings.hooks = mergedHooks;
       writeFileSync(targetSettingsPath, `${JSON.stringify(mergedSettings, null, 2)}\n`, "utf8");
+      // Keep our file out of `git status` for the agent and the operator in
+      // repositories that do not ignore `.claude/` themselves.
+      ensureGitExcludeEntries(
+        targetCwd,
+        [...OCTOGENT_MANAGED_WORKTREE_PATHS].map((path) => `/${path}`),
+      );
     } catch {
       // Best-effort
     }
@@ -430,7 +438,13 @@ export const createHookProcessor = (deps: {
     // Deliver any queued channel messages now that the agent is idle.
     if (matchedSessionId) {
       const deliveredMessageCount = deliverChannelMessages(matchedSessionId);
-      if (deliveredMessageCount === 0) {
+      // A terminal parked in awaiting-review is waiting for a reviewer, who
+      // may still talk to the agent over the channel. Releasing keep-alive
+      // here closed its PTY five minutes later and stranded the coordinator
+      // (trial run, 2026-09-05); it stays alive until an operator stops it or
+      // the verdict moves on.
+      const lifecycleState = terminals.get(matchedSessionId)?.lifecycleState;
+      if (deliveredMessageCount === 0 && lifecycleState !== "awaiting-review") {
         releaseSessionKeepAlive(matchedSessionId);
       }
     }

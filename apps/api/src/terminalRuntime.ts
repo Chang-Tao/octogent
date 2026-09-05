@@ -39,6 +39,7 @@ import {
 } from "./terminalRuntime/conversations";
 import { createGitOperations } from "./terminalRuntime/gitOperations";
 import { createHookProcessor } from "./terminalRuntime/hookProcessor";
+import { resolveSessionIdleGraceMs } from "./terminalRuntime/idleGrace";
 import { type EffortTier, resolveAgentModelSelection } from "./terminalRuntime/modelSelection";
 import {
   createTerminalRegistryPersistence,
@@ -61,7 +62,7 @@ import {
   type TerminalSessionEndDetails,
   type TerminalSessionStartDetails,
 } from "./terminalRuntime/types";
-import { shouldReclaimWorktree } from "./terminalRuntime/worktreeGc";
+import { resolveLiveMergeVerdict, shouldReclaimWorktree } from "./terminalRuntime/worktreeGc";
 import { createWorktreeManager } from "./terminalRuntime/worktreeManager";
 
 export type {
@@ -342,10 +343,29 @@ export const createTerminalRuntime = ({
     stallDetectorInterval.unref();
   }
 
+  const runGit = (cwd: string, args: string[]): string =>
+    execFileSync("git", args, { cwd, encoding: "utf8" });
+
+  // "Merged" means merged into whatever the operator's main workspace has
+  // checked out; a detached workspace falls back to comparing against HEAD.
+  const resolveWorkspaceBaseRef = (): string => {
+    try {
+      const branch = runGit(workspaceCwd, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+      if (branch.length > 0) {
+        return branch;
+      }
+    } catch {
+      // Keep the HEAD fallback.
+    }
+    return "HEAD";
+  };
+
   // Worktree GC. A worktree directory may back several terminal records
   // (shared worktreeId), so it is only reclaimable when every record pointing
   // at it independently passes shouldReclaimWorktree — one unmerged sibling
-  // keeps the whole worktree on disk.
+  // keeps the whole worktree on disk. Git is consulted once per worktree so
+  // the decision reflects the branch as it is now, not only what the records
+  // remember.
   const listReclaimableWorktreeCandidates = (): Array<{
     worktreeId: string;
     terminalIds: string[];
@@ -363,11 +383,17 @@ export const createTerminalRuntime = ({
     }
 
     const candidates: Array<{ worktreeId: string; terminalIds: string[] }> = [];
+    const baseRef = resolveWorkspaceBaseRef();
     for (const [worktreeId, group] of worktreeGroups) {
-      const isReclaimable = group.every(
-        (terminal) => shouldReclaimWorktree(terminal) && !sessions.has(terminal.terminalId),
+      if (!worktreeManager.hasTentacleWorktree(worktreeId)) continue;
+      if (group.some((terminal) => sessions.has(terminal.terminalId))) continue;
+      const liveVerdict = resolveLiveMergeVerdict(
+        worktreeManager.getTentacleWorktreePath(worktreeId),
+        baseRef,
+        runGit,
       );
-      if (!isReclaimable || !worktreeManager.hasTentacleWorktree(worktreeId)) continue;
+      const isReclaimable = group.every((terminal) => shouldReclaimWorktree(terminal, liveVerdict));
+      if (!isReclaimable) continue;
       candidates.push({
         worktreeId,
         terminalIds: group.map((terminal) => terminal.terminalId),
@@ -552,6 +578,7 @@ export const createTerminalRuntime = ({
     ptyLogDir,
     transcriptDirectoryPath,
     maxConcurrentSessions: configuredMaxConcurrentSessions,
+    sessionIdleGraceMs: resolveSessionIdleGraceMs(process.env.OCTOGENT_TERMINAL_IDLE_GRACE_MS),
     onStateChange: broadcastTerminalStateChanged,
     onSessionStart: markTerminalRunning,
     onSessionEnd: markTerminalEnded,
@@ -562,9 +589,6 @@ export const createTerminalRuntime = ({
     worktreeManager,
     gitClient,
   });
-
-  const runGit = (cwd: string, args: string[]): string =>
-    execFileSync("git", args, { cwd, encoding: "utf8" });
 
   // On a Stop hook, decide whether this terminal's work is finished and stamp
   // the verdict plus a git-facts completion summary onto the record.
@@ -580,22 +604,10 @@ export const createTerminalRuntime = ({
       worktreeCwd = worktreeManager.getTentacleWorktreePath(worktreeId);
     }
 
-    // "Merged" means merged into whatever the operator's main workspace has
-    // checked out; a detached workspace falls back to comparing against HEAD.
-    let baseRef = "HEAD";
-    try {
-      const branch = runGit(workspaceCwd, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
-      if (branch.length > 0) {
-        baseRef = branch;
-      }
-    } catch {
-      // Keep the HEAD fallback.
-    }
-
     const verdict = evaluateCompletionOnStop({
       workspaceMode: terminal.workspaceMode === "worktree" ? "worktree" : "shared",
       worktreeCwd,
-      baseRef,
+      baseRef: resolveWorkspaceBaseRef(),
       run: runGit,
     });
     if (verdict.outcome === "none") {
@@ -1305,19 +1317,12 @@ export const createTerminalRuntime = ({
         )
         .map((record) => record.terminalId);
 
-      let baseRef = "HEAD";
-      try {
-        const branch = runGit(workspaceCwd, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
-        if (branch.length > 0) baseRef = branch;
-      } catch {
-        // Keep HEAD.
-      }
       let unmergedCommitCount = 0;
       let branch: string | null = null;
       try {
         const facts = collectCompletionGitFacts(
           worktreeManager.getTentacleWorktreePath(worktreeId),
-          baseRef,
+          resolveWorkspaceBaseRef(),
           runGit,
         );
         if (facts && !facts.merged) {

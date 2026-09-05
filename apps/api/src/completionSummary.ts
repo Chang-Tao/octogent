@@ -11,7 +11,7 @@ export type CompletionGitFacts = {
   merged: boolean;
 };
 
-const isExitCode = (error: unknown, exitCode: number) => {
+export const isExitCode = (error: unknown, exitCode: number) => {
   if (typeof error !== "object" || error === null) {
     return false;
   }

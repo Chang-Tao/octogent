@@ -11,6 +11,32 @@ export type CompletionVerdict =
   | { outcome: "none" };
 
 /**
+ * Files Octogent itself drops into a worktree. They are never evidence of
+ * unfinished work — but in a repository that does not ignore `.claude/`, the
+ * hooks file showed up as `?? .claude/` on every Stop and kept Claude worktree
+ * terminals from ever reaching awaiting-review (DiveoDevOps trial, 2026-09-05).
+ * Octogent's own repo ignores `/.claude`, which is why self-tests never saw it.
+ */
+export const OCTOGENT_MANAGED_WORKTREE_PATHS: ReadonlySet<string> = new Set([
+  ".claude/settings.json",
+]);
+
+const porcelainPath = (line: string): string => {
+  // Porcelain v1: `XY path` or `XY old -> new`; quoted paths keep their quotes,
+  // which only matters for names with special characters — not ours.
+  const path = line.slice(3).trim();
+  const arrow = path.indexOf(" -> ");
+  return arrow === -1 ? path : path.slice(arrow + 4);
+};
+
+/** True when `git status --porcelain --untracked-files=all` lists anything Octogent did not put there. */
+export const hasForeignWorktreeChanges = (statusOutput: string): boolean =>
+  statusOutput
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .some((line) => !OCTOGENT_MANAGED_WORKTREE_PATHS.has(porcelainPath(line)));
+
+/**
  * Decides, on a Stop hook, whether a terminal's work is finished.
  *
  * Claude fires Stop after every conversational turn, so the bar is
@@ -34,7 +60,10 @@ export const evaluateCompletionOnStop = (input: {
   }
 
   try {
-    if (input.run(input.worktreeCwd, ["status", "--porcelain"]).trim().length > 0) {
+    // File-level listing so Octogent's own files can be told apart from the
+    // agent's; the default mode collapses an untracked `.claude/` to one line.
+    const status = input.run(input.worktreeCwd, ["status", "--porcelain", "--untracked-files=all"]);
+    if (hasForeignWorktreeChanges(status)) {
       return { outcome: "none" };
     }
   } catch {

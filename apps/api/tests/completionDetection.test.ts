@@ -150,6 +150,60 @@ describe("evaluateCompletionOnStop", () => {
   });
 });
 
+describe("evaluateCompletionOnStop and Octogent's own worktree files", () => {
+  const committedUnmerged = {
+    log: "abc123\tfeat: do the thing",
+    diff: " 2 files changed, 10 insertions(+), 1 deletion(-)",
+    "rev-parse --abbrev-ref HEAD": "octogent/terminal-9\n",
+    "merge-base --is-ancestor": notAncestor,
+  };
+
+  it("ignores the hooks file Octogent wrote into the worktree", () => {
+    // The trial-run repo did not ignore `.claude/`, so this line appeared on
+    // every Stop and no Claude worktree terminal ever reached awaiting-review.
+    const verdict = evaluateCompletionOnStop({
+      workspaceMode: "worktree",
+      worktreeCwd: "/wt",
+      baseRef: "main",
+      run: scriptedRun({
+        "status --porcelain --untracked-files=all": "?? .claude/settings.json\n",
+        ...committedUnmerged,
+      }),
+    });
+
+    expect(verdict.outcome).toBe("awaiting-review");
+  });
+
+  it("still treats the agent's own uncommitted files as unfinished work", () => {
+    const verdict = evaluateCompletionOnStop({
+      workspaceMode: "worktree",
+      worktreeCwd: "/wt",
+      baseRef: "main",
+      run: scriptedRun({
+        "status --porcelain --untracked-files=all": "?? .claude/settings.json\n M src/app.ts\n",
+        ...committedUnmerged,
+      }),
+    });
+
+    expect(verdict).toEqual({ outcome: "none" });
+  });
+
+  it("asks git for a file-level listing so the managed file is not hidden inside `.claude/`", () => {
+    const calls: string[] = [];
+    evaluateCompletionOnStop({
+      workspaceMode: "worktree",
+      worktreeCwd: "/wt",
+      baseRef: "main",
+      run: (_cwd, args) => {
+        calls.push(args.join(" "));
+        return scriptedRun({ status: "", ...committedUnmerged })(_cwd, args);
+      },
+    });
+
+    expect(calls[0]).toBe("status --porcelain --untracked-files=all");
+  });
+});
+
 describe("resolveSnapshotLifecycle", () => {
   it("reports running while a live session exists", () => {
     expect(resolveSnapshotLifecycle(true, "registered")).toBe("running");

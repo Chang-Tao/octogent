@@ -103,6 +103,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mirror, so reloads and `/api/health` showed silent agents as busy. `stalled`
   now survives the mirror like `completed` / `awaiting-review`, and the health
   lifecycle counters use the same resolution as the terminal snapshots.
+- Claude worktree terminals never reached `awaiting-review` in repositories
+  that do not ignore `.claude/`: the hooks file Octogent writes into the
+  worktree showed up as untracked on every Stop and read as unfinished work.
+  The completion check now ignores Octogent's own files (file-level status
+  listing), and the hook installer adds them to the repository's
+  `info/exclude` so agents and operators stop seeing them in `git status`.
+- Terminals parked in `awaiting-review` are no longer closed by the idle
+  grace five minutes after their last turn; they stay open for the reviewer
+  until an operator stops them. The grace itself is now configurable with
+  `OCTOGENT_TERMINAL_IDLE_GRACE_MS`.
+- `octogent worktree gc` (and the archive sweep's reclaim) asks git at gc
+  time: a branch already merged into the operator's branch is reclaimable even
+  if its record never learned of the merge, and a branch git says is unmerged
+  is protected even if its record claims otherwise. Recorded signals decide
+  only when git cannot answer.
 
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull

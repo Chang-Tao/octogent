@@ -23,6 +23,7 @@ octogent
 - `OCTOGENT_LOCALE`：UI/CLI 语言（`en` 或 `zh-CN`）
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`：并发运行终端会话的上限
 - `OCTOGENT_TERMINAL_STALL_MS`：运行中的终端在多少毫秒无转录活动后被标记为 `stalled`（默认 `120000`）
+- `OCTOGENT_TERMINAL_IDLE_GRACE_MS`：代理完成一轮后，没有浏览器连着的 PTY 保持打开多少毫秒再由运行时关闭（默认 `300000`，即 5 分钟；非法值回落默认）。`awaiting-review` 状态的终端豁免——它们会为审阅者一直保持打开，直到操作者显式停止
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`：`completed`、`stopped`、`exited` 终端记录在多少小时后被自动归档；`awaiting-review` 记录永不过期（默认 `72`，非法值回落默认）
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`：Claude 用量数据源：`auto`（OAuth 优先、CLI PTY 回退）、`oauth`、`cli`，或 `off` 禁用采集（默认 `auto`）
 - `OCTOGENT_CODEX_SANDBOX_MODE`：Codex 沙箱模式：`read-only`、`workspace-write` 或 `danger-full-access`。未设置时，worktree 终端默认 `danger-full-access`，shared 终端默认 `workspace-write`——在 `workspace-write` 下 Codex 会把 `.git` 挂载为只读，worktree 代理将永远无法提交自己的工作；而 Claude 本就没有沙箱，因此这样对齐了两种提供方的行为
@@ -140,7 +141,7 @@ octogent worktree gc
 octogent worktree gc --dry-run
 ```
 
-删除所有「已归档且已确证合并」的 worktree 终端对应的 worktree 目录与分支——即记录的生命周期状态为 `completed`，或完成摘要标记了 `merged`。未合并的工作（包括 `awaiting-review`）永不回收；由多条终端记录共享的 worktree，只有在每条记录都满足条件时才会回收。`--dry-run` 仅列出可回收的 worktree，不做任何删除。归档扫描器在归档记录时也会自动回收符合条件的 worktree。无论哪种方式，终端记录本身都保持不变——清理记录是 `octogent terminal prune` 的职责。
+删除所有「已归档且已确证合并」的 worktree 终端对应的 worktree 目录与分支。gc 时会现场问 git：worktree 的 HEAD 已是操作者分支的祖先（且没有未提交内容）即视为已合并，哪怕记录本身没记下这次合并；反之 git 说未合并的分支一律保留，哪怕记录标着已合并。只有 git 无法回答时才看记录信号——生命周期状态为 `completed`，或完成摘要标记了 `merged`。未合并的工作（包括 `awaiting-review`）永不回收；由多条终端记录共享的 worktree，只有在每条记录都满足条件时才会回收。`--dry-run` 仅列出可回收的 worktree，不做任何删除。归档扫描器在归档记录时也会自动回收符合条件的 worktree。无论哪种方式，终端记录本身都保持不变——清理记录是 `octogent terminal prune` 的职责。
 
 ## 发送消息
 
