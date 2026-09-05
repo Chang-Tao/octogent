@@ -118,6 +118,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   if its record never learned of the merge, and a branch git says is unmerged
   is protected even if its record claims otherwise. Recorded signals decide
   only when git cannot answer.
+- Flow view tentacles now take their color the same way the canvas does
+  (deck color, else a per-id palette color); tentacles created without a
+  color used to all fall back to the octoboss gold. Links carry their
+  tentacle's color, trunk links (octoboss → tentacle) are drawn heavier than
+  the fan below, and the traveling dot glows in the same color, so each
+  branch reads as one path instead of the octoboss appearing wired straight
+  to terminals.
 
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull
