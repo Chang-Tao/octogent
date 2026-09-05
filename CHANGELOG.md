@@ -129,6 +129,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and model ("Claude Code · opus", "Codex · gpt-5.6-sol"), a tentacle card
   lists the distinct CLIs its agents run. Terminal snapshots now carry
   `agentProvider` for this.
+- Long turns no longer read as `stalled` (DEIMv2 trial): only prompt
+  submissions refreshed `lastActiveAt`, so one turn with many tool calls and
+  no new prompt was flagged two minutes in. Tool calls (PreToolUse) and PTY
+  output (throttled) now count as activity, and each tool call is written to
+  the Octogent transcript as a `tool_use` event so a long turn has a
+  heartbeat instead of a single `processing` line.
+- `octogent channel send` says whether the message was delivered or queued
+  (the agent was busy; delivery happens when it goes idle), and
+  `octogent terminal list` shows `agent=` and `model=`.
+- Terminals created without `--model` now learn the model from the Claude
+  transcript (`agentModelObserved`); the flow card shows it, or "default
+  model" until known. The registry also reads `agentModel` /
+  `agentEffortTier` back on load — they were written but never restored, so
+  a restart forgot every terminal's model.
 
 This fork of [hesamsheikh/octogent](https://github.com/hesamsheikh/octogent) is now
 maintained independently. This first batch merges the valuable open upstream pull

@@ -69,6 +69,7 @@ const makeHarness = (
   const releaseSessionKeepAlive = vi.fn(() => true);
   const reviveSessionTranscript = vi.fn(() => false);
   const evaluateSessionCompletion = vi.fn();
+  const recordToolUse = vi.fn();
   const persistRegistry = vi.fn();
   const onStateChange = vi.fn();
 
@@ -82,6 +83,7 @@ const makeHarness = (
     releaseSessionKeepAlive,
     reviveSessionTranscript,
     evaluateSessionCompletion,
+    recordToolUse,
     onStateChange,
   });
 
@@ -95,6 +97,7 @@ const makeHarness = (
     deliverChannelMessages,
     releaseSessionKeepAlive,
     evaluateSessionCompletion,
+    recordToolUse,
     onStateChange,
   };
 };
@@ -337,6 +340,79 @@ describe("stop hook and awaiting-review terminals", () => {
     );
 
     expect(releaseSessionKeepAlive).toHaveBeenCalledWith(TERMINAL_ID);
+  });
+});
+
+const writeClaudeTranscriptWithModel = (dir: string, model: string): string => {
+  const transcriptPath = join(dir, "claude-transcript-model.jsonl");
+  const lines = [
+    JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "do the thing" },
+      timestamp: "2026-09-05T10:00:00.000Z",
+    }),
+    JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", model, content: [{ type: "text", text: "done" }] },
+      timestamp: "2026-09-05T10:01:00.000Z",
+    }),
+  ];
+  writeFileSync(transcriptPath, `${lines.join("\n")}\n`, "utf8");
+  return transcriptPath;
+};
+
+describe("tool-use heartbeat and observed model", () => {
+  it("reports every tool call so a long turn counts as activity", () => {
+    const { processor, recordToolUse } = makeHarness();
+
+    processor.handleHook("pre-tool-use", { tool_name: "Bash", cwd: "/tmp" }, TERMINAL_ID);
+    processor.handleHook("pre-tool-use", { tool_name: "Read", cwd: "/tmp" }, TERMINAL_ID);
+
+    expect(recordToolUse).toHaveBeenNthCalledWith(1, TERMINAL_ID, "Bash");
+    expect(recordToolUse).toHaveBeenNthCalledWith(2, TERMINAL_ID, "Read");
+  });
+
+  it("learns the model from the Claude transcript when none was requested", () => {
+    const { processor, terminal, transcriptDirectoryPath } = makeHarness();
+    const transcriptPath = writeClaudeTranscriptWithModel(
+      transcriptDirectoryPath,
+      "claude-sonnet-5",
+    );
+
+    processor.handleHook(
+      "pre-tool-use",
+      { tool_name: "Bash", cwd: "/tmp", transcript_path: transcriptPath },
+      TERMINAL_ID,
+    );
+
+    expect(terminal.agentModelObserved).toBe("claude-sonnet-5");
+  });
+
+  it("keeps the first observed model and leaves codex terminals alone", () => {
+    const claude = makeHarness();
+    claude.terminal.agentModelObserved = "claude-opus-5";
+    const claudePath = writeClaudeTranscriptWithModel(
+      claude.transcriptDirectoryPath,
+      "claude-haiku-4-5",
+    );
+    claude.processor.handleHook(
+      "user-prompt-submit",
+      { prompt: "again", cwd: "/tmp", transcript_path: claudePath },
+      TERMINAL_ID,
+    );
+    expect(claude.terminal.agentModelObserved).toBe("claude-opus-5");
+
+    const codex = makeHarness({ agentProvider: "codex" });
+    const codexPath = writeClaudeTranscriptWithModel(
+      codex.transcriptDirectoryPath,
+      "claude-sonnet-5",
+    );
+    codex.processor.handleHook(
+      "pre-tool-use",
+      { tool_name: "Bash", cwd: "/tmp", transcript_path: codexPath },
+      TERMINAL_ID,
+    );
+    expect(codex.terminal.agentModelObserved).toBeUndefined();
   });
 });
 

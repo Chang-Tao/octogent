@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { logVerbose } from "../logging";
-import { parseClaudeTranscript } from "./claudeTranscript";
+import { parseClaudeTranscript, readClaudeTranscriptModel } from "./claudeTranscript";
 import { OCTOGENT_MANAGED_WORKTREE_PATHS } from "./completionDetection";
 import { storeClaudeTranscriptTurns } from "./conversations";
 import { ensureGitExcludeEntries } from "./gitExclude";
@@ -34,6 +34,7 @@ export const createHookProcessor = (deps: {
   releaseSessionKeepAlive: (terminalId: string) => boolean;
   reviveSessionTranscript: (terminalId: string) => boolean;
   evaluateSessionCompletion: (terminalId: string) => void;
+  recordToolUse?: (terminalId: string, toolName: string) => void;
   onStateChange?: (
     terminalId: string,
     state: TerminalSession["agentState"],
@@ -50,8 +51,29 @@ export const createHookProcessor = (deps: {
     releaseSessionKeepAlive,
     reviveSessionTranscript,
     evaluateSessionCompletion,
+    recordToolUse,
     onStateChange,
   } = deps;
+
+  // Hook payloads never say which model answered; the Claude transcript does.
+  // Read it once per terminal so a terminal created without --model still
+  // shows what is actually working.
+  const noteObservedModel = (terminalId: string, hookPayload: Record<string, unknown>) => {
+    const terminal = terminals.get(terminalId);
+    if (!terminal || terminal.agentModelObserved || terminal.agentProvider === "codex") {
+      return;
+    }
+    const transcriptPath =
+      typeof hookPayload.transcript_path === "string" ? hookPayload.transcript_path : null;
+    if (!transcriptPath) {
+      return;
+    }
+    const model = readClaudeTranscriptModel(transcriptPath);
+    if (model) {
+      terminal.agentModelObserved = model;
+      persistRegistry();
+    }
+  };
 
   const installHooksInDirectory = (targetCwd: string) => {
     const targetClaudeDir = join(targetCwd, ".claude");
@@ -288,7 +310,9 @@ export const createHookProcessor = (deps: {
 
       if (toolName) {
         session.lastToolName = toolName;
+        recordToolUse?.(octogentSessionId, toolName);
       }
+      noteObservedModel(octogentSessionId, hookPayloadRecord);
 
       if (toolName === "AskUserQuestion") {
         session.agentState = "waiting_for_user";
@@ -312,6 +336,7 @@ export const createHookProcessor = (deps: {
 
       // Update last-active timestamp (determines active/inactive on the canvas).
       terminal.lastActiveAt = new Date().toISOString();
+      noteObservedModel(terminal.terminalId, hookPayloadRecord);
 
       // The user submitted a prompt, so the agent is about to start processing.
       // Transition state out of waiting/idle to processing immediately.
@@ -382,6 +407,9 @@ export const createHookProcessor = (deps: {
     // Codex writes its own rollout-format JSONL at transcript_path, which the
     // Claude parser cannot read; rely on last_assistant_message alone there.
     const isCodexSession = terminals.get(matchedSessionId)?.agentProvider === "codex";
+    if (!isCodexSession) {
+      noteObservedModel(matchedSessionId, hookPayload);
+    }
 
     logVerbose(`[Hook] Matched session: ${matchedSessionId}, parsing transcript...`);
     const turns = isCodexSession ? null : parseClaudeTranscript(transcriptPath);

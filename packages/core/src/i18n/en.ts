@@ -24,6 +24,9 @@ export const en: TranslationMap = {
     "Error: worktree branch {branch} has {count} unmerged commit(s) that would be lost. Re-run with --force to delete anyway.",
   "cli.archived.terminals": "Archived {count} completed terminals.",
   "cli.sent.message": "Message sent to terminal {to}",
+  "cli.sent.messageDelivered": "Message delivered to terminal {to}",
+  "cli.sent.messageQueued":
+    "Message queued for terminal {to}: the agent is busy; it is delivered when the agent goes idle",
   "cli.migrated.state": "Migrated state to {path}",
   "cli.error.apiUnreachable": "Error: Could not reach API at {url}",
   "cli.error.tentacleNameRequired": "Error: tentacle name is required.",
@@ -198,6 +201,7 @@ export const en: TranslationMap = {
   "web.flow.allTodosDone": "All todos done",
   "web.flow.noTodos": "No todos yet",
   "web.flow.none": "—",
+  "web.flow.defaultModel": "default model",
   "web.flow.commitsSummary": "{count} commits · +{ins}/-{del}",
   "web.nav.hint": "Press 1-{max} to navigate",
 

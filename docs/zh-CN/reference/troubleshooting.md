@@ -46,6 +46,16 @@ gh auth status
 
 这是预期行为。通道消息只存在内存中，不会跨 API 重启持久化。
 
+## 正在忙的终端被标成 `stalled`，转录也不再增长
+
+Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**变化**（idle → processing 及其反向），以及代理 PreToolUse 钩子上报的每次工具调用（`tool_use` 事件）。因此一轮很长的任务在转录里表现为一串 `tool_use` 事件，而不是反复的 `processing` 行。停滞检测所认的"活动"包括提交 prompt、工具调用和 PTY 输出（每几秒记一次），所以肉眼可见在干活的代理不会被判 `stalled`；这个判定只留给活着却在 `OCTOGENT_TERMINAL_STALL_MS` 内毫无输出的 PTY。
+
+如果代理明明在干活却仍被判 stalled，检查它的钩子是否到达了 API：用 `OCTOGENT_VERBOSE_LOGS=1` 启动 API，代理动作时应能看到 `[Hook] Received hook` 日志。Claude 的钩子在 `<workspace>/.claude/settings.json`，Codex 的在用户层 `$CODEX_HOME/hooks.json`。
+
+## `channel send` 提示消息已排队
+
+目标代理正忙时这就是正常回应。channel 消息只在目标会话空闲（由钩子和输出检测共同判断）时注入；在此之前它留在队列里，`octogent channel list <terminal-id>` 会显示 `status=pending`，代理当前一轮结束后自动投递。注意 `channel list` 只知道发给当前正在运行的这个 API 进程的消息。
+
 ## 终端能撑过页面刷新，却撑不过服务重启
 
 这同样是预期行为。PTY 会话可以在重连窗口内存活，但不会在 API 重启后存活。

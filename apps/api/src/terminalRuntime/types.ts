@@ -88,6 +88,7 @@ export type TerminalSession = {
   keepAliveWithoutClients?: boolean;
   isClosed?: boolean;
   hasSeenProcessing?: boolean;
+  lastOutputActivityAt?: number;
   lastToolName?: string | undefined;
 };
 
@@ -136,6 +137,8 @@ export type PersistedTerminal = {
   agentModel?: string;
   agentReasoningEffort?: string;
   agentEffortTier?: string;
+  /** Model the agent actually reported in its transcript (Claude), when none was requested. */
+  agentModelObserved?: string;
   initialPrompt?: string;
   initialInputDraft?: string;
   lastActiveAt?: string;

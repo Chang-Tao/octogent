@@ -28,6 +28,18 @@ describe("FlowNodeCard agent provider line", () => {
     expect(screen.getByText("Claude Code · opus")).toBeInTheDocument();
   });
 
+  it("falls back to the model the transcript reported, then to 'default model'", () => {
+    renderWithLocale(
+      <FlowNodeCard
+        node={{ ...base, agentProvider: "claude-code", agentModelObserved: "claude-fable-5" }}
+      />,
+    );
+    expect(screen.getByText("Claude Code · claude-fable-5")).toBeInTheDocument();
+
+    renderWithLocale(<FlowNodeCard node={{ ...base, agentProvider: "claude-code" }} />);
+    expect(screen.getByText("Claude Code · default model")).toBeInTheDocument();
+  });
+
   it("lists the distinct agent CLIs a tentacle is running", () => {
     renderWithLocale(
       <FlowNodeCard

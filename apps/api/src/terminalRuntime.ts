@@ -567,6 +567,16 @@ export const createTerminalRuntime = ({
     archiveSweepInterval.unref();
   }
 
+  // PTY output and tool calls count as activity. Only prompt hooks refreshed
+  // lastActiveAt before, so one long turn (many tool calls, no new prompt)
+  // read as "stalled" two minutes in while the agent was plainly busy.
+  const touchTerminalActivity = (terminalId: string) => {
+    const terminal = terminals.get(terminalId);
+    if (!terminal) return;
+    terminal.lastActiveAt = new Date().toISOString();
+    persistRegistry();
+  };
+
   const sessionRuntime = createSessionRuntime({
     websocketServer,
     terminals,
@@ -580,6 +590,7 @@ export const createTerminalRuntime = ({
     maxConcurrentSessions: configuredMaxConcurrentSessions,
     sessionIdleGraceMs: resolveSessionIdleGraceMs(process.env.OCTOGENT_TERMINAL_IDLE_GRACE_MS),
     onStateChange: broadcastTerminalStateChanged,
+    onOutputActivity: touchTerminalActivity,
     onSessionStart: markTerminalRunning,
     onSessionEnd: markTerminalEnded,
   });
@@ -657,6 +668,14 @@ export const createTerminalRuntime = ({
     deliverChannelMessages: channelMessaging.deliverChannelMessages,
     evaluateSessionCompletion,
     reviveSessionTranscript: (terminalId) => sessionRuntime.reviveSessionTranscript(terminalId),
+    recordToolUse: (terminalId, toolName) => {
+      touchTerminalActivity(terminalId);
+      sessionRuntime.appendSessionTranscriptEvent(terminalId, {
+        type: "tool_use",
+        toolName,
+        timestamp: new Date().toISOString(),
+      });
+    },
     releaseSessionKeepAlive: sessionRuntime.releaseSessionKeepAlive,
     onStateChange: broadcastTerminalStateChanged,
   });
@@ -739,6 +758,7 @@ export const createTerminalRuntime = ({
       ...(terminal.agentProvider ? { agentProvider: terminal.agentProvider } : {}),
       ...(terminal.agentModel ? { agentModel: terminal.agentModel } : {}),
       ...(terminal.agentEffortTier ? { agentEffortTier: terminal.agentEffortTier } : {}),
+      ...(terminal.agentModelObserved ? { agentModelObserved: terminal.agentModelObserved } : {}),
       ...(terminal.completedAt ? { completedAt: terminal.completedAt } : {}),
       ...(terminal.completionSummary ? { completionSummary: terminal.completionSummary } : {}),
       ...(session ? { agentRuntimeState: session.agentState } : {}),

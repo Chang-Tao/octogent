@@ -20,9 +20,14 @@ const roleLine = (node: FlowNode, t: Translate): string => {
 };
 
 /** Which agent CLI(s) sit behind the node: one for an agent, the distinct set for a tentacle. */
-const agentLine = (node: FlowNode): string | null => {
+const agentLine = (node: FlowNode, t: Translate): string | null => {
   if (node.kind === "agent" && node.agentProvider) {
-    return agentProviderSummary(node.agentProvider, node.agentModel);
+    // Requested model first, then what the agent's own transcript reported,
+    // else say plainly that the provider's default is at work.
+    return agentProviderSummary(
+      node.agentProvider,
+      node.agentModel ?? node.agentModelObserved ?? t("web.flow.defaultModel"),
+    );
   }
   if (node.kind === "tentacle" && node.agentProviders && node.agentProviders.length > 0) {
     return node.agentProviders.map(agentProviderLabel).join(" · ");
@@ -113,10 +118,10 @@ export const FlowNodeCard = ({
 
       <p className="flow-card-role">{roleLine(node, t)}</p>
 
-      {agentLine(node) && (
+      {agentLine(node, t) && (
         <p className="flow-card-agent">
           <span className="flow-card-agent-label">{t("common.agent")}</span>
-          {agentLine(node)}
+          {agentLine(node, t)}
         </p>
       )}
 

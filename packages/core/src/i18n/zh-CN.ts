@@ -22,6 +22,8 @@ export const zhCN: TranslationMap = {
     "错误：worktree 分支 {branch} 有 {count} 个未合并提交将丢失。确认要删除请加 --force 重试。",
   "cli.archived.terminals": "已归档 {count} 个已完成终端。",
   "cli.sent.message": "消息已发送至终端 {to}",
+  "cli.sent.messageDelivered": "消息已投递到终端 {to}",
+  "cli.sent.messageQueued": "消息已排队：终端 {to} 的代理正忙，空闲后自动投递",
   "cli.migrated.state": "已将状态迁移至 {path}",
   "cli.error.apiUnreachable": "错误：无法连接到 API {url}",
   "cli.error.tentacleNameRequired": "错误：触手名称为必填项。",
@@ -192,6 +194,7 @@ export const zhCN: TranslationMap = {
   "web.flow.allTodosDone": "全部待办已完成",
   "web.flow.noTodos": "暂无待办",
   "web.flow.none": "—",
+  "web.flow.defaultModel": "默认模型",
   "web.flow.commitsSummary": "{count} 个提交 · +{ins}/-{del}",
   "web.nav.hint": "按 1-{max} 导航",
 

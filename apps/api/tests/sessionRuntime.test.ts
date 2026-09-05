@@ -185,6 +185,52 @@ describe("createSessionRuntime", () => {
     runtime.close();
   });
 
+  it("reports PTY output as activity, throttled to one tick per burst", () => {
+    const tentacleId = "tentacle-1";
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        tentacleId,
+        {
+          terminalId: tentacleId,
+          tentacleId,
+          tentacleName: tentacleId,
+          createdAt: new Date().toISOString(),
+          workspaceMode: "shared",
+        },
+      ],
+    ]);
+    const sessions = new Map<string, TerminalSession>();
+    const websocketServer = new FakeWebSocketServer();
+    const pty = new FakePty();
+    spawnMock.mockReturnValue(pty);
+    const onOutputActivity = vi.fn();
+
+    const runtime = createSessionRuntime({
+      websocketServer: websocketServer as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions,
+      getTentacleWorkspaceCwd: () => process.cwd(),
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: process.cwd(),
+      transcriptDirectoryPath: createTemporaryDirectory(),
+      sessionIdleGraceMs: 60_000,
+      onOutputActivity,
+    });
+    websocketServer.nextSocket = new FakeWebSocket();
+    runtime.handleUpgrade(createUpgradeRequest(tentacleId), {} as Duplex, Buffer.alloc(0));
+
+    // A spinner redraws many times a second; only the first chunk of a burst
+    // should count, so the registry is not rewritten on every frame.
+    pty.emitData("⠋ thinking");
+    pty.emitData("⠙ thinking");
+    pty.emitData("⠹ thinking");
+
+    expect(onOutputActivity).toHaveBeenCalledTimes(1);
+    expect(onOutputActivity).toHaveBeenCalledWith(tentacleId);
+
+    runtime.close();
+  });
+
   it("closes idle sessions after the configured grace timeout", () => {
     vi.useFakeTimers();
 

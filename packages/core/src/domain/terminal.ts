@@ -55,6 +55,8 @@ export type TerminalSnapshot = {
   agentModel?: string;
   /** Difficulty tier the model was chosen from, when one was given. */
   agentEffortTier?: string;
+  /** Model the agent reported in its own transcript; fills in when no model was requested. */
+  agentModelObserved?: string;
   agentRuntimeState?: AgentRuntimeState;
   lifecycleState?: TerminalLifecycleState;
   lifecycleReason?: string;

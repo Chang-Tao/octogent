@@ -53,11 +53,15 @@ type CreateSessionRuntimeOptions = {
   scrollbackMaxBytes?: number;
   maxConcurrentSessions?: number;
   onStateChange?: (terminalId: string, state: AgentRuntimeState, toolName?: string) => void;
+  /** PTY output heartbeat, throttled; the runtime uses it to keep lastActiveAt honest during long turns. */
+  onOutputActivity?: (terminalId: string) => void;
   onSessionStart?: (terminalId: string, details: TerminalSessionStartDetails) => void;
   onSessionEnd?: (terminalId: string, details: TerminalSessionEndDetails) => void;
 };
 
 const ANSI_BEL = String.fromCharCode(0x07);
+// A spinner redraws many times a second; one activity tick per few seconds is plenty.
+const OUTPUT_ACTIVITY_THROTTLE_MS = 5_000;
 const ANSI_ESCAPE = String.fromCharCode(0x1b);
 const BROKEN_OSC_TAIL_RE = new RegExp(
   `^\\][^${ANSI_BEL}${ANSI_ESCAPE}]*(?:${ANSI_BEL}|${ANSI_ESCAPE}\\\\)`,
@@ -77,6 +81,7 @@ export const createSessionRuntime = ({
   scrollbackMaxBytes = TERMINAL_SCROLLBACK_MAX_BYTES,
   maxConcurrentSessions = TERMINAL_MAX_CONCURRENT_SESSIONS,
   onStateChange,
+  onOutputActivity,
   onSessionStart,
   onSessionEnd,
 }: CreateSessionRuntimeOptions) => {
@@ -640,12 +645,20 @@ export const createSessionRuntime = ({
 
       appendDebugLog(session, `pty-output session=${sessionId} chunk=${JSON.stringify(chunk)}`);
       appendScrollback(session, chunk);
-      const nextState = session.stateTracker.observeChunk(chunk, Date.now());
+      const now = Date.now();
+      const nextState = session.stateTracker.observeChunk(chunk, now);
       broadcastMessage(session, {
         type: "output",
         data: chunk,
       });
       emitStateIfChanged(session, sessionId, nextState);
+      if (
+        onOutputActivity &&
+        now - (session.lastOutputActivityAt ?? 0) >= OUTPUT_ACTIVITY_THROTTLE_MS
+      ) {
+        session.lastOutputActivityAt = now;
+        onOutputActivity(sessionId);
+      }
     });
 
     const exitDisposable = pty.onExit(({ exitCode, signal }) => {
@@ -894,6 +907,18 @@ export const createSessionRuntime = ({
   // A fresh agent session can start inside a PTY whose previous transcript was
   // closed (the prior agent exited). Without reviving the log, the new agent's
   // events are dropped and queued channel messages can never be delivered.
+  const appendSessionTranscriptEvent = (
+    sessionId: string,
+    event: ConversationTranscriptEventPayload,
+  ): boolean => {
+    const session = sessions.get(sessionId);
+    if (!session || session.isClosed) {
+      return false;
+    }
+    appendTranscriptEvent(session, sessionId, event);
+    return true;
+  };
+
   const reviveSessionTranscript = (sessionId: string): boolean => {
     const session = sessions.get(sessionId);
     if (!session || session.isClosed) {
@@ -911,7 +936,6 @@ export const createSessionRuntime = ({
     appendTranscriptEvent(session, sessionId, {
       type: "session_start",
       timestamp: new Date().toISOString(),
-      tentacleId: session.tentacleId,
     });
     return true;
   };
@@ -921,6 +945,7 @@ export const createSessionRuntime = ({
     stopSession,
     killSession,
     reviveSessionTranscript,
+    appendSessionTranscriptEvent,
     handleUpgrade,
     connectDirect,
     startSession,

@@ -63,6 +63,8 @@ octogent channel list <terminal-id>
 
 - 消息存储在内存中
 - 消息不会跨 API 重启持久化
+
+`octogent channel send` 会回显两种结果之一：“已投递”表示消息已即时注入；“已排队”表示代理正忙，会在它当前一轮结束后投递。
 - 投递状态由 API 跟踪
 - 空闲与 stop 钩子事件可以触发投递
 - 列出消息会显示当前 API 进程内已排队与已投递的消息

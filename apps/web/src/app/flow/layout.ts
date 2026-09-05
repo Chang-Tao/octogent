@@ -40,6 +40,7 @@ export type FlowNode = {
   /** Agents: which agent CLI runs the terminal, and the model it was given. */
   agentProvider?: TerminalAgentProvider;
   agentModel?: string;
+  agentModelObserved?: string;
   /** Tentacles: distinct providers across their agents, live ones first. */
   agentProviders?: TerminalAgentProvider[];
 };
@@ -316,6 +317,7 @@ export const buildFlowLayout = ({
       ...(record.workspaceMode ? { workspaceMode: record.workspaceMode } : {}),
       ...(record.agentProvider ? { agentProvider: record.agentProvider } : {}),
       ...(record.agentModel ? { agentModel: record.agentModel } : {}),
+      ...(record.agentModelObserved ? { agentModelObserved: record.agentModelObserved } : {}),
       ...(record.completionSummary ? { completionSummary: record.completionSummary } : {}),
       ...(() => {
         const info = agentRuntimeStates?.get(record.terminalId);
@@ -355,6 +357,7 @@ export const buildFlowLayout = ({
         ...(record.workspaceMode ? { workspaceMode: record.workspaceMode } : {}),
         ...(record.agentProvider ? { agentProvider: record.agentProvider } : {}),
         ...(record.agentModel ? { agentModel: record.agentModel } : {}),
+        ...(record.agentModelObserved ? { agentModelObserved: record.agentModelObserved } : {}),
         ...(record.completionSummary ? { completionSummary: record.completionSummary } : {}),
       });
     });

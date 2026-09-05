@@ -460,7 +460,16 @@ const terminalList = async () => {
           : "";
       const reason =
         typeof terminal.lifecycleReason === "string" ? ` reason=${terminal.lifecycleReason}` : "";
-      console.log(`  ${terminalId}  ${lifecycle}${pid}${reason}  ${name}`);
+      const modelValue =
+        typeof terminal.agentModel === "string"
+          ? terminal.agentModel
+          : typeof terminal.agentModelObserved === "string"
+            ? terminal.agentModelObserved
+            : null;
+      const provider =
+        typeof terminal.agentProvider === "string" ? ` agent=${terminal.agentProvider}` : "";
+      const model = modelValue ? ` model=${modelValue}` : "";
+      console.log(`  ${terminalId}  ${lifecycle}${pid}${provider}${model}${reason}  ${name}`);
     }
   } catch {
     apiError();
@@ -736,7 +745,11 @@ const channelSend = async () => {
       console.error(`Error: ${data.error ?? "Failed"}`);
       process.exit(1);
     }
-    console.log(t(locale, "cli.sent.message", { to: terminalId }));
+    console.log(
+      t(locale, data.delivered === true ? "cli.sent.messageDelivered" : "cli.sent.messageQueued", {
+        to: terminalId,
+      }),
+    );
   } catch {
     apiError();
   }
