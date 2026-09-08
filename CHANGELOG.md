@@ -92,6 +92,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is intentionally not a default because it delegates to its own sub-agents.
   Retired `gpt-5.4` / `gpt-5.4-mini` no longer appear anywhere.
 
+### Model list follow-up (2026-09-08)
+
+- Codex published GPT-6: `gpt-6-astra` is the new top model and
+  `gpt-5.6-sol` is now billed as the everyday workhorse. Effort tiers follow:
+  `standard` = gpt-5.6-sol@medium (was terra), `heavy` = gpt-6-astra@medium
+  (was sol@high), `max` = gpt-6-astra@xhigh (was sol@xhigh); `light` stays
+  on gpt-5.6-luna@low. The hidden `gpt-reserve` is not used. GPT-6 is
+  rolling out per account, so each Codex tier carries a fallback that applies
+  when the local Codex models cache does not list the first choice, and
+  `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
+
 ### Trial-run fixes (this fork's evolution, phase 7)
 
 - Flow view links kept flowing after agents had finished: the animation was

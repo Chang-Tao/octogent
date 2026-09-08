@@ -1,4 +1,9 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
 import type { TerminalAgentProvider } from "@octogent/core";
+
+import { resolveCodexConfigPath } from "../codexTrust";
 
 /**
  * Difficulty tiers for dispatching a task without naming a model. The mapping
@@ -13,21 +18,34 @@ const EFFORT_TIERS: readonly EffortTier[] = ["light", "standard", "heavy", "max"
 export const isEffortTier = (value: unknown): value is EffortTier =>
   typeof value === "string" && (EFFORT_TIERS as readonly string[]).includes(value);
 
-/** Codex entries pack the reasoning effort as `model@effort`. */
-type EffortModelMap = Partial<Record<EffortTier, Partial<Record<TerminalAgentProvider, string>>>>;
+/**
+ * Codex entries pack the reasoning effort as `model@effort`. A list means
+ * candidates in preference order: the first one the local Codex account can
+ * actually see (per its models cache) wins.
+ */
+type EffortModelEntry = string | string[];
+type EffortModelMap = Partial<
+  Record<EffortTier, Partial<Record<TerminalAgentProvider, EffortModelEntry>>>
+>;
 
 // Claude entries are family aliases so they track each new generation without
 // a code change (as of 2026-09: haiku → Haiku 4.5, sonnet → Sonnet 5,
-// opus → Opus 5, fable → Fable 5.1). Codex has no aliases, so the top two
-// tiers share the current strongest model and let the reasoning level do the
-// work — gpt-5.5 was demoted to "previous-generation" and is deliberately not
-// used. Codex's `ultra` level ("automatic task delegation") is left out of the
-// defaults: it spawns its own sub-agents, which fights Octogent's orchestration.
+// opus → Opus 5, fable → Fable 5.1). Codex has no aliases, so these follow
+// the models_cache of 2026-09-08: gpt-6-astra is the new top model (GPT-6,
+// "most capable"), so the two heavy tiers sit on it and differ by reasoning
+// level; gpt-5.6-sol is now billed as the everyday workhorse and takes the
+// standard tier; luna stays the cheap one. gpt-5.5 (previous-generation) and
+// the hidden gpt-reserve are not used. Codex's `max` / `ultra` levels are left
+// out of the defaults — `ultra` spawns its own sub-agents, which fights
+// Octogent's orchestration; both remain reachable via OCTOGENT_EFFORT_MODELS.
+// GPT-6 is rolling out per account (one of our two machines sees it, the
+// other does not yet), so each Codex tier lists a fallback that resolves when
+// the account's models cache lacks the first choice.
 const DEFAULT_EFFORT_MODELS: EffortModelMap = {
   light: { "claude-code": "haiku", codex: "gpt-5.6-luna@low" },
-  standard: { "claude-code": "sonnet", codex: "gpt-5.6-terra@medium" },
-  heavy: { "claude-code": "opus", codex: "gpt-5.6-sol@high" },
-  max: { "claude-code": "fable", codex: "gpt-5.6-sol@xhigh" },
+  standard: { "claude-code": "sonnet", codex: ["gpt-5.6-sol@medium", "gpt-5.6-terra@medium"] },
+  heavy: { "claude-code": "opus", codex: ["gpt-6-astra@medium", "gpt-5.6-sol@high"] },
+  max: { "claude-code": "fable", codex: ["gpt-6-astra@xhigh", "gpt-5.6-sol@xhigh"] },
 };
 
 // These strings end up inside the PTY bootstrap command line, so only accept
@@ -43,7 +61,64 @@ export type ResolvedAgentModel = {
   effortTier?: EffortTier;
 };
 
-type ModelSelectionEnv = { OCTOGENT_EFFORT_MODELS?: string };
+type ModelSelectionEnv = {
+  OCTOGENT_EFFORT_MODELS?: string;
+  OCTOGENT_CODEX_CONFIG?: string;
+  CODEX_HOME?: string;
+};
+
+/**
+ * Model slugs the local Codex account can use, from the cache the Codex CLI
+ * keeps next to its config. `null` when there is no readable cache — then the
+ * first candidate is taken on faith.
+ */
+export const readCodexListedModels = (env: ModelSelectionEnv): Set<string> | null => {
+  const cachePath = join(
+    dirname(resolveCodexConfigPath(env as NodeJS.ProcessEnv)),
+    "models_cache.json",
+  );
+  if (!existsSync(cachePath)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(cachePath, "utf8")) as { models?: unknown };
+    if (!Array.isArray(parsed.models)) {
+      return null;
+    }
+    const slugs = new Set<string>();
+    for (const model of parsed.models) {
+      const slug = (model as { slug?: unknown }).slug;
+      if (typeof slug === "string") slugs.add(slug);
+    }
+    return slugs;
+  } catch {
+    return null;
+  }
+};
+
+const pickCandidate = (
+  entry: EffortModelEntry,
+  provider: TerminalAgentProvider,
+  env: ModelSelectionEnv,
+): string | undefined => {
+  if (typeof entry === "string") {
+    return entry;
+  }
+  const candidates = entry.filter((value) => typeof value === "string");
+  if (candidates.length === 0) {
+    return undefined;
+  }
+  if (provider !== "codex") {
+    return candidates[0];
+  }
+  const listed = readCodexListedModels(env);
+  if (!listed) {
+    return candidates[0];
+  }
+  return (
+    candidates.find((candidate) => listed.has(candidate.split("@", 1)[0] ?? "")) ?? candidates[0]
+  );
+};
 
 const readEffortModelOverrides = (env: ModelSelectionEnv): EffortModelMap => {
   const raw = env.OCTOGENT_EFFORT_MODELS?.trim();
@@ -99,9 +174,10 @@ export const resolveAgentModelSelection = (
   }
 
   const overrides = readEffortModelOverrides(env);
-  const entry =
+  const configured =
     overrides[input.effort]?.[input.provider] ??
     DEFAULT_EFFORT_MODELS[input.effort]?.[input.provider];
+  const entry = configured ? pickCandidate(configured, input.provider, env) : undefined;
   if (!entry) {
     return null;
   }
