@@ -22,6 +22,12 @@ pnpm install
 
 如果启动失败并提示 `Terminal session limit reached`，说明 Octogent 已达到配置的活动 PTY 会话数上限。用 `octogent terminal stop <terminal-id>` 停掉不用的终端，或用 `octogent terminal prune` 清理不活跃的记录。默认上限是 32；在启动 Octogent 前把 `OCTOGENT_MAX_TERMINAL_SESSIONS` 设为正整数即可调整。
 
+## 工作代理一直没有收到初始提示词
+
+Octogent 在 Claude 或 Codex 上报 `SessionStart` 时发送 `--initial-prompt`；如果就绪信号一直未到，则在启动命令发出 15 秒后兜底发送。`UserPromptSubmit` 表示投递已确认。如果已收到 `SessionStart`，但发送后 10 秒内没有收到确认，Octogent 只会重试一次粘贴和回车。未收到 `SessionStart` 的代理不会重试，因为钩子缺失时无法判断提示词是丢失了还是已经送达。
+
+重试后再过 10 秒仍未确认，终端快照和 `octogent terminal list` 会显示 `reason=initial prompt not acknowledged`。生命周期保持 `running`，后续由常规停滞检测处理；迟到的确认会清除此原因。用 `OCTOGENT_VERBOSE_LOGS=1` 启动 API，可查看钩子到达记录以及 `initial-prompt retry` / `initial-prompt not acknowledged after retry` 日志。检查工作代理的终端是否卡在启动、更新、信任或登录提示，解决后再重新发送任务。重发前先检查终端和日志，避免重复执行已经开始的工作。
+
 ## 工作树终端创建失败
 
 确认：
