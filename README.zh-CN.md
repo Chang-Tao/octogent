@@ -132,16 +132,16 @@ pnpm install
 pnpm dev
 ```
 
-从克隆仓库进行本地全局 CLI 安装：
+从克隆仓库进行本地全局 CLI 安装（需要 pnpm 10+：`npm install -g pnpm`；Linux 还需要 `build-essential` 与 `python3` 来编译 node-pty）：
 
 ```bash
-pnpm install
-pnpm build
-npm install -g .
-octogent
+pnpm install     # 结束时不能有 "Ignored build scripts: … node-pty" 警告，否则先 pnpm approve-builds
+pnpm build       # 每次 git pull 之后重跑
+npm install -g . # 软链到克隆目录，之后别移动该目录
+octogent --help
 ```
 
-仓库安装流程 `npm install -g octogent` 需要等到包发布后才能使用。
+不要在仓库里用 `npm install`。完整说明与排错见 [安装文档](docs/zh-CN/getting-started/installation.md)。仓库安装流程 `npm install -g octogent` 需要等到包发布后才能使用。
 
 </details>
 

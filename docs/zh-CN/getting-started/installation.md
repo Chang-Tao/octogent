@@ -4,13 +4,15 @@ Octogent 是一个本地 Node.js 项目，包含本地 API 和 Web UI。
 
 ## 系统要求
 
-- Node.js `22+`
-- `claude`（用于支持的 workflow）
+- Node.js `22+`（用 [nvm](https://github.com/nvm-sh/nvm) 装的也可以；安装时所在的 shell 要先 `nvm use`）
+- `pnpm` `10+`——仓库是 pnpm workspace。先装一次：`npm install -g pnpm`（或 `corepack enable`）。**不要**在仓库里跑 `npm install`：它解析不了 workspace 里的包，还会留下一个多余的 `package-lock.json`
+- Linux 上编译 `node-pty` 原生模块需要 C++ 工具链：`python3`、`make`、`g++`（Debian/Ubuntu：`sudo apt install build-essential python3`）。macOS 和 Windows 自带预编译二进制
+- 至少一个已安装并登录的代理 CLI：`claude`（`npm install -g @anthropic-ai/claude-code`，然后运行一次 `claude` 完成登录）和/或 `codex`
 - `git`（用于工作树终端）
-- `gh`（用于 GitHub 拉取请求功能）
-- `curl`（用于当前的 Claude 钩子回调流程）
+- `curl`（用于 Claude 钩子回调流程）
+- `gh`（GitHub 拉取请求功能，可选）
 
-当前文档以 Claude Code 为主。代码库中存在一些其他供应商的管道代码，但尚不是受支持的主要方案。
+Codex 与 Claude Code 终端都受支持，用 `octogent terminal create --agent-provider` 按终端选择。
 
 ## 本地开发安装
 
@@ -22,9 +24,31 @@ pnpm dev
 ## 从克隆仓库进行本地全局 CLI 安装
 
 ```bash
+git clone http://192.168.8.240/tao.chang/octogent.git   # 或 GitHub 上的 fork
+cd octogent
 pnpm install
 pnpm build
 npm install -g .
+octogent --help
+```
+
+每一步在做什么、失败时查什么：
+
+- `pnpm install` 结束时**不能**出现 "Ignored build scripts: … node-pty" 的警告。出现了就说明原生 PTY 模块没有编译，Octogent 启动会因缺少 `pty.node` 崩溃。运行 `pnpm approve-builds`（勾选 `node-pty`）后再 `pnpm install`，或者直接编译：
+
+  ```bash
+  cd node_modules/.pnpm/node-pty@1.1.0/node_modules/node-pty && npx node-gyp rebuild && cd -
+  ```
+
+  用 `ls node_modules/.pnpm/node-pty@*/node_modules/node-pty/build/Release/pty.node` 确认文件存在。
+- `pnpm build` 生成 `dist/api` 和 `dist/web`。全局命令直接从克隆目录运行，所以每次 `git pull` 之后也要重新执行这一步。
+- `npm install -g .` 把 `octogent` 链接进当前 Node 的 `bin` 目录（nvm 下是 `~/.nvm/versions/node/<版本>/bin/octogent`），它是指向克隆目录的软链。之后不要移动或删除克隆目录；要换位置就在新路径下再执行一次 `npm install -g .`。
+- `octogent --help` 能打印出命令列表就说明装好了。然后到项目目录里运行 `octogent`。
+
+如果之前在仓库里跑过 `npm install`，先清理：
+
+```bash
+rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json
 ```
 
 ## npm 注册表安装

@@ -157,16 +157,16 @@ pnpm install
 pnpm dev
 ```
 
-For a local global CLI install from a clone:
+For a local global CLI install from a clone (needs pnpm 10+: `npm install -g pnpm`; on Linux also `build-essential` and `python3` to compile node-pty):
 
 ```bash
-pnpm install
-pnpm build
-npm install -g .
-octogent
+pnpm install     # must not end with "Ignored build scripts: … node-pty"; run pnpm approve-builds if it does
+pnpm build       # repeat after every git pull
+npm install -g . # symlinks to the clone; do not move the clone afterwards
+octogent --help
 ```
 
-The registry install flow `npm install -g octogent` will only work after the package is published.
+Do not run `npm install` inside the clone. Full steps and troubleshooting: [installation guide](docs/getting-started/installation.md). The registry install flow `npm install -g octogent` will only work after the package is published.
 
 </details>
 
