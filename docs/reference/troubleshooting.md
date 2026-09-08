@@ -52,6 +52,14 @@ If a terminal still reads as stalled while its agent is working, check that the 
 
 That is the normal answer while the target agent is busy. A channel message is injected only when the target session is idle (as reported by its hooks and output detection); until then it stays in the queue with `status=pending`, which `octogent channel list <terminal-id>` shows. It is delivered automatically at the end of the agent's current turn. Note that `channel list` only knows about messages sent to the API process that is running now.
 
+## The worker's session closed five minutes after its first turn
+
+Previously, a shared-mode worker's first Stop hook marked it `completed` and released its PTY keep-alive. Without a browser, the default five-minute idle grace then closed the session (`session_close`), stranding later channel messages.
+
+Workers created with `--initial-prompt` now stay alive between turns, even when shared-mode completion is reported. A worktree-mode `completed` verdict (proven merged work) still releases keep-alive, and `awaiting-review` remains exempt. If the old pattern persists, unset `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1` before restarting Octogent; that override restores the old release behavior. `OCTOGENT_TERMINAL_IDLE_GRACE_MS` controls the grace after release.
+
+When finished, use `octogent terminal stop <terminal-id>` to close the worker immediately or `octogent terminal archive <terminal-id>` to archive an eligible idle worker and release keep-alive. Retention also archives eligible idle workers. The next batch's top-level dispatch cleans up finished idle workers: deck records are archived, and ephemeral terminals are deleted. Busy workers and workers awaiting review are protected from automatic cleanup.
+
 ## Messages disappear after restart
 
 That is expected. Channel messages are in-memory only and do not persist across API restarts.

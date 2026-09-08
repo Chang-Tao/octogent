@@ -105,6 +105,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Headless workers created with an initial prompt now keep their PTYs alive
+  between turns, so a shared-mode `completed` verdict no longer cuts off later
+  channel messages after five minutes. Proven-merged worktree completion still
+  releases keep-alive; `awaiting-review` remains exempt. Set
+  `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1` to restore the previous behavior.
+  Manual, bulk, retention, and next-batch archiving release idle workers'
+  keep-alive; stop/delete still close sessions immediately. Busy workers stay
+  protected from archival and automatic cleanup.
+
 - Flow view links kept flowing after agents had finished: the animation was
   gated on lifecycle alone, and a PTY stays open after the turn ends. The
   flow view now uses the canvas rule — runtime state known and not idle — via
