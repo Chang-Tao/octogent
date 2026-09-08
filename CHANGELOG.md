@@ -105,6 +105,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Workers could silently lose `--initial-prompt` when concurrent launches or
+  CLI updates took longer than the fixed four-second delay (2026-09-07 trial).
+  Claude and Codex now receive it on `SessionStart`, with a 15-second fallback.
+  `UserPromptSubmit` acknowledges delivery; sessions with a readiness hook
+  retry once after 10 seconds without acknowledgement and expose
+  `initial prompt not acknowledged` in snapshots and `terminal list` if the
+  retry also times out. Retries are logged with `OCTOGENT_VERBOSE_LOGS=1`;
+  agents without readiness hooks are never retried. Input drafts are unchanged.
 - Flow view links kept flowing after agents had finished: the animation was
   gated on lifecycle alone, and a PTY stays open after the turn ends. The
   flow view now uses the canvas rule — runtime state known and not idle — via
