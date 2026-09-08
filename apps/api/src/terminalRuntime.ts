@@ -422,6 +422,12 @@ export const createTerminalRuntime = ({
   const TERMINAL_RETENTION_HOURS = resolveTerminalRetentionHours(
     process.env.OCTOGENT_TERMINAL_RETENTION_HOURS,
   );
+  // A live PTY can be a parked multi-turn worker. Protect active turns while
+  // allowing finished, idle workers to leave the retention shelf.
+  const hasBusySession = (terminalId: string): boolean => {
+    const session = sessions.get(terminalId);
+    return session !== undefined && session.agentState !== "idle";
+  };
   // Persist, broadcast and reclaim after a batch of records has been archived.
   // Reclaim upholds the iron rule (shouldReclaimWorktree never deletes unmerged
   // work); a failure only logs and the next sweep or `worktree gc` retries.
@@ -431,6 +437,7 @@ export const createTerminalRuntime = ({
     }
     persistRegistry();
     for (const terminal of archivedTerminals) {
+      sessionRuntime.releaseSessionKeepAlive(terminal.terminalId);
       broadcastTerminalEvent({
         type: "terminal-updated",
         snapshot: toTerminalSnapshot(terminal),
@@ -453,9 +460,7 @@ export const createTerminalRuntime = ({
     const nowMs = Date.now();
     const archivedTerminals: PersistedTerminal[] = [];
     for (const terminal of terminals.values()) {
-      // A live session means the record is effectively running regardless of
-      // its persisted lifecycle state.
-      if (sessions.has(terminal.terminalId)) continue;
+      if (hasBusySession(terminal.terminalId)) continue;
       if (!shouldAutoArchive(terminal, nowMs, TERMINAL_RETENTION_HOURS)) continue;
 
       terminal.archivedAt = new Date(nowMs).toISOString();
@@ -523,8 +528,8 @@ export const createTerminalRuntime = ({
     !existsSync(join(workspaceCwd, ".octogent", "tentacles", terminal.tentacleId));
 
   // The flow view's bottom shelf holds a round of finished, not-reused
-  // terminals; the next dispatch clears them. A terminal is "reused" while it
-  // is still live (running or awaiting-review) — those are never touched here.
+  // terminals; the next dispatch clears them. Busy sessions and terminals
+  // still running or awaiting-review are never touched here.
   // Finished durable (deck) terminals are archived (record hidden, worktree
   // kept unless merged — the iron rule). Finished ephemeral terminals were
   // never reused this round, so they are removed outright, worktree and all
@@ -536,7 +541,7 @@ export const createTerminalRuntime = ({
     const ephemeralTerminalIds: string[] = [];
     for (const terminal of terminals.values()) {
       if (terminal.archivedAt) continue;
-      if (sessions.has(terminal.terminalId)) continue;
+      if (hasBusySession(terminal.terminalId)) continue;
       if (terminal.parentTerminalId) continue; // handled with its top-level chain
       if (!terminal.lifecycleState || !FINISHED_SHELF_STATES.has(terminal.lifecycleState)) continue;
 
@@ -550,9 +555,17 @@ export const createTerminalRuntime = ({
     finalizeArchivedTerminals(archivedTerminals);
 
     for (const terminalId of ephemeralTerminalIds) {
-      // A live child (unlikely for a finished parent) keeps the whole chain.
+      // An unfinished or busy child keeps the whole chain, even if its parent is idle.
       const cascade = collectTerminalCascade(terminalId);
-      if (cascade.some((id) => sessions.has(id))) continue;
+      if (
+        cascade.some(
+          (id) =>
+            hasBusySession(id) ||
+            (sessions.has(id) &&
+              !FINISHED_SHELF_STATES.has(terminals.get(id)?.lifecycleState ?? "")),
+        )
+      )
+        continue;
       try {
         // best-effort so an already-removed or stuck worktree never orphans the
         // record — the whole point is that the throwaway leaves nothing behind.
@@ -1205,12 +1218,13 @@ export const createTerminalRuntime = ({
         return null;
       }
 
-      if (sessions.has(terminalId) || terminal.lifecycleState === "running") {
+      if (hasBusySession(terminalId) || terminal.lifecycleState === "running") {
         throw new RuntimeInputError(
           `Terminal "${terminalId}" is running. Stop it before archiving.`,
         );
       }
 
+      sessionRuntime.releaseSessionKeepAlive(terminalId);
       if (!terminal.archivedAt) {
         terminal.archivedAt = new Date().toISOString();
         persistRegistry();
@@ -1231,10 +1245,11 @@ export const createTerminalRuntime = ({
         if (terminal.archivedAt || terminal.lifecycleState !== "completed") {
           continue;
         }
-        if (sessions.has(terminal.terminalId)) {
+        if (hasBusySession(terminal.terminalId)) {
           continue;
         }
 
+        sessionRuntime.releaseSessionKeepAlive(terminal.terminalId);
         terminal.archivedAt = archivedAt;
         archivedTerminalIds.push(terminal.terminalId);
       }
