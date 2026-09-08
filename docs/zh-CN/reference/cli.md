@@ -23,7 +23,8 @@ octogent
 - `OCTOGENT_LOCALE`：UI/CLI 语言（`en` 或 `zh-CN`）
 - `OCTOGENT_MAX_TERMINAL_SESSIONS`：并发运行终端会话的上限
 - `OCTOGENT_TERMINAL_STALL_MS`：运行中的终端在多少毫秒无转录活动后被标记为 `stalled`（默认 `120000`）
-- `OCTOGENT_TERMINAL_IDLE_GRACE_MS`：代理完成一轮后，没有浏览器连着的 PTY 保持打开多少毫秒再由运行时关闭（默认 `300000`，即 5 分钟；非法值回落默认）。`awaiting-review` 状态的终端豁免——它们会为审阅者一直保持打开，直到操作者显式停止
+- `OCTOGENT_TERMINAL_IDLE_GRACE_MS`：释放保活后，没有浏览器连接的 PTY 再保持打开多少毫秒（默认 `300000`，即 5 分钟；非法值回落默认）。通过 `--initial-prompt` 创建的工作代理默认在轮次之间保活，只有工作已证实合并的工作树模式 `completed` 终端例外。`awaiting-review` 保留原有豁免。归档会释放保活；停止则立即关闭会话
+- `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN`：在启动 Octogent 前设为 `1`，恢复每次 Stop hook 后释放工作代理保活的旧行为。未设置或其他值均默认让带初始提示词的工作代理在轮次之间保活。原有的 `awaiting-review` 和刚投递通道消息的豁免仍然有效
 - `OCTOGENT_TERMINAL_RETENTION_HOURS`：`completed`、`stopped`、`exited` 终端记录在多少小时后被自动归档；`awaiting-review` 记录永不过期（默认 `72`，非法值回落默认）
 - `OCTOGENT_CLAUDE_USAGE_SOURCE`：Claude 用量数据源：`auto`（OAuth 优先、CLI PTY 回退）、`oauth`、`cli`，或 `off` 禁用采集（默认 `auto`）
 - `OCTOGENT_CODEX_SANDBOX_MODE`：Codex 沙箱模式：`read-only`、`workspace-write` 或 `danger-full-access`。未设置时，worktree 终端默认 `danger-full-access`，shared 终端默认 `workspace-write`——在 `workspace-write` 下 Codex 会把 `.git` 挂载为只读，worktree 代理将永远无法提交自己的工作；而 Claude 本就没有沙箱，因此这样对齐了两种提供方的行为

@@ -20,6 +20,7 @@ const TERMINAL_ID = "t-1";
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -30,6 +31,8 @@ const makeHarness = (
     agentProvider?: TerminalAgentProvider;
     hasSession?: boolean;
     lastToolName?: string;
+    initialPrompt?: string;
+    workspaceMode?: PersistedTerminal["workspaceMode"];
   } = {},
 ) => {
   const transcriptDirectoryPath = mkdtempSync(join(tmpdir(), "octogent-hook-processor-"));
@@ -39,6 +42,8 @@ const makeHarness = (
     terminalId: TERMINAL_ID,
     tentacleId: TERMINAL_ID,
     tentacleName: "Terminal",
+    initialPrompt: options.initialPrompt,
+    workspaceMode: options.workspaceMode ?? "shared",
     ...(options.agentProvider ? { agentProvider: options.agentProvider } : {}),
   } as PersistedTerminal;
   const terminals = new Map<string, PersistedTerminal>([[TERMINAL_ID, terminal]]);
@@ -482,3 +487,56 @@ describe("stop hook for claude-code sessions", () => {
     expect(session.agentState).toBe("processing");
   });
 });
+
+describe.each(["codex", "claude-code"] as const)(
+  "%s dispatched worker keep-alive after Stop",
+  (agentProvider) => {
+    it.each([
+      ["shared", "completed", undefined, false],
+      ["shared", "running", undefined, false],
+      ["worktree", "running", undefined, false],
+      ["worktree", "stalled", undefined, false],
+      ["worktree", "completed", undefined, true],
+      ["worktree", "awaiting-review", undefined, false],
+      ["shared", "completed", "1", true],
+      ["worktree", "running", "1", true],
+      ["worktree", "awaiting-review", "1", false],
+      ["shared", "completed", "true", false],
+    ] as const)(
+      "%s / %s / override %s releases: %s",
+      (workspaceMode, verdict, override, releases) => {
+        vi.stubEnv("OCTOGENT_TERMINAL_RELEASE_AFTER_TURN", override);
+        const { processor, terminal, evaluateSessionCompletion, releaseSessionKeepAlive } =
+          makeHarness({
+            agentProvider,
+            initialPrompt: "do work",
+            workspaceMode,
+          });
+        evaluateSessionCompletion.mockImplementation(() => {
+          terminal.lifecycleState = verdict;
+        });
+        processor.handleHook(
+          "stop",
+          { cwd: "/tmp", transcript_path: "/missing-rollout" },
+          TERMINAL_ID,
+        );
+        expect(releaseSessionKeepAlive).toHaveBeenCalledTimes(releases ? 1 : 0);
+      },
+    );
+
+    it("preserves keep-alive when Stop delivers queued messages even with the override", () => {
+      vi.stubEnv("OCTOGENT_TERMINAL_RELEASE_AFTER_TURN", "1");
+      const { processor, deliverChannelMessages, releaseSessionKeepAlive } = makeHarness({
+        agentProvider,
+        initialPrompt: "do work",
+      });
+      deliverChannelMessages.mockReturnValue(1);
+      processor.handleHook(
+        "stop",
+        { cwd: "/tmp", transcript_path: "/missing-rollout" },
+        TERMINAL_ID,
+      );
+      expect(releaseSessionKeepAlive).not.toHaveBeenCalled();
+    });
+  },
+);

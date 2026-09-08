@@ -21,7 +21,7 @@ vi.mock("../src/terminalRuntime/ptyEnvironment", () => ({
 }));
 
 import { createApiServer } from "../src/createApiServer";
-import type { GitClient } from "../src/terminalRuntime";
+import { type GitClient, createTerminalRuntime } from "../src/terminalRuntime";
 
 class FakePty extends EventEmitter {
   write = vi.fn();
@@ -307,5 +307,107 @@ describe("terminal archiving", () => {
 
     const visibleIds = (await fetchSnapshots(baseUrl)).map((snapshot) => snapshot.terminalId);
     expect(visibleIds).toEqual(["term-stopped-fresh", "term-review"]);
+  });
+});
+
+describe("headless worker cleanup", () => {
+  let runtime: ReturnType<typeof createTerminalRuntime>;
+  let workspaceCwd: string;
+
+  afterEach(async () => {
+    await runtime?.close();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    if (workspaceCwd) rmSync(workspaceCwd, { recursive: true, force: true });
+    spawnMock.mockReset();
+  });
+
+  const startWorker = () => {
+    vi.useFakeTimers();
+    vi.stubEnv("OCTOGENT_TERMINAL_RELEASE_AFTER_TURN", undefined);
+    vi.stubEnv("OCTOGENT_TERMINAL_IDLE_GRACE_MS", "300000");
+    vi.stubEnv("OCTOGENT_TERMINAL_RETENTION_HOURS", "1");
+    workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-worker-cleanup-"));
+    const pty = new FakePty();
+    spawnMock.mockReturnValue(pty);
+    runtime = createTerminalRuntime({ workspaceCwd, gitClient: new FakeGitClient() });
+    const { terminalId } = runtime.createTerminal({
+      agentProvider: "codex",
+      initialPrompt: "do work",
+    });
+    vi.advanceTimersByTime(5000);
+    const stopTurn = () =>
+      runtime.handleHook(
+        "stop",
+        {
+          cwd: workspaceCwd,
+          transcript_path: join(workspaceCwd, "missing-rollout"),
+          last_assistant_message: "first turn done",
+        },
+        terminalId,
+      );
+    stopTurn();
+    return { terminalId, pty };
+  };
+
+  it("delivers a later channel message after a completed worker outlives the idle grace", () => {
+    const { terminalId, pty } = startWorker();
+    vi.advanceTimersByTime(6 * 60 * 1000);
+    expect(pty.kill).not.toHaveBeenCalled();
+    expect(runtime.listTerminalSnapshots()[0]?.lifecycleState).toBe("completed");
+    pty.write.mockClear();
+    expect(runtime.sendChannelMessage(terminalId, "orchestrator", "continue")?.delivered).toBe(
+      true,
+    );
+    vi.advanceTimersByTime(1000);
+    expect(pty.write).toHaveBeenCalledWith(
+      expect.stringContaining("[Channel message from orchestrator]: continue"),
+    );
+    expect(pty.write).toHaveBeenCalledWith("\r");
+  });
+
+  it.each(["manual", "completed", "retention", "next-batch"])(
+    "releases an idle worker when archived by %s",
+    (path) => {
+      const { terminalId, pty } = startWorker();
+      if (path === "manual") runtime.archiveTerminal(terminalId);
+      if (path === "completed") expect(runtime.archiveCompletedTerminals()).toEqual([terminalId]);
+      if (path === "retention") vi.advanceTimersByTime(2 * 60 * 60 * 1000);
+      if (path === "next-batch") {
+        mkdirSync(join(workspaceCwd, ".octogent", "tentacles", terminalId), { recursive: true });
+        runtime.createTerminal({});
+      }
+      expect(
+        runtime
+          .listTerminalSnapshots({ includeArchived: true })
+          .find((t) => t.terminalId === terminalId)?.archivedAt,
+      ).toEqual(expect.any(String));
+      expect(pty.kill).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(300000);
+      expect(pty.kill).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["stop", "delete", "next-batch"])(
+    "closes a kept-alive worker immediately on %s",
+    (path) => {
+      const { terminalId, pty } = startWorker();
+      if (path === "stop") runtime.stopTerminal(terminalId);
+      if (path === "delete") runtime.deleteTerminal(terminalId);
+      if (path === "next-batch") runtime.createTerminal({});
+      expect(pty.kill).toHaveBeenCalledTimes(1);
+      expect(runtime.readHealthCounts().ptySessions).toBe(0);
+    },
+  );
+
+  it("protects a completed worker that has started another turn from archiving and sweeps", () => {
+    const { terminalId, pty } = startWorker();
+    runtime.handleHook("user-prompt-submit", { prompt: "continue" }, terminalId);
+    expect(() => runtime.archiveTerminal(terminalId)).toThrow(/running/i);
+    expect(runtime.archiveCompletedTerminals()).toEqual([]);
+    runtime.createTerminal({});
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    expect(pty.kill).not.toHaveBeenCalled();
+    expect(runtime.listTerminalSnapshots().some((t) => t.terminalId === terminalId)).toBe(true);
   });
 });

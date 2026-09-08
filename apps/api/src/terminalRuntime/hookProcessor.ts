@@ -8,6 +8,7 @@ import { storeClaudeTranscriptTurns } from "./conversations";
 import { ensureGitExcludeEntries } from "./gitExclude";
 import { mergeHookEntries, parseSettingsObject } from "./hookSettingsMerge";
 import { broadcastMessage } from "./protocol";
+import { resolveTerminalReleaseAfterTurn } from "./releaseAfterTurn";
 import type { PersistedTerminal, TerminalSession } from "./types";
 
 const MAX_AUTO_NAME_LENGTH = 50;
@@ -472,13 +473,19 @@ export const createHookProcessor = (deps: {
     // Deliver any queued channel messages now that the agent is idle.
     if (matchedSessionId) {
       const deliveredMessageCount = deliverChannelMessages(matchedSessionId);
-      // A terminal parked in awaiting-review is waiting for a reviewer, who
-      // may still talk to the agent over the channel. Releasing keep-alive
-      // here closed its PTY five minutes later and stranded the coordinator
-      // (trial run, 2026-09-05); it stays alive until an operator stops it or
-      // the verdict moves on.
-      const lifecycleState = terminals.get(matchedSessionId)?.lifecycleState;
-      if (deliveredMessageCount === 0 && lifecycleState !== "awaiting-review") {
+      const terminal = terminals.get(matchedSessionId);
+      const lifecycleState = terminal?.lifecycleState;
+      // A dispatched worker's Stop ends a turn, not the dialogue. Only proven
+      // merged work is finished; shared workers may receive follow-up messages.
+      const keepDispatchedWorkerAlive =
+        Boolean(terminal?.initialPrompt) &&
+        !resolveTerminalReleaseAfterTurn(process.env.OCTOGENT_TERMINAL_RELEASE_AFTER_TURN) &&
+        !(terminal?.workspaceMode === "worktree" && lifecycleState === "completed");
+      if (
+        deliveredMessageCount === 0 &&
+        lifecycleState !== "awaiting-review" &&
+        !keepDispatchedWorkerAlive
+      ) {
         releaseSessionKeepAlive(matchedSessionId);
       }
     }
