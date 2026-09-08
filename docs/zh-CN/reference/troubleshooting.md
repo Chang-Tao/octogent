@@ -48,7 +48,7 @@ gh auth status
 
 通过 `--initial-prompt` 创建的工作代理现在默认在轮次之间保活，即使共享模式已标记完成。工作树模式的 `completed` 判定（工作已证实合并）仍会释放保活，`awaiting-review` 保留豁免。如果仍出现旧现象，请在重启 Octogent 前取消 `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1`；该开关会恢复旧的释放行为。`OCTOGENT_TERMINAL_IDLE_GRACE_MS` 控制释放后的宽限期。
 
-工作结束后，用 `octogent terminal stop <terminal-id>` 立即关闭工作代理，或用 `octogent terminal archive <terminal-id>` 归档符合条件的空闲工作代理并释放保活。保留期扫描也会归档符合条件的空闲工作代理。下一批顶层派发会清理已完成且空闲的工作代理：Deck 记录归档，临时终端删除。忙碌或等待审阅的工作代理不会被自动清理。
+工作结束后，用 `octogent terminal stop <terminal-id>` 立即关闭工作代理，或用 `octogent terminal archive <terminal-id>` 归档符合条件的空闲工作代理并释放保活。保留期扫描会在 `OCTOGENT_TERMINAL_RETENTION_HOURS` 之后归档符合条件的空闲工作代理。PTY 仍开着的工作代理——不管忙不忙——都不会被下一批派发的清理触碰：编排方可能还要通过 channel 继续用它。
 
 ## 消息在重启后消失
 

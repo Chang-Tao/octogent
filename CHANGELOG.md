@@ -110,9 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   channel messages after five minutes. Proven-merged worktree completion still
   releases keep-alive; `awaiting-review` remains exempt. Set
   `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1` to restore the previous behavior.
-  Manual, bulk, retention, and next-batch archiving release idle workers'
-  keep-alive; stop/delete still close sessions immediately. Busy workers stay
-  protected from archival and automatic cleanup.
+  Manual, bulk, and retention archiving release idle workers' keep-alive;
+  stop/delete still close sessions immediately. A worker whose PTY is open
+  is never touched by the next batch's cleanup, idle or not, since the
+  orchestrator may still continue it over the channel.
 
 - Flow view links kept flowing after agents had finished: the animation was
   gated on lifecycle alone, and a PTY stays open after the turn ends. The

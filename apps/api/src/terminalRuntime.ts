@@ -528,8 +528,10 @@ export const createTerminalRuntime = ({
     !existsSync(join(workspaceCwd, ".octogent", "tentacles", terminal.tentacleId));
 
   // The flow view's bottom shelf holds a round of finished, not-reused
-  // terminals; the next dispatch clears them. Busy sessions and terminals
-  // still running or awaiting-review are never touched here.
+  // terminals; the next dispatch clears them. A terminal is "reused" while it
+  // is still live (running, awaiting-review, or a kept-alive idle worker the
+  // orchestrator may still continue over the channel) — those are never
+  // touched here; only records without a PTY are finished for good.
   // Finished durable (deck) terminals are archived (record hidden, worktree
   // kept unless merged — the iron rule). Finished ephemeral terminals were
   // never reused this round, so they are removed outright, worktree and all
@@ -541,7 +543,7 @@ export const createTerminalRuntime = ({
     const ephemeralTerminalIds: string[] = [];
     for (const terminal of terminals.values()) {
       if (terminal.archivedAt) continue;
-      if (hasBusySession(terminal.terminalId)) continue;
+      if (sessions.has(terminal.terminalId)) continue;
       if (terminal.parentTerminalId) continue; // handled with its top-level chain
       if (!terminal.lifecycleState || !FINISHED_SHELF_STATES.has(terminal.lifecycleState)) continue;
 
@@ -555,17 +557,9 @@ export const createTerminalRuntime = ({
     finalizeArchivedTerminals(archivedTerminals);
 
     for (const terminalId of ephemeralTerminalIds) {
-      // An unfinished or busy child keeps the whole chain, even if its parent is idle.
+      // A live child (unlikely for a finished parent) keeps the whole chain.
       const cascade = collectTerminalCascade(terminalId);
-      if (
-        cascade.some(
-          (id) =>
-            hasBusySession(id) ||
-            (sessions.has(id) &&
-              !FINISHED_SHELF_STATES.has(terminals.get(id)?.lifecycleState ?? "")),
-        )
-      )
-        continue;
+      if (cascade.some((id) => sessions.has(id))) continue;
       try {
         // best-effort so an already-removed or stuck worktree never orphans the
         // record — the whole point is that the throwaway leaves nothing behind.

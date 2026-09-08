@@ -366,17 +366,13 @@ describe("headless worker cleanup", () => {
     expect(pty.write).toHaveBeenCalledWith("\r");
   });
 
-  it.each(["manual", "completed", "retention", "next-batch"])(
+  it.each(["manual", "completed", "retention"])(
     "releases an idle worker when archived by %s",
     (path) => {
       const { terminalId, pty } = startWorker();
       if (path === "manual") runtime.archiveTerminal(terminalId);
       if (path === "completed") expect(runtime.archiveCompletedTerminals()).toEqual([terminalId]);
       if (path === "retention") vi.advanceTimersByTime(2 * 60 * 60 * 1000);
-      if (path === "next-batch") {
-        mkdirSync(join(workspaceCwd, ".octogent", "tentacles", terminalId), { recursive: true });
-        runtime.createTerminal({});
-      }
       expect(
         runtime
           .listTerminalSnapshots({ includeArchived: true })
@@ -388,17 +384,24 @@ describe("headless worker cleanup", () => {
     },
   );
 
-  it.each(["stop", "delete", "next-batch"])(
-    "closes a kept-alive worker immediately on %s",
-    (path) => {
-      const { terminalId, pty } = startWorker();
-      if (path === "stop") runtime.stopTerminal(terminalId);
-      if (path === "delete") runtime.deleteTerminal(terminalId);
-      if (path === "next-batch") runtime.createTerminal({});
-      expect(pty.kill).toHaveBeenCalledTimes(1);
-      expect(runtime.readHealthCounts().ptySessions).toBe(0);
-    },
-  );
+  it.each(["stop", "delete"])("closes a kept-alive worker immediately on %s", (path) => {
+    const { terminalId, pty } = startWorker();
+    if (path === "stop") runtime.stopTerminal(terminalId);
+    if (path === "delete") runtime.deleteTerminal(terminalId);
+    expect(pty.kill).toHaveBeenCalledTimes(1);
+    expect(runtime.readHealthCounts().ptySessions).toBe(0);
+  });
+
+  it("keeps a kept-alive idle worker through the next batch's dispatch", () => {
+    // The orchestrator may dispatch B while A waits to be continued over the
+    // channel; a live PTY means "still in use", idle or not.
+    const { terminalId, pty } = startWorker();
+    runtime.createTerminal({});
+    expect(pty.kill).not.toHaveBeenCalled();
+    expect(
+      runtime.listTerminalSnapshots().find((t) => t.terminalId === terminalId)?.lifecycleState,
+    ).toBe("completed");
+  });
 
   it("protects a completed worker that has started another turn from archiving and sweeps", () => {
     const { terminalId, pty } = startWorker();

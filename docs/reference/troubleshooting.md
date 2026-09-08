@@ -58,7 +58,7 @@ Previously, a shared-mode worker's first Stop hook marked it `completed` and rel
 
 Workers created with `--initial-prompt` now stay alive between turns, even when shared-mode completion is reported. A worktree-mode `completed` verdict (proven merged work) still releases keep-alive, and `awaiting-review` remains exempt. If the old pattern persists, unset `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1` before restarting Octogent; that override restores the old release behavior. `OCTOGENT_TERMINAL_IDLE_GRACE_MS` controls the grace after release.
 
-When finished, use `octogent terminal stop <terminal-id>` to close the worker immediately or `octogent terminal archive <terminal-id>` to archive an eligible idle worker and release keep-alive. Retention also archives eligible idle workers. The next batch's top-level dispatch cleans up finished idle workers: deck records are archived, and ephemeral terminals are deleted. Busy workers and workers awaiting review are protected from automatic cleanup.
+When finished, use `octogent terminal stop <terminal-id>` to close the worker immediately or `octogent terminal archive <terminal-id>` to archive an eligible idle worker and release keep-alive. Retention also archives eligible idle workers after `OCTOGENT_TERMINAL_RETENTION_HOURS`. A worker whose PTY is still open is never touched by the next batch's cleanup, idle or not — the orchestrator may still continue it over the channel.
 
 ## Messages disappear after restart
 
