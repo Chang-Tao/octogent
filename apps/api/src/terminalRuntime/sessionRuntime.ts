@@ -7,6 +7,7 @@ import { type IPty, spawn } from "node-pty";
 import type { WebSocket, WebSocketServer } from "ws";
 
 import { type AgentRuntimeState, AgentStateTracker } from "../agentStateDetection";
+import { logVerbose } from "../logging";
 import { resolveBootstrapCommand } from "./bootstrapCommand";
 import {
   AGENT_INJECT_SUBMIT_DELAY_MS,
@@ -57,6 +58,7 @@ type CreateSessionRuntimeOptions = {
   onOutputActivity?: (terminalId: string) => void;
   onSessionStart?: (terminalId: string, details: TerminalSessionStartDetails) => void;
   onSessionEnd?: (terminalId: string, details: TerminalSessionEndDetails) => void;
+  onTerminalUpdated?: (terminalId: string) => void;
 };
 
 const ANSI_BEL = String.fromCharCode(0x07);
@@ -84,6 +86,7 @@ export const createSessionRuntime = ({
   onOutputActivity,
   onSessionStart,
   onSessionEnd,
+  onTerminalUpdated,
 }: CreateSessionRuntimeOptions) => {
   const DEFAULT_PTY_COLS = 120;
   const DEFAULT_PTY_ROWS = 35;
@@ -465,9 +468,102 @@ export const createSessionRuntime = ({
   };
 
   const INITIAL_PROMPT_DELAY_MS = 4_000;
+  const INITIAL_PROMPT_FALLBACK_MS = 15_000;
+  const INITIAL_PROMPT_ACK_TIMEOUT_MS = 10_000;
+  const INITIAL_PROMPT_UNACKNOWLEDGED_REASON = "initial prompt not acknowledged";
   const INITIAL_PROMPT_SUBMIT_DELAY_MS = AGENT_INJECT_SUBMIT_DELAY_MS;
   const BRACKETED_PASTE_START = AGENT_PASTE_START;
   const BRACKETED_PASTE_END = AGENT_PASTE_END;
+
+  const scheduleInitialPromptVerification = (sessionId: string, session: TerminalSession) => {
+    // Without SessionStart, missing acknowledgements may just mean disabled
+    // hooks. Retrying those agents could submit the same task twice.
+    if (
+      !session.hasSessionStartHook ||
+      session.isInitialPromptAcknowledged ||
+      session.initialPromptSentAt === undefined
+    ) {
+      return;
+    }
+
+    schedulePromptTimer(
+      session,
+      sessionId,
+      () => {
+        if (session.isInitialPromptAcknowledged) {
+          return;
+        }
+        if (!session.hasRetriedInitialPrompt) {
+          session.hasRetriedInitialPrompt = true;
+          logVerbose(`[Session] initial-prompt retry session=${sessionId}: no acknowledgement`);
+          writeInitialPrompt(sessionId, session);
+          return;
+        }
+
+        logVerbose(`[Session] initial-prompt not acknowledged after retry session=${sessionId}`);
+        const terminal = terminals.get(session.terminalId);
+        if (terminal?.lifecycleState === "running") {
+          terminal.lifecycleReason = INITIAL_PROMPT_UNACKNOWLEDGED_REASON;
+          terminal.lifecycleUpdatedAt = new Date().toISOString();
+          onTerminalUpdated?.(session.terminalId);
+        }
+      },
+      Math.max(0, session.initialPromptSentAt + INITIAL_PROMPT_ACK_TIMEOUT_MS - Date.now()),
+    );
+  };
+
+  const writeInitialPrompt = (sessionId: string, session: TerminalSession) => {
+    if (!session.initialPrompt || session.isClosed || !session.pty) {
+      return;
+    }
+
+    session.isInitialPromptSent = true;
+    session.initialPromptSentAt = Date.now();
+    appendDebugLog(session, `initial-prompt session=${sessionId}`);
+    session.pty.write(`${BRACKETED_PASTE_START}${session.initialPrompt}${BRACKETED_PASTE_END}`);
+    schedulePromptTimer(
+      session,
+      sessionId,
+      () => {
+        appendDebugLog(session, `initial-prompt-submit session=${sessionId}`);
+        session.pty?.write("\r");
+      },
+      INITIAL_PROMPT_SUBMIT_DELAY_MS,
+    );
+    scheduleInitialPromptVerification(sessionId, session);
+  };
+
+  const sendInitialPromptNow = (sessionId: string) => {
+    const session = sessions.get(sessionId);
+    if (!session || session.isClosed || !session.isBootstrapCommandSent) {
+      return;
+    }
+
+    const hadSessionStartHook = session.hasSessionStartHook;
+    session.hasSessionStartHook = true;
+    if (!session.isInitialPromptSent) {
+      writeInitialPrompt(sessionId, session);
+    } else if (!hadSessionStartHook) {
+      // A slow startup may signal readiness after the fallback already sent.
+      // Verify that attempt without restarting its acknowledgement deadline.
+      scheduleInitialPromptVerification(sessionId, session);
+    }
+  };
+
+  const acknowledgeInitialPrompt = (sessionId: string) => {
+    const session = sessions.get(sessionId);
+    if (!session || session.isClosed || !session.isInitialPromptSent) {
+      return;
+    }
+
+    session.isInitialPromptAcknowledged = true;
+    const terminal = terminals.get(session.terminalId);
+    if (terminal?.lifecycleReason === INITIAL_PROMPT_UNACKNOWLEDGED_REASON) {
+      terminal.lifecycleReason = undefined;
+      terminal.lifecycleUpdatedAt = new Date().toISOString();
+      onTerminalUpdated?.(session.terminalId);
+    }
+  };
 
   const scheduleIdleCloseIfNeeded = (session: TerminalSession, sessionId: string) => {
     if (session.isClosed || sessions.get(sessionId) !== session) {
@@ -512,7 +608,8 @@ export const createSessionRuntime = ({
     appendDebugLog(session, `bootstrap session=${sessionId} command=${bootstrapCommand}`);
     session.pty?.write(`${bootstrapCommand}\r`);
 
-    // Schedule initial prompt injection after Claude Code has had time to boot.
+    // SessionStart sends as soon as the agent is ready; agents without hooks
+    // still get a best-effort attempt after a longer startup window.
     if (session.initialPrompt && !session.isInitialPromptSent) {
       schedulePromptTimer(
         session,
@@ -521,21 +618,9 @@ export const createSessionRuntime = ({
           if (session.isInitialPromptSent) {
             return;
           }
-          session.isInitialPromptSent = true;
-          appendDebugLog(session, `initial-prompt session=${sessionId}`);
-          const prompt = session.initialPrompt ?? "";
-          session.pty?.write(`${BRACKETED_PASTE_START}${prompt}${BRACKETED_PASTE_END}`);
-          schedulePromptTimer(
-            session,
-            sessionId,
-            () => {
-              appendDebugLog(session, `initial-prompt-submit session=${sessionId}`);
-              session.pty?.write("\r");
-            },
-            INITIAL_PROMPT_SUBMIT_DELAY_MS,
-          );
+          writeInitialPrompt(sessionId, session);
         },
-        INITIAL_PROMPT_DELAY_MS,
+        INITIAL_PROMPT_FALLBACK_MS,
       );
     }
 
@@ -944,6 +1029,8 @@ export const createSessionRuntime = ({
     closeSession,
     stopSession,
     killSession,
+    sendInitialPromptNow,
+    acknowledgeInitialPrompt,
     reviveSessionTranscript,
     appendSessionTranscriptEvent,
     handleUpgrade,

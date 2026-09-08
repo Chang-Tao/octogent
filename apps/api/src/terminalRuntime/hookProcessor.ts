@@ -33,6 +33,8 @@ export const createHookProcessor = (deps: {
   deliverChannelMessages: (terminalId: string) => number;
   releaseSessionKeepAlive: (terminalId: string) => boolean;
   reviveSessionTranscript: (terminalId: string) => boolean;
+  sendInitialPromptNow: (sessionId: string) => void;
+  acknowledgeInitialPrompt: (sessionId: string) => void;
   evaluateSessionCompletion: (terminalId: string) => void;
   recordToolUse?: (terminalId: string, toolName: string) => void;
   /** Push a fresh snapshot to UI clients after a hook changed the record outside a lifecycle event. */
@@ -52,6 +54,8 @@ export const createHookProcessor = (deps: {
     deliverChannelMessages,
     releaseSessionKeepAlive,
     reviveSessionTranscript,
+    sendInitialPromptNow,
+    acknowledgeInitialPrompt,
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
@@ -220,6 +224,7 @@ export const createHookProcessor = (deps: {
       if (!octogentSessionId) {
         return { ok: true };
       }
+      sendInitialPromptNow(octogentSessionId);
       // A new agent came up in this PTY. Reopen the transcript if the previous
       // agent closed it, then hand over anything that queued up in between.
       if (reviveSessionTranscript(octogentSessionId)) {
@@ -341,6 +346,7 @@ export const createHookProcessor = (deps: {
       }
 
       // Update last-active timestamp (determines active/inactive on the canvas).
+      acknowledgeInitialPrompt(octogentSessionId);
       terminal.lastActiveAt = new Date().toISOString();
       noteObservedModel(terminal.terminalId, hookPayloadRecord);
 

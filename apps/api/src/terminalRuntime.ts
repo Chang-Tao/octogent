@@ -577,6 +577,16 @@ export const createTerminalRuntime = ({
     persistRegistry();
   };
 
+  const broadcastTerminalUpdated = (terminalId: string) => {
+    const terminal = terminals.get(terminalId);
+    if (terminal) {
+      broadcastTerminalEvent({
+        type: "terminal-updated",
+        snapshot: toTerminalSnapshot(terminal),
+      });
+    }
+  };
+
   const sessionRuntime = createSessionRuntime({
     websocketServer,
     terminals,
@@ -593,6 +603,10 @@ export const createTerminalRuntime = ({
     onOutputActivity: touchTerminalActivity,
     onSessionStart: markTerminalRunning,
     onSessionEnd: markTerminalEnded,
+    onTerminalUpdated: (terminalId) => {
+      persistRegistry();
+      broadcastTerminalUpdated(terminalId);
+    },
   });
 
   const gitOps = createGitOperations({
@@ -668,15 +682,9 @@ export const createTerminalRuntime = ({
     deliverChannelMessages: channelMessaging.deliverChannelMessages,
     evaluateSessionCompletion,
     reviveSessionTranscript: (terminalId) => sessionRuntime.reviveSessionTranscript(terminalId),
-    onTerminalUpdated: (terminalId) => {
-      const terminal = terminals.get(terminalId);
-      if (terminal) {
-        broadcastTerminalEvent({
-          type: "terminal-updated",
-          snapshot: toTerminalSnapshot(terminal),
-        });
-      }
-    },
+    sendInitialPromptNow: sessionRuntime.sendInitialPromptNow,
+    acknowledgeInitialPrompt: sessionRuntime.acknowledgeInitialPrompt,
+    onTerminalUpdated: broadcastTerminalUpdated,
     recordToolUse: (terminalId, toolName) => {
       touchTerminalActivity(terminalId);
       sessionRuntime.appendSessionTranscriptEvent(terminalId, {

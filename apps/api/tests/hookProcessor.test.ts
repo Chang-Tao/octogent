@@ -68,6 +68,8 @@ const makeHarness = (
   });
   const releaseSessionKeepAlive = vi.fn(() => true);
   const reviveSessionTranscript = vi.fn(() => false);
+  const sendInitialPromptNow = vi.fn();
+  const acknowledgeInitialPrompt = vi.fn();
   const evaluateSessionCompletion = vi.fn();
   const recordToolUse = vi.fn();
   const onTerminalUpdated = vi.fn();
@@ -83,6 +85,8 @@ const makeHarness = (
     deliverChannelMessages,
     releaseSessionKeepAlive,
     reviveSessionTranscript,
+    sendInitialPromptNow,
+    acknowledgeInitialPrompt,
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
@@ -98,6 +102,9 @@ const makeHarness = (
     agentStatesAtDelivery,
     deliverChannelMessages,
     releaseSessionKeepAlive,
+    reviveSessionTranscript,
+    sendInitialPromptNow,
+    acknowledgeInitialPrompt,
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
@@ -144,6 +151,55 @@ const readStoredTurns = (transcriptDirectoryPath: string): ConversationTurn[] | 
   }
   return JSON.parse(readFileSync(filePath, "utf8")) as ConversationTurn[];
 };
+
+describe("initial prompt hooks", () => {
+  it.each(["claude-code", "codex"] as const)(
+    "sends the initial prompt on %s readiness even when no transcript was revived",
+    (agentProvider) => {
+      const { processor, sendInitialPromptNow, deliverChannelMessages } = makeHarness({
+        agentProvider,
+      });
+
+      processor.handleHook("session-start", { session_id: "provider-session" }, TERMINAL_ID);
+
+      expect(sendInitialPromptNow).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID);
+      expect(deliverChannelMessages).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still revives transcripts and delivers queued messages on readiness", () => {
+    const { processor, reviveSessionTranscript, sendInitialPromptNow, deliverChannelMessages } =
+      makeHarness();
+    reviveSessionTranscript.mockReturnValue(true);
+
+    processor.handleHook("session-start", {}, TERMINAL_ID);
+
+    expect(reviveSessionTranscript).toHaveBeenCalledWith(TERMINAL_ID);
+    expect(sendInitialPromptNow).toHaveBeenCalledWith(TERMINAL_ID);
+    expect(deliverChannelMessages).toHaveBeenCalledWith(TERMINAL_ID);
+  });
+
+  it.each(["claude-code", "codex"] as const)(
+    "acknowledges the initial prompt on %s user-prompt-submit",
+    (agentProvider) => {
+      const { processor, acknowledgeInitialPrompt } = makeHarness({ agentProvider });
+
+      processor.handleHook("user-prompt-submit", { prompt: "Investigate." }, TERMINAL_ID);
+
+      expect(acknowledgeInitialPrompt).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID);
+    },
+  );
+
+  it("ignores initial prompt hooks without an Octogent session id", () => {
+    const { processor, sendInitialPromptNow, acknowledgeInitialPrompt } = makeHarness();
+
+    processor.handleHook("session-start", { session_id: TERMINAL_ID });
+    processor.handleHook("user-prompt-submit", { session_id: TERMINAL_ID });
+
+    expect(sendInitialPromptNow).not.toHaveBeenCalled();
+    expect(acknowledgeInitialPrompt).not.toHaveBeenCalled();
+  });
+});
 
 describe("permission-request hook", () => {
   it("puts a codex session into waiting_for_permission with the payload tool name", () => {

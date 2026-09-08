@@ -83,6 +83,10 @@ export type TerminalSession = {
   hasTranscriptEnded?: boolean;
   initialPrompt?: string;
   isInitialPromptSent?: boolean;
+  initialPromptSentAt?: number;
+  hasSessionStartHook?: boolean;
+  isInitialPromptAcknowledged?: boolean;
+  hasRetriedInitialPrompt?: boolean;
   initialInputDraft?: string;
   isInitialInputDraftSent?: boolean;
   keepAliveWithoutClients?: boolean;
