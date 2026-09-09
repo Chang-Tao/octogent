@@ -167,6 +167,7 @@ PTY 会话在空闲宽限期内可以在浏览器刷新后存活，但**不能**
 
 ## 文档
 
+- [用 Octogent 完成第一份工作](docs/zh-CN/guides/getting-work-done.md)
 - [文档首页](docs/zh-CN/index.md)
 - [安装](docs/zh-CN/getting-started/installation.md)
 - [快速入门](docs/zh-CN/getting-started/quickstart.md)

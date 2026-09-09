@@ -105,6 +105,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Added a Chinese-first getting-work-done guide and full English translation:
+  five steps to a reviewed and merged result, a verified CLI quick reference,
+  trial pitfalls, and a complete headless coordinator walkthrough. The guide
+  also documents the current ephemeral-terminal batch-cleanup exception to
+  unmerged-work protection.
 - Headless workers created with an initial prompt now keep their PTYs alive
   between turns, so a shared-mode `completed` verdict no longer cuts off later
   channel messages after five minutes. Proven-merged worktree completion still

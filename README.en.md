@@ -192,6 +192,7 @@ PTY sessions survive browser reloads during the idle grace period, but they do *
 
 ## Docs
 
+- [Get Work Done](docs/guides/getting-work-done.md)
 - [Docs Home](docs/index.md)
 - [Installation](docs/getting-started/installation.md)
 - [Quickstart](docs/getting-started/quickstart.md)

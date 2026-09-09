@@ -10,6 +10,7 @@ Octogent has three main layers:
 
 ## Start here
 
+- [Get Work Done](guides/getting-work-done.md) walks through your first dispatch, reviewed result, and merge in about ten minutes
 - [Installation](getting-started/installation.md)
 - [Quickstart](getting-started/quickstart.md)
 - [Mental Model](concepts/mental-model.md) explains the boundaries between tentacles, terminals, worktrees, and runtime state
