@@ -523,7 +523,12 @@ const printTerminalResult = (result: TerminalResult, json: boolean) => {
   console.log(
     `  ${t(locale, "cli.result.state")}: ${result.lifecycleState}${result.lifecycleReason ? ` (${result.lifecycleReason})` : ""}`,
   );
-  if (result.completionSummary) {
+  // Shared-mode workers never commit, so their summary is all zeros; printing
+  // it read as "no output" in a real review (2026-09-09).
+  const hasSummary =
+    result.completionSummary !== null &&
+    (result.completionSummary.commits.length > 0 || result.completionSummary.branch !== null);
+  if (hasSummary && result.completionSummary) {
     const s = result.completionSummary;
     console.log(
       `  ${t(locale, "cli.result.summary")}: ${t(locale, "cli.result.summaryLine", {
