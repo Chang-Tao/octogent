@@ -14,7 +14,7 @@ octogent init
 octogent
 ```
 
-可选：把 `init` 添加到 `.gitignore` 的忽略规则提交到 Git。
+可选：`init` 会把 `.octogent` 写进 `.gitignore`，可以顺手把这条改动提交到 Git。
 
 ### 2. 建一个触手
 
