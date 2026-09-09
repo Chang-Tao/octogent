@@ -253,6 +253,25 @@ octogent terminal delete first-worker --with-worktree
 - The service defaults to 32 active sessions; set `OCTOGENT_MAX_TERMINAL_SESSIONS` before startup according to host resources and account allowances.
 - The deck uses `todo.md` checkboxes for single-item solves or swarms (multiple collaborating workers); keep their order during execution and check them off after review. See [Working With Todos](working-with-todos.md) and [Orchestrating Child Agents](orchestrating-child-agents.md).
 
+### The coordinator's routine: dispatch → wait → read → follow up → review → finish
+
+This section is for whoever hands out the work — you, or an AI coordinator (a Claude Code or Codex session) calling commands from a shell. The coordinator does not have to be an Octogent terminal; every step below uses only the CLI, with no browser and no hand-written API or WebSocket code.
+
+1. **Dispatch**: `octogent tentacle create` first, then `octogent terminal create` per worker — **always with `--tentacle-id`** — and give each worker a `--terminal-id` you can refer to later. Say in the brief where the deliverable goes: have the worker write its conclusions to `.octogent/tentacles/<tentacle-id>/RESULT.md` and name the path in its final message.
+2. **Wait**: `octogent terminal wait <worker-id> [<worker-id>...] --timeout 600`. It blocks until the workers settle and prints each one's state, summary, and final answer; exit code 0 means all reached awaiting-review or completed, 1 means one ended some other way, 2 means timeout (sessions stay open, so you can wait again).
+3. **Read the answer**: `octogent terminal result <worker-id>` prints the same block at any time; use `--json` in scripts. Read the files the answer names (`RESULT.md` and the like) yourself.
+4. **Follow up**: `octogent channel send <worker-id> "..."`. A worker created with an initial prompt keeps its session between turns; the message is delivered when it is idle (`send` says delivered or queued). Then `wait` again for the new answer.
+5. **Review and merge**: for worktree tasks look at the branch — `git diff main..octogent/<worker-id>`, then `git merge --no-ff octogent/<worker-id>` once satisfied; for shared-workspace tasks read the files it changed.
+6. **Finish**: you end every worker — `octogent terminal delete <worker-id> --with-worktree` (once merged) or `octogent terminal stop <worker-id>`. Workers do not exit on their own, and the server allows 32 concurrent sessions by default.
+
+Mistakes coordinators keep making:
+
+- Forgetting `--tentacle-id`, so every worker hangs off the octoboss.
+- Attaching to a terminal's WebSocket or polling `/api/terminal-snapshots` to detect completion — `terminal wait` is all you need.
+- Treating `stalled` as a dead process and re-dispatching the same task; run `terminal result` first to see what it last said.
+- Expecting the worker to "reply" over the channel to a coordinator that is not an Octogent terminal — answers are read with `terminal result`.
+- Dispatching the next batch without stopping the previous one, so sessions pile up.
+
 ### Trial pitfalls: symptom → cause → action
 
 Based on the 2026-09-05 through 09-08 DEIMv2 and DiveoDevOps trial records:

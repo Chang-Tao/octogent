@@ -111,7 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `octogent terminal result <id>` prints the same block at once. A Codex
   coordinator on a colleague's machine had hand-rolled WebSocket listeners
   to learn that its workers were done — the answer was stored on the Stop
-  hook all along, but nothing in the CLI exposed it.
+  hook all along, but nothing in the CLI exposed it. The quick-start guide
+  gained a "coordinator's routine" section (dispatch → wait → read → follow
+  up → review → finish) and the mistakes coordinators keep making.
 - Added a Chinese-first getting-work-done guide and full English translation:
   five steps to a reviewed and merged result, a verified CLI quick reference,
   trial pitfalls, and a complete headless coordinator walkthrough. The guide

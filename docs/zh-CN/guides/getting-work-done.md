@@ -253,6 +253,25 @@ octogent terminal delete first-worker --with-worktree
 - 服务默认最多 32 个活动会话；启动前用 `OCTOGENT_MAX_TERMINAL_SESSIONS` 按主机资源和账号额度调整。
 - deck 用 `todo.md` 复选框启动单项求解或 swarm（多工人协作）；执行中保持顺序，审阅后勾选。详见[使用待办事项](working-with-todos.md)和[编排子代理](orchestrating-child-agents.md)。
 
+### 协调者工作法：派发 → 等待 → 读回答 → 追问 → 审阅 → 收尾
+
+这一节写给“派活的人”——既可以是你自己，也可以是一个通过 shell 调用命令的 AI 协调者（Claude Code 或 Codex 会话）。协调者本身不必是 Octogent 终端；下面每一步都只用 CLI，不需要浏览器，也不需要自己去接 API 或 WebSocket。
+
+1. **派发**：先 `octogent tentacle create`，再为每个工人 `octogent terminal create`，**总是带 `--tentacle-id`**，并用 `--terminal-id` 给工人起一个你后面直接引用的 ID。任务书里写明成果交付在哪里：建议让工人把结论写到 `.octogent/tentacles/<触手ID>/RESULT.md`，并在最后一句回答里给出路径。
+2. **等待**：`octogent terminal wait <工人ID> [<工人ID>...] --timeout 600`。它阻塞到工人尘埃落定，打印每个工人的状态、摘要和最终回答；退出码 0 表示都到了待审阅或已完成，1 表示有工人以其他方式结束，2 表示超时（会话仍在，可继续等）。
+3. **读回答**：`octogent terminal result <工人ID>` 随时打印同样的结果块；脚本用 `--json`。回答里提到的文件（如 `RESULT.md`）自己读。
+4. **追问**：`octogent channel send <工人ID> "..."`。带初始任务的工人回合结束后仍保持会话，消息在它空闲时投递（`send` 会回显已投递或已排队）；然后再次 `wait` 拿新回答。
+5. **审阅与合并**：工作树任务看分支——`git diff main..octogent/<工人ID>`，通过后 `git merge --no-ff octogent/<工人ID>`；共享工作区任务直接看它改动的文件。
+6. **收尾**：每个工人都由你主动结束——`octogent terminal delete <工人ID> --with-worktree`（已合并时）或 `octogent terminal stop <工人ID>`。工人不会自己退出，服务默认最多 32 个并发会话。
+
+协调者常犯的错：
+
+- 忘了 `--tentacle-id`，所有工人挂在大章鱼下面。
+- 自己去接终端的 WebSocket 或轮询 `/api/terminal-snapshots` 来判断是否完成——用 `terminal wait` 就够了。
+- 把 `stalled` 当成进程已死而重派同一任务；先 `terminal result` 看它最后说了什么。
+- 期待工人用 channel “回信”给不是 Octogent 终端的协调者——回答要用 `terminal result` 读。
+- 派了下一批却没有停止上一批，会话越积越多。
+
 ### 试用中遇到的坑：现象 → 原因 → 处理
 
 依据 2026-09-05 至 09-08 的 DEIMv2、DiveoDevOps 试用记录：
