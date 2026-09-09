@@ -40,10 +40,12 @@ octogent terminal create --terminal-id first-worker --name "说明文档小修" 
 
 ### 4. 看它干得怎么样
 
-用下面的命令查看进度：`running` 表示运行中，`awaiting-review`（待审阅）表示已有提交、工作树干净，可以检查结果。
+用第一条命令查看进度：`running` 表示运行中，`awaiting-review`（待审阅）表示已有提交、工作树干净，可以检查结果。
+不想反复查就用第二条：它会一直等到工人做完，然后把工人的最终回答打印出来。
 
 ```bash
 octogent terminal list
+octogent terminal wait first-worker
 ```
 
 ### 5. 审阅、合并、收尾
@@ -71,6 +73,7 @@ octogent terminal delete first-worker --with-worktree
 | 指定模型 | `octogent terminal create --tentacle-id <触手ID> --workspace-mode worktree --agent-provider claude-code --model sonnet --initial-prompt "<任务书>"` |
 | 列终端 / 查归档记录 | `octogent terminal list` / `octogent terminal list --archived` |
 | 看工人的活动转录 | `tail -n 40 ~/.octogent/projects/<项目ID>/state/transcripts/<终端ID>.jsonl` |
+| 等工人做完并拿到回答 / 随时看回答 | `octogent terminal wait <终端ID>` / `octogent terminal result <终端ID>`（脚本加 `--json`） |
 | 追加消息 / 核对是否投递 | `octogent channel send <终端ID> "请补充测试结果和疑问"` / `octogent channel list <终端ID>` |
 | 停止 / 归档 / 只删记录 | `octogent terminal stop <终端ID>` / `octogent terminal archive <终端ID>` / `octogent terminal delete <终端ID>` |
 | 查看提交和差异 | `git -C .octogent/worktrees/<终端ID> log main..HEAD` / `git diff main..octogent/<终端ID>` |
@@ -324,31 +327,13 @@ octogent terminal create --terminal-id "$octogent_codex" --name "忽略规则说
   --initial-prompt "只修改 .gitignore：在现有 .octogent 忽略规则旁补一句注释，说明它保存本地代理配置和工作树，不应提交这些运行文件。保持所有忽略规则语义不变。运行 git check-ignore .octogent/project.json 和 git diff --check 验证。在自己的分支提交，不要 push。最后总结改动、验证和疑问。"
 ```
 
-第二段：追加要求，轮询最多十分钟；超时保留会话，查日志和转录后续作。
+第二段：追加要求，然后等两名工人做完并打印它们的最终回答，最多等十分钟；超时（退出码 2）时会话仍在，查日志和转录后续作。
 
 ```bash
 octogent terminal list
 octogent channel send "$octogent_claude" "补充要求：请在提交说明中列出核对过的命令及依据文件，方便无浏览器审阅。"
 octogent channel list "$octogent_claude"
-octogent_done=0
-for octogent_attempt in {1..120}; do
-  octogent_snapshot=$(octogent terminal list)
-  printf '%s\n' "$octogent_snapshot"
-  octogent_done=0
-  for octogent_worker in "$octogent_claude" "$octogent_codex"; do
-    octogent_lifecycle=$(awk -v id="$octogent_worker" '$1 == id {print $2}' <<< "$octogent_snapshot")
-    case "$octogent_lifecycle" in
-      awaiting-review|completed) octogent_done=$((octogent_done + 1)) ;;
-    esac
-  done
-  if test "$octogent_done" = 2; then break; fi
-  sleep 5
-done
-octogent channel list "$octogent_claude"
-for octogent_worker in "$octogent_claude" "$octogent_codex"; do
-  tail -n 20 "$octogent_state/transcripts/$octogent_worker.jsonl"
-done
-test "$octogent_done" = 2
+octogent terminal wait "$octogent_claude" "$octogent_codex" --timeout 600
 ```
 
 第三段：对照任务书和补充要求审阅；以下是文档门禁，代码任务改用工作树中的项目测试（本仓库为 API 测试、lint、build）。

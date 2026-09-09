@@ -6,6 +6,12 @@ import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
 import { parseTerminalCreateArgs } from "./cliTerminalCreate";
+import {
+  type TerminalResult,
+  buildTerminalResult,
+  isSettledLifecycle,
+  parseTerminalWaitArgs,
+} from "./cliTerminalResult";
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
 import {
   isRemoteAccessEnabled,
@@ -481,6 +487,157 @@ const terminalList = async () => {
   }
 };
 
+type SnapshotRecord = Record<string, unknown>;
+
+const fetchTerminalSnapshots = async (apiBase: string): Promise<SnapshotRecord[] | null> => {
+  const response = await fetch(`${apiBase}/api/terminal-snapshots?includeArchived=1`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return (await response.json()) as SnapshotRecord[];
+};
+
+// The agent's answer lives in the conversation store (written on its Stop
+// hook), not on the terminal record; a missing conversation just means no
+// turn has ended yet.
+const fetchConversationTurns = async (apiBase: string, terminalId: string): Promise<unknown> => {
+  const response = await fetch(`${apiBase}/api/conversations/${encodeURIComponent(terminalId)}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const data = (await response.json()) as { turns?: unknown };
+  return data.turns ?? null;
+};
+
+const printTerminalResult = (result: TerminalResult, json: boolean) => {
+  if (json) {
+    console.log(JSON.stringify(result));
+    return;
+  }
+  const agent = [result.agentProvider, result.model].filter(Boolean).join(" · ");
+  console.log(`== ${result.terminalId}${agent ? `  (${agent})` : ""}`);
+  console.log(
+    `  ${t(locale, "cli.result.state")}: ${result.lifecycleState}${result.lifecycleReason ? ` (${result.lifecycleReason})` : ""}`,
+  );
+  if (result.completionSummary) {
+    const s = result.completionSummary;
+    console.log(
+      `  ${t(locale, "cli.result.summary")}: ${t(locale, "cli.result.summaryLine", {
+        commits: s.commits.length,
+        files: s.filesChanged,
+        ins: s.insertions,
+        del: s.deletions,
+        branch: s.branch ?? "-",
+        merged: s.merged ? "✓" : "✗",
+      })}`,
+    );
+  }
+  console.log(`  ${t(locale, "cli.result.answer")}:`);
+  if (result.lastAssistantMessage) {
+    for (const line of result.lastAssistantMessage.split("\n")) {
+      console.log(`    ${line}`);
+    }
+  } else {
+    console.log(`    ${t(locale, "cli.result.noAnswer")}`);
+  }
+};
+
+const resolveTerminalResult = async (
+  apiBase: string,
+  snapshot: SnapshotRecord,
+): Promise<TerminalResult> =>
+  buildTerminalResult(snapshot, await fetchConversationTurns(apiBase, String(snapshot.terminalId)));
+
+const terminalResult = async () => {
+  const terminalId = args[2];
+  if (!terminalId || terminalId.startsWith("-")) {
+    console.error(t(locale, "cli.error.terminalIdRequired"));
+    process.exit(1);
+  }
+  const json = args.includes("--json");
+  const apiBase = resolveRuntimeApiBase();
+  try {
+    const snapshots = await fetchTerminalSnapshots(apiBase);
+    if (!snapshots) {
+      console.error(t(locale, "cli.error.fetchTerminals"));
+      process.exit(1);
+    }
+    const snapshot = snapshots.find((entry) => entry.terminalId === terminalId);
+    if (!snapshot) {
+      console.error(t(locale, "cli.error.terminalNotFound", { id: terminalId }));
+      process.exit(1);
+    }
+    printTerminalResult(await resolveTerminalResult(apiBase, snapshot), json);
+  } catch {
+    apiError();
+  }
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const terminalWait = async () => {
+  const parsed = parseTerminalWaitArgs(args.slice(2));
+  if (!parsed.ok) {
+    console.error(t(locale, parsed.errorKey, parsed.flag ? { flag: parsed.flag } : undefined));
+    process.exit(1);
+  }
+  const { terminalIds, timeoutMs, intervalMs, json } = parsed;
+  const apiBase = resolveRuntimeApiBase();
+  const startedAt = Date.now();
+  const lastSeen = new Map<string, string>();
+  try {
+    while (true) {
+      const snapshots = await fetchTerminalSnapshots(apiBase);
+      if (!snapshots) {
+        console.error(t(locale, "cli.error.fetchTerminals"));
+        process.exit(1);
+      }
+      const byId = new Map(snapshots.map((entry) => [String(entry.terminalId), entry] as const));
+      for (const terminalId of terminalIds) {
+        if (!byId.has(terminalId)) {
+          console.error(t(locale, "cli.error.terminalNotFound", { id: terminalId }));
+          process.exit(1);
+        }
+      }
+      const pending: string[] = [];
+      for (const terminalId of terminalIds) {
+        const snapshot = byId.get(terminalId) as SnapshotRecord;
+        const state = String(snapshot.lifecycleState ?? snapshot.state ?? "unknown");
+        if (!json && lastSeen.get(terminalId) !== state) {
+          console.log(`  ${terminalId}  ${state}`);
+          lastSeen.set(terminalId, state);
+        }
+        if (!isSettledLifecycle(state)) {
+          pending.push(terminalId);
+        }
+      }
+      if (pending.length === 0) {
+        let allWell = true;
+        for (const terminalId of terminalIds) {
+          const result = await resolveTerminalResult(
+            apiBase,
+            byId.get(terminalId) as SnapshotRecord,
+          );
+          allWell = allWell && result.finishedWell;
+          printTerminalResult(result, json);
+        }
+        process.exit(allWell ? 0 : 1);
+      }
+      if (timeoutMs > 0 && Date.now() - startedAt >= timeoutMs) {
+        console.error(t(locale, "cli.wait.timeout", { ids: pending.join(", ") }));
+        process.exit(2);
+      }
+      await sleep(intervalMs);
+    }
+  } catch {
+    apiError();
+  }
+};
+
 const terminalAction = async (action: "stop" | "kill") => {
   const terminalId = args[2];
   if (!terminalId || terminalId.startsWith("-")) {
@@ -848,6 +1005,12 @@ const main = async () => {
     if (args[1] === "delete" || args[1] === "rm") {
       return terminalDelete();
     }
+    if (args[1] === "wait") {
+      return terminalWait();
+    }
+    if (args[1] === "result") {
+      return terminalResult();
+    }
   }
 
   if (command === "worktree" || command === "worktrees") {
@@ -889,6 +1052,12 @@ const main = async () => {
   octogent terminal archive <id>       Archive a non-running terminal record
   octogent terminal archive --all-completed  Archive every completed terminal record
   octogent terminal prune              Remove stale, stopped, and exited terminal records
+  octogent terminal wait <id> [<id>...] Wait until the terminals settle, then print their answers
+    --timeout <seconds>                Give up after this long (default 0 = wait forever)
+    --interval <seconds>               Poll interval (default 5)
+    --json                             One JSON object per terminal
+  octogent terminal result <id>        Print a terminal's state, summary, and final answer
+    --json                             JSON instead of text
   octogent worktree gc                 Reclaim worktrees and branches of merged, archived terminals
     --dry-run                          List reclaimable worktrees without removing them
   octogent channel send <id> <msg>     Send a channel message

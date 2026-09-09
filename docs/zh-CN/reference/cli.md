@@ -144,6 +144,17 @@ octogent worktree gc --dry-run
 
 删除所有「已归档且已确证合并」的 worktree 终端对应的 worktree 目录与分支。gc 时会现场问 git：worktree 的 HEAD 已是操作者分支的祖先（且没有未提交内容）即视为已合并，哪怕记录本身没记下这次合并；反之 git 说未合并的分支一律保留，哪怕记录标着已合并。只有 git 无法回答时才看记录信号——生命周期状态为 `completed`，或完成摘要标记了 `merged`。未合并的工作（包括 `awaiting-review`）永不回收；由多条终端记录共享的 worktree，只有在每条记录都满足条件时才会回收。`--dry-run` 仅列出可回收的 worktree，不做任何删除。归档扫描器在归档记录时也会自动回收符合条件的 worktree。无论哪种方式，终端记录本身都保持不变——清理记录是 `octogent terminal prune` 的职责。
 
+## 等待工作代理并读取它的回答
+
+```bash
+octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <秒>] [--interval <秒>] [--json]
+octogent terminal result <terminal-id> [--json]
+```
+
+`wait` 轮询直到列出的每个终端都已尘埃落定——`awaiting-review`、`completed`、`stopped`、`exited` 或 `stale`——过程中打印每次状态变化，最后打印每个终端的结果块。全部以 `awaiting-review` 或 `completed` 结束时退出码为 `0`，任一以其他方式结束为 `1`，超时为 `2`（`--timeout 0` 即默认值表示一直等；`--interval` 默认 5 秒、最小 1 秒）。`result` 不等待，立即打印同样的结果块。
+
+结果块包含生命周期状态与原因、代理与模型、完成摘要（有提交时：提交数、文件数、分支、是否已合并），以及代理在 Stop 钩子里留下的最终回答。`--json` 按终端各输出一个 JSON 对象，方便脚本使用。无界面的协调者就靠它拿到工作代理的答复，不必自己挂终端的 WebSocket；把成果写进文件（例如触手目录下的 `RESULT.md`）的工作代理，通常会在最终回答里给出路径。
+
 ## 发送消息
 
 ```bash

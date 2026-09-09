@@ -70,6 +70,10 @@ Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**
 
 目标代理正忙时这就是正常回应。channel 消息只在目标会话空闲（由钩子和输出检测共同判断）时注入；在此之前它留在队列里，`octogent channel list <terminal-id>` 会显示 `status=pending`，代理当前一轮结束后自动投递。注意 `channel list` 只知道发给当前正在运行的这个 API 进程的消息。
 
+## 协调者一直等不到工作代理的答复
+
+工作代理的最终回答在它的 Stop 钩子触发时被保存，但不会推送给派发它的人；协调者如果本身不是 Octogent 终端，也收不到 channel 消息。用 `octogent terminal wait <terminal-id> [...]` 阻塞到工作代理结束并打印回答，或随时用 `octogent terminal result <terminal-id>` 读取；脚本用 `--json`。两条命令都是只读的，对任何近期版本的运行中服务都有效。
+
 ## 终端能撑过页面刷新，却撑不过服务重启
 
 这同样是预期行为。PTY 会话可以在重连窗口内存活，但不会在 API 重启后存活。

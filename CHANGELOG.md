@@ -105,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- `octogent terminal wait <id>...` blocks until the listed terminals settle
+  and prints each one's final answer (exit 0 when all reached
+  awaiting-review/completed, 1 otherwise, 2 on `--timeout`);
+  `octogent terminal result <id>` prints the same block at once. A Codex
+  coordinator on a colleague's machine had hand-rolled WebSocket listeners
+  to learn that its workers were done — the answer was stored on the Stop
+  hook all along, but nothing in the CLI exposed it.
 - Added a Chinese-first getting-work-done guide and full English translation:
   five steps to a reviewed and merged result, a verified CLI quick reference,
   trial pitfalls, and a complete headless coordinator walkthrough. The guide

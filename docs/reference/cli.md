@@ -149,6 +149,17 @@ octogent worktree gc --dry-run
 
 Removes the worktree directory and branch of every archived worktree terminal whose work is proven merged. Git is asked at gc time: a worktree whose HEAD is already an ancestor of the operator's branch (and has nothing uncommitted) counts as merged even if its record never learned of the merge, and a branch git says is unmerged is kept even if its record claims otherwise. Only when git cannot answer do the recorded signals decide — a `completed` lifecycle state, or a completion summary that says `merged`. Unmerged work (including `awaiting-review`) is never reclaimed, and a worktree shared by several terminal records is only reclaimed when every record qualifies. `--dry-run` lists the reclaimable worktrees without removing anything. The server also reclaims eligible worktrees automatically when the archive sweep archives their records. Terminal records stay in place either way — that is what `octogent terminal prune` is for.
 
+## Wait for workers and read their answers
+
+```bash
+octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <seconds>] [--interval <seconds>] [--json]
+octogent terminal result <terminal-id> [--json]
+```
+
+`wait` polls until every listed terminal has settled — `awaiting-review`, `completed`, `stopped`, `exited`, or `stale` — printing each state change on the way, then prints each terminal's result block. The exit code is `0` when all of them ended in `awaiting-review` or `completed`, `1` when any ended another way, and `2` on timeout (`--timeout 0`, the default, waits forever; `--interval` defaults to 5 seconds and never goes below 1). `result` prints the same block immediately without waiting.
+
+The block holds the lifecycle state and reason, the agent and model, the completion summary when there is one (commits, files, branch, merged flag), and the agent's final message as stored from its Stop hook. `--json` prints one JSON object per terminal for scripts. This is how a headless coordinator collects a worker's answer without attaching to its terminal; a worker that wrote its deliverable to a file (a `RESULT.md` under its tentacle, say) usually names the path in that final message.
+
 ## Send a message
 
 ```bash

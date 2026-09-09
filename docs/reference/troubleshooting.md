@@ -66,6 +66,10 @@ Workers created with `--initial-prompt` now stay alive between turns, even when 
 
 When finished, use `octogent terminal stop <terminal-id>` to close the worker immediately or `octogent terminal archive <terminal-id>` to archive an eligible idle worker and release keep-alive. Retention also archives eligible idle workers after `OCTOGENT_TERMINAL_RETENTION_HOURS`. A worker whose PTY is still open is never touched by the next batch's cleanup, idle or not — the orchestrator may still continue it over the channel.
 
+## The coordinator never hears back from its worker
+
+A worker's final message is stored when its Stop hook fires; nothing pushes it to whoever dispatched the worker, and a coordinator that is not itself an Octogent terminal cannot receive channel messages. Use `octogent terminal wait <terminal-id> [...]` to block until the worker settles and print its answer, or `octogent terminal result <terminal-id>` to read it at any time; `--json` for scripts. Both are read-only and work against a running server of any recent version.
+
 ## Messages disappear after restart
 
 That is expected. Channel messages are in-memory only and do not persist across API restarts.

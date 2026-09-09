@@ -40,10 +40,12 @@ octogent terminal create --terminal-id first-worker --name "Small documentation 
 
 ### 4. Check how it is doing
 
-Check progress with the command below: `running` means work is in progress, and `awaiting-review` means there are commits and a clean worktree ready to inspect.
+Use the first command to check progress: `running` means work is in progress, and `awaiting-review` means there are commits and a clean worktree ready to inspect.
+To avoid polling, use the second one: it waits until the worker is done and then prints the worker's final answer.
 
 ```bash
 octogent terminal list
+octogent terminal wait first-worker
 ```
 
 ### 5. Review, merge, and finish
@@ -71,6 +73,7 @@ Replace `<tentacle-id>`, `<terminal-id>`, `<project-id>`, and `<task-brief>` wit
 | Choose an explicit model | `octogent terminal create --tentacle-id <tentacle-id> --workspace-mode worktree --agent-provider claude-code --model sonnet --initial-prompt "<task-brief>"` |
 | List terminals / archived records | `octogent terminal list` / `octogent terminal list --archived` |
 | Read a worker's activity transcript | `tail -n 40 ~/.octogent/projects/<project-id>/state/transcripts/<terminal-id>.jsonl` |
+| Wait for a worker and get its answer / read the answer any time | `octogent terminal wait <terminal-id>` / `octogent terminal result <terminal-id>` (add `--json` in scripts) |
 | Send a follow-up / check delivery | `octogent channel send <terminal-id> "Add your test results and doubts"` / `octogent channel list <terminal-id>` |
 | Stop / archive / delete only the record | `octogent terminal stop <terminal-id>` / `octogent terminal archive <terminal-id>` / `octogent terminal delete <terminal-id>` |
 | Read commits and changes | `git -C .octogent/worktrees/<terminal-id> log main..HEAD` / `git diff main..octogent/<terminal-id>` |
@@ -324,31 +327,13 @@ octogent terminal create --terminal-id "$octogent_codex" --name "Ignore-rule doc
   --initial-prompt "Edit only .gitignore: add a comment beside the existing .octogent ignore rule explaining that it holds local agent configuration and worktrees, which should not be committed as runtime files. Preserve the meaning of every ignore rule. Verify with git check-ignore .octogent/project.json and git diff --check. Commit on your branch; do not push. End with a summary of changes, verification, and doubts."
 ```
 
-Block two: send a follow-up and poll for up to ten minutes; timeout keeps sessions open for investigation and continuation using logs and transcripts.
+Block two: send a follow-up, then wait up to ten minutes for both workers to finish and print their final answers; on timeout (exit code 2) the sessions stay open for investigation and continuation using logs and transcripts.
 
 ```bash
 octogent terminal list
 octogent channel send "$octogent_claude" "Additional requirement: list the commands you verified and their source files in the commit message to support review without a browser."
 octogent channel list "$octogent_claude"
-octogent_done=0
-for octogent_attempt in {1..120}; do
-  octogent_snapshot=$(octogent terminal list)
-  printf '%s\n' "$octogent_snapshot"
-  octogent_done=0
-  for octogent_worker in "$octogent_claude" "$octogent_codex"; do
-    octogent_lifecycle=$(awk -v id="$octogent_worker" '$1 == id {print $2}' <<< "$octogent_snapshot")
-    case "$octogent_lifecycle" in
-      awaiting-review|completed) octogent_done=$((octogent_done + 1)) ;;
-    esac
-  done
-  if test "$octogent_done" = 2; then break; fi
-  sleep 5
-done
-octogent channel list "$octogent_claude"
-for octogent_worker in "$octogent_claude" "$octogent_codex"; do
-  tail -n 20 "$octogent_state/transcripts/$octogent_worker.jsonl"
-done
-test "$octogent_done" = 2
+octogent terminal wait "$octogent_claude" "$octogent_codex" --timeout 600
 ```
 
 Block three: review against the briefs and follow-up. These are documentation gates; code tasks use project tests in each worktree (API tests, lint, and build here).
