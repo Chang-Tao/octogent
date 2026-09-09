@@ -10,6 +10,7 @@ Octogent 包含三个主要层次：
 
 ## 从这里开始
 
+- [用 Octogent 完成第一份工作](guides/getting-work-done.md)：约十分钟走通派发、审阅和合并
 - [安装](getting-started/installation.md)
 - [快速入门](getting-started/quickstart.md)
 - [心智模型](concepts/mental-model.md) 解释了触手、终端、工作树和运行时状态之间的边界
