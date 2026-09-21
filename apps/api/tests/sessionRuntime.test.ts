@@ -579,6 +579,53 @@ describe("createSessionRuntime", () => {
     runtime.close();
   });
 
+  it("runs session timers without holding the process open and drops them on close", () => {
+    vi.useFakeTimers();
+
+    const terminalId = "terminal-1";
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        terminalId,
+        {
+          terminalId,
+          tentacleId: terminalId,
+          tentacleName: terminalId,
+          createdAt: new Date().toISOString(),
+          workspaceMode: "shared",
+        },
+      ],
+    ]);
+    const sessions = new Map<string, TerminalSession>();
+    spawnMock.mockReturnValue(new FakePty());
+    const runtime = createSessionRuntime({
+      websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions,
+      getTentacleWorkspaceCwd: () => process.cwd(),
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: process.cwd(),
+      transcriptDirectoryPath: createTemporaryDirectory(),
+    });
+    const callback = vi.fn();
+
+    expect(runtime.scheduleSessionTimer(terminalId, callback, 1_000)).toBe(false);
+    expect(runtime.startSession(terminalId)).toBe(true);
+    expect(runtime.scheduleSessionTimer(terminalId, callback, 1_000)).toBe(true);
+    const timers = [...(sessions.get(terminalId)?.promptTimers ?? [])];
+    expect(timers).toHaveLength(1);
+    expect(timers.every((timer) => !timer.hasRef())).toBe(true);
+    vi.advanceTimersByTime(1_000);
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    expect(runtime.scheduleSessionTimer(terminalId, callback, 1_000)).toBe(true);
+    runtime.closeSession(terminalId);
+    vi.advanceTimersByTime(60_000);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(runtime.scheduleSessionTimer(terminalId, callback, 1_000)).toBe(false);
+
+    runtime.close();
+  });
+
   it("adds the existing tentacles directory to a worktree Claude bootstrap", () => {
     const tentacleId = "tentacle-1";
     const workspaceCwd = createTemporaryDirectory();
@@ -1168,6 +1215,17 @@ describe("createSessionRuntime", () => {
       runtime.sendInitialPromptNow(terminalId);
       vi.advanceTimersByTime(60_000);
       expect(pty.write).toHaveBeenCalledTimes(3);
+    });
+
+    it("reports whether a prompt submit acknowledged the initial prompt", () => {
+      makeHarness();
+      expect(runtime.acknowledgeInitialPrompt(terminalId)).toBe(false);
+      runtime.sendInitialPromptNow(terminalId);
+      // Only the first submit after the paste belongs to the initial prompt;
+      // later ones are left for channel messages.
+      expect(runtime.acknowledgeInitialPrompt(terminalId)).toBe(true);
+      expect(runtime.acknowledgeInitialPrompt(terminalId)).toBe(false);
+      expect(runtime.acknowledgeInitialPrompt("unknown")).toBe(false);
     });
 
     it("ignores acknowledgements before sending and hooks for unknown sessions", () => {

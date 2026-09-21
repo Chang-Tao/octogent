@@ -85,6 +85,8 @@ export type TerminalSession = {
   isInitialPromptSent?: boolean;
   initialPromptSentAt?: number;
   hasSessionStartHook?: boolean;
+  /** Some Octogent hook reached this session, so a missing acknowledgement means lost input. */
+  hasSeenHook?: boolean;
   isInitialPromptAcknowledged?: boolean;
   hasRetriedInitialPrompt?: boolean;
   initialInputDraft?: string;

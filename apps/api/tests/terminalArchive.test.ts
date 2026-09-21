@@ -21,6 +21,7 @@ vi.mock("../src/terminalRuntime/ptyEnvironment", () => ({
 }));
 
 import { createApiServer } from "../src/createApiServer";
+import * as logging from "../src/logging";
 import { type GitClient, createTerminalRuntime } from "../src/terminalRuntime";
 
 class FakePty extends EventEmitter {
@@ -493,5 +494,132 @@ describe("headless worker cleanup", () => {
     vi.advanceTimersByTime(60 * 60 * 1000);
     expect(pty.kill).not.toHaveBeenCalled();
     expect(runtime.listTerminalSnapshots().some((t) => t.terminalId === terminalId)).toBe(true);
+  });
+});
+
+describe("channel delivery acknowledgement", () => {
+  let runtime: ReturnType<typeof createTerminalRuntime>;
+  let workspaceCwd: string;
+
+  afterEach(async () => {
+    await runtime?.close();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    if (workspaceCwd) rmSync(workspaceCwd, { recursive: true, force: true });
+    spawnMock.mockReset();
+  });
+
+  // A worker whose hooks are live: SessionStart pasted its task, and unless
+  // told otherwise the agent took it and has gone idle again.
+  const startWorker = ({ acknowledgeTask = true } = {}) => {
+    vi.useFakeTimers();
+    workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-channel-ack-"));
+    const pty = new FakePty();
+    spawnMock.mockReturnValue(pty);
+    runtime = createTerminalRuntime({ workspaceCwd, gitClient: new FakeGitClient() });
+    const { terminalId } = runtime.createTerminal({
+      agentProvider: "codex",
+      initialPrompt: "do work",
+    });
+    runtime.handleHook("session-start", { session_id: "codex-session" }, terminalId);
+    if (acknowledgeTask) {
+      runtime.handleHook("user-prompt-submit", { prompt: "do work" }, terminalId);
+      // Past the tracker's idle window, so the next message is delivered at once.
+      vi.advanceTimersByTime(2_000);
+    }
+    const channelPastes = () =>
+      pty.write.mock.calls.filter(([data]) => String(data).includes("[Channel message from"))
+        .length;
+    const snapshot = () =>
+      runtime.listTerminalSnapshots().find((terminal) => terminal.terminalId === terminalId);
+    const submit = (prompt: string) =>
+      runtime.handleHook("user-prompt-submit", { prompt }, terminalId);
+    return { terminalId, pty, channelPastes, snapshot, submit };
+  };
+
+  it("confirms a delivered message on the worker's next prompt submit", () => {
+    const { terminalId, channelPastes, submit } = startWorker();
+
+    const sent = runtime.sendChannelMessage(terminalId, "orchestrator", "continue");
+    expect(sent).toMatchObject({ delivered: true, deliveryAttempts: 1 });
+    expect(sent?.acknowledgedAt).toBeUndefined();
+
+    submit("[Channel message from orchestrator]: continue");
+    expect(runtime.listChannelMessages(terminalId)[0]?.acknowledgedAt).toEqual(expect.any(String));
+    vi.advanceTimersByTime(30_000);
+    expect(channelPastes()).toBe(1);
+  });
+
+  it("re-delivers once, then fails the message and flags the running worker", async () => {
+    // Seen live: a Codex usage-limit dialog took the paste and the Enter, the
+    // worker never saw the message, and "delivered" was all anyone was told.
+    const { terminalId, channelPastes, snapshot, submit } = startWorker();
+
+    runtime.sendChannelMessage(terminalId, "orchestrator", "continue");
+    vi.advanceTimersByTime(10_000);
+    expect(channelPastes()).toBe(2);
+    vi.advanceTimersByTime(10_000);
+
+    expect(runtime.listChannelMessages(terminalId)[0]).toMatchObject({
+      failed: "not acknowledged",
+      deliveryAttempts: 2,
+    });
+    expect(snapshot()).toMatchObject({
+      lifecycleState: "running",
+      lifecycleReason: "channel message not acknowledged",
+    });
+    const readRecord = () =>
+      JSON.parse(readFileSync(join(workspaceCwd, ".octogent/state/tentacles.json"), "utf8"))
+        .terminals[0];
+    await vi.waitFor(() =>
+      expect(readRecord().lifecycleReason).toBe("channel message not acknowledged"),
+    );
+
+    // The next message that gets through clears the flag.
+    expect(runtime.sendChannelMessage(terminalId, "orchestrator", "still there?")?.delivered).toBe(
+      true,
+    );
+    submit("[Channel message from orchestrator]: still there?");
+    expect(snapshot()?.lifecycleReason).toBeUndefined();
+    expect(channelPastes()).toBe(3);
+  });
+
+  it("leaves the first prompt submit to the still-unconfirmed task prompt", () => {
+    const { terminalId, channelPastes, snapshot, submit } = startWorker({
+      acknowledgeTask: false,
+    });
+
+    runtime.sendChannelMessage(terminalId, "orchestrator", "also check the docs");
+    submit("do work");
+    expect(runtime.listChannelMessages(terminalId)[0]?.acknowledgedAt).toBeUndefined();
+
+    vi.advanceTimersByTime(10_000);
+    expect(channelPastes()).toBe(2);
+    submit("[Channel message from orchestrator]: also check the docs");
+    expect(runtime.listChannelMessages(terminalId)[0]).toMatchObject({
+      acknowledgedAt: expect.any(String),
+      deliveryAttempts: 2,
+    });
+    vi.advanceTimersByTime(30_000);
+    expect(channelPastes()).toBe(2);
+    expect(snapshot()?.lifecycleReason).toBeUndefined();
+  });
+
+  it("stops verifying when the worker is stopped", () => {
+    const { terminalId, pty } = startWorker();
+    runtime.sendChannelMessage(terminalId, "orchestrator", "continue");
+    const logVerbose = vi.spyOn(logging, "logVerbose").mockImplementation(() => {});
+
+    runtime.stopTerminal(terminalId);
+    const writesAtStop = pty.write.mock.calls.length;
+    vi.advanceTimersByTime(30_000);
+
+    expect(pty.write).toHaveBeenCalledTimes(writesAtStop);
+    expect(logVerbose).not.toHaveBeenCalledWith(expect.stringMatching(/\[Channel\]/));
+    expect(runtime.listChannelMessages(terminalId)[0]).toMatchObject({
+      delivered: true,
+      deliveryAttempts: 1,
+    });
+    expect(runtime.listChannelMessages(terminalId)[0]?.failed).toBeUndefined();
   });
 });

@@ -40,6 +40,8 @@ export const en: TranslationMap = {
   "cli.sent.messageDelivered": "Message delivered to terminal {to}",
   "cli.sent.messageQueued":
     "Message queued for terminal {to}: the agent is busy; it is delivered when the agent goes idle",
+  "cli.sent.messageConfirmHint":
+    "Run `octogent channel list {to}` to see whether the agent confirmed receiving it.",
   "cli.migrated.state": "Migrated state to {path}",
   "cli.error.apiUnreachable": "Error: Could not reach API at {url}",
   "cli.error.tentacleNameRequired": "Error: tentacle name is required.",

@@ -205,7 +205,7 @@ octogent channel send first-worker "Explain which commands you verified; tell me
 octogent channel list first-worker
 ```
 
-- `send` reports delivered (written into the terminal) or queued (busy, delivered when idle); `list` shows `status=delivered` / `status=pending`.
+- `send` reports delivered (written into the terminal) or queued (busy, delivered when idle); `list` shows `status=pending`, `delivered (unconfirmed)`, `confirmed` (the agent submitted it), or `failed: not acknowledged` (two pastes, no receipt — check `terminal screen`).
 - Add `--from <sender-terminal-id>` when sending on behalf of a worker; omission uses `OCTOGENT_SESSION_ID` if present.
 - Workers with initial tasks keep sessions alive between turns; merged worktree `completed` releases keep-alive, while `awaiting-review` retains it.
 - `terminal stop` closes immediately; archiving releases keep-alive, followed by closure after `OCTOGENT_TERMINAL_IDLE_GRACE_MS` (default five minutes). `OCTOGENT_TERMINAL_RETENTION_HOURS` (default 72 hours) archives eligible `completed`, `stopped`, and `exited` records, never awaiting-review records.

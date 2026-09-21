@@ -648,6 +648,11 @@ export const createTerminalRuntime = ({
     }
   };
 
+  const persistTerminalUpdate = (terminalId: string) => {
+    persistRegistry();
+    broadcastTerminalUpdated(terminalId);
+  };
+
   const sessionRuntime = createSessionRuntime({
     websocketServer,
     terminals,
@@ -669,10 +674,7 @@ export const createTerminalRuntime = ({
     },
     onSessionStart: markTerminalRunning,
     onSessionEnd: markTerminalEnded,
-    onTerminalUpdated: (terminalId) => {
-      persistRegistry();
-      broadcastTerminalUpdated(terminalId);
-    },
+    onTerminalUpdated: persistTerminalUpdate,
   });
 
   const gitOps = createGitOperations({
@@ -738,6 +740,8 @@ export const createTerminalRuntime = ({
     terminals,
     sessions,
     writeInput: (terminalId: string, data: string) => sessionRuntime.writeInput(terminalId, data),
+    scheduleSessionTimer: sessionRuntime.scheduleSessionTimer,
+    onTerminalUpdated: persistTerminalUpdate,
   });
 
   const hookProcessor = createHookProcessor({
@@ -751,6 +755,7 @@ export const createTerminalRuntime = ({
     reviveSessionTranscript: (terminalId) => sessionRuntime.reviveSessionTranscript(terminalId),
     sendInitialPromptNow: sessionRuntime.sendInitialPromptNow,
     acknowledgeInitialPrompt: sessionRuntime.acknowledgeInitialPrompt,
+    acknowledgeChannelMessages: channelMessaging.acknowledgeChannelMessages,
     onTerminalUpdated: broadcastTerminalUpdated,
     recordToolUse: (terminalId, toolName) => {
       touchTerminalActivity(terminalId);

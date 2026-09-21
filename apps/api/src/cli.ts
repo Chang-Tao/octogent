@@ -5,6 +5,7 @@ import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
+import { formatChannelMessageLine } from "./cliChannel";
 import { parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
@@ -992,6 +993,7 @@ const channelSend = async () => {
         to: terminalId,
       }),
     );
+    console.log(t(locale, "cli.sent.messageConfirmHint", { to: terminalId }));
   } catch {
     apiError();
   }
@@ -1022,10 +1024,7 @@ const channelList = async () => {
     }
 
     for (const message of messages) {
-      const status = message.delivered ? "delivered" : "pending";
-      console.log(
-        `  [${message.messageId}] from=${message.fromTerminalId || "(unknown)"} status=${status}: ${message.content}`,
-      );
+      console.log(formatChannelMessageLine(message));
     }
   } catch {
     apiError();

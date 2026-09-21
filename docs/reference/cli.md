@@ -184,11 +184,21 @@ octogent channel send <terminal-id> "message"
 
 Use `--from <terminal-id>` when sending on behalf of a worker or parent terminal. If `--from` is omitted, the CLI falls back to `OCTOGENT_SESSION_ID` when the command is running inside an Octogent-managed terminal.
 
+The command prints whether the message was delivered (written into the idle agent's terminal) or queued (the agent is busy), then a reminder that `channel list` shows whether the agent confirmed it. Delivery alone does not prove receipt; see [Inter-agent messaging](../guides/inter-agent-messaging.md#delivered-is-not-received).
+
 ## List messages
 
 ```bash
 octogent channel list <terminal-id>
 ```
+
+Prints one line per message sent to that terminal through the running API process:
+
+```text
+  [msg-3] from=terminal-1 status=delivered (unconfirmed): Need review on the parser change
+```
+
+`status` is one of `pending` (queued), `delivered (unconfirmed)` (written, no receipt yet), `confirmed` (the agent's next prompt submit arrived), or `failed: <reason>` (`failed: not acknowledged` after two unconfirmed attempts).
 
 ## Inspect a screen and send direct input
 

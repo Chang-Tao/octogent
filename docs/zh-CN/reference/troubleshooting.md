@@ -82,6 +82,23 @@ Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**
 
 目标代理正忙时这就是正常回应。channel 消息只在目标会话空闲（由钩子和输出检测共同判断）时注入；在此之前它留在队列里，`octogent channel list <terminal-id>` 会显示 `status=pending`，代理当前一轮结束后自动投递。注意 `channel list` 只知道发给当前正在运行的这个 API 进程的消息。
 
+## channel 消息显示已投递，代理却没有动静
+
+“已投递”只表示文字写进了目标终端，不代表代理收到了；代理 TUI 里的对话框（比如用量上限或切换模型提示）可能吞掉粘贴内容和回车。运行 `octogent channel list <terminal-id>` 看状态：
+
+- `confirmed`：投递后代理提交过提示词，消息已到手；去它的终端看它正在怎么处理。
+- `delivered (unconfirmed)`：还没有回执。Octogent 每次投递等 10 秒，刚投递的消息可能还会重试；从未发来任何钩子的代理会一直保持未确认，因为那里没有东西能确认。
+- `failed: not acknowledged`：Octogent 粘贴了两次，两次都没有回执。处于 `running` 的目标在 `octogent terminal list` 中还会显示 `reason=channel message not acknowledged`，`octogent logs` 里有对应的 `[Channel] ... not acknowledged` 日志。
+
+然后看代理界面上显示的是什么，直接作答：
+
+```bash
+octogent terminal screen <terminal-id> --lines 40
+octogent terminal input <terminal-id> --keys esc
+```
+
+对话框消失后再发一次消息；代理接受提示词后这条原因会自动清除。重发前先看屏幕：如果消息其实已经送达（丢的是回执而不是消息），重发会让代理收到两遍。
+
 ## 协调者一直等不到工作代理的答复
 
 工作代理的最终回答在它的 Stop 钩子触发时被保存，但不会推送给派发它的人；协调者如果本身不是 Octogent 终端，也收不到 channel 消息。用 `octogent terminal wait <terminal-id> [...]` 阻塞到工作代理结束并打印回答，或随时用 `octogent terminal result <terminal-id>` 读取；脚本用 `--json`。两条命令都是只读的，对任何近期版本的运行中服务都有效。

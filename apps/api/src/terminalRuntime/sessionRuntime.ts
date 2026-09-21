@@ -19,6 +19,7 @@ import { type AgentRuntimeState, AgentStateTracker } from "../agentStateDetectio
 import { logVerbose } from "../logging";
 import { resolveBootstrapCommand } from "./bootstrapCommand";
 import {
+  AGENT_INJECT_ACK_TIMEOUT_MS,
   AGENT_INJECT_SUBMIT_DELAY_MS,
   AGENT_PASTE_END,
   AGENT_PASTE_START,
@@ -266,6 +267,10 @@ export const createSessionRuntime = ({
 
       callback();
     }, delayMs);
+    // Everything here serves a live session; none of it should hold the process open.
+    if (typeof timer.unref === "function") {
+      timer.unref();
+    }
 
     if (!session.promptTimers) {
       session.promptTimers = new Set();
@@ -484,7 +489,7 @@ export const createSessionRuntime = ({
 
   const INITIAL_PROMPT_DELAY_MS = 4_000;
   const INITIAL_PROMPT_FALLBACK_MS = 15_000;
-  const INITIAL_PROMPT_ACK_TIMEOUT_MS = 10_000;
+  const INITIAL_PROMPT_ACK_TIMEOUT_MS = AGENT_INJECT_ACK_TIMEOUT_MS;
   const INITIAL_PROMPT_UNACKNOWLEDGED_REASON = "initial prompt not acknowledged";
   const INITIAL_PROMPT_SUBMIT_DELAY_MS = AGENT_INJECT_SUBMIT_DELAY_MS;
   const BRACKETED_PASTE_START = AGENT_PASTE_START;
@@ -565,10 +570,16 @@ export const createSessionRuntime = ({
     }
   };
 
-  const acknowledgeInitialPrompt = (sessionId: string) => {
+  /** True when this prompt submit was the initial prompt's, so nothing else may claim it. */
+  const acknowledgeInitialPrompt = (sessionId: string): boolean => {
     const session = sessions.get(sessionId);
-    if (!session || session.isClosed || !session.isInitialPromptSent) {
-      return;
+    if (
+      !session ||
+      session.isClosed ||
+      !session.isInitialPromptSent ||
+      session.isInitialPromptAcknowledged
+    ) {
+      return false;
     }
 
     session.isInitialPromptAcknowledged = true;
@@ -578,6 +589,23 @@ export const createSessionRuntime = ({
       terminal.lifecycleUpdatedAt = new Date().toISOString();
       onTerminalUpdated?.(session.terminalId);
     }
+    return true;
+  };
+
+  // Lets other runtime parts time work against a session: the timer dies with
+  // it, and never fires into a replacement session for the same terminal.
+  const scheduleSessionTimer = (
+    sessionId: string,
+    callback: () => void,
+    delayMs: number,
+  ): boolean => {
+    const session = sessions.get(sessionId);
+    if (!session || session.isClosed) {
+      return false;
+    }
+
+    schedulePromptTimer(session, sessionId, callback, delayMs);
+    return true;
   };
 
   const scheduleIdleCloseIfNeeded = (session: TerminalSession, sessionId: string) => {
@@ -1145,6 +1173,7 @@ export const createSessionRuntime = ({
     killSession,
     sendInitialPromptNow,
     acknowledgeInitialPrompt,
+    scheduleSessionTimer,
     reviveSessionTranscript,
     appendSessionTranscriptEvent,
     handleUpgrade,

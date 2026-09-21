@@ -75,7 +75,8 @@ const makeHarness = (
   const releaseSessionKeepAlive = vi.fn(() => true);
   const reviveSessionTranscript = vi.fn(() => false);
   const sendInitialPromptNow = vi.fn();
-  const acknowledgeInitialPrompt = vi.fn();
+  const acknowledgeInitialPrompt = vi.fn((_sessionId: string) => false);
+  const acknowledgeChannelMessages = vi.fn();
   const evaluateSessionCompletion = vi.fn();
   const recordToolUse = vi.fn();
   const onTerminalUpdated = vi.fn();
@@ -93,6 +94,7 @@ const makeHarness = (
     reviveSessionTranscript,
     sendInitialPromptNow,
     acknowledgeInitialPrompt,
+    acknowledgeChannelMessages,
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
@@ -111,6 +113,7 @@ const makeHarness = (
     reviveSessionTranscript,
     sendInitialPromptNow,
     acknowledgeInitialPrompt,
+    acknowledgeChannelMessages,
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
@@ -205,6 +208,44 @@ describe("initial prompt hooks", () => {
 
     expect(sendInitialPromptNow).not.toHaveBeenCalled();
     expect(acknowledgeInitialPrompt).not.toHaveBeenCalled();
+  });
+});
+
+describe("hook liveness and prompt acknowledgements", () => {
+  it.each(["session-start", "user-prompt-submit", "pre-tool-use", "notification", "stop"])(
+    "marks the session's hooks alive on %s",
+    (hookName) => {
+      const { processor, session } = makeHarness();
+      expect(session.hasSeenHook).toBeUndefined();
+
+      processor.handleHook(hookName, {}, TERMINAL_ID);
+
+      expect(session.hasSeenHook).toBe(true);
+    },
+  );
+
+  it("does not mark hooks alive for a hook without an Octogent session id", () => {
+    const { processor, session } = makeHarness();
+
+    processor.handleHook("user-prompt-submit", { prompt: "hi" });
+
+    expect(session.hasSeenHook).toBeUndefined();
+  });
+
+  it("gives a prompt submit to the unconfirmed initial prompt before any channel batch", () => {
+    const { processor, acknowledgeInitialPrompt, acknowledgeChannelMessages } = makeHarness();
+    acknowledgeInitialPrompt.mockReturnValueOnce(true);
+
+    processor.handleHook("user-prompt-submit", { prompt: "Investigate." }, TERMINAL_ID);
+    expect(acknowledgeChannelMessages).not.toHaveBeenCalled();
+
+    processor.handleHook(
+      "user-prompt-submit",
+      { prompt: "[Channel message from terminal-9]: continue" },
+      TERMINAL_ID,
+    );
+    expect(acknowledgeInitialPrompt).toHaveBeenCalledTimes(2);
+    expect(acknowledgeChannelMessages).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID);
   });
 });
 

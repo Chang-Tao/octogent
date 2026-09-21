@@ -37,6 +37,7 @@ export const zhCN: TranslationMap = {
   "cli.sent.message": "消息已发送至终端 {to}",
   "cli.sent.messageDelivered": "消息已投递到终端 {to}",
   "cli.sent.messageQueued": "消息已排队：终端 {to} 的代理正忙，空闲后自动投递",
+  "cli.sent.messageConfirmHint": "运行 `octogent channel list {to}` 可查看代理是否已确认收到。",
   "cli.migrated.state": "已将状态迁移至 {path}",
   "cli.error.apiUnreachable": "错误：无法连接到 API {url}",
   "cli.error.tentacleNameRequired": "错误：触手名称为必填项。",
