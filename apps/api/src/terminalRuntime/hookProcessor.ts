@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { logVerbose } from "../logging";
+import { updateTerminalAttention } from "./attention";
 import { parseClaudeTranscript, readClaudeTranscriptModel } from "./claudeTranscript";
 import { OCTOGENT_MANAGED_WORKTREE_PATHS } from "./completionDetection";
 import { storeClaudeTranscriptTurns } from "./conversations";
@@ -60,8 +61,23 @@ export const createHookProcessor = (deps: {
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
-    onStateChange,
+    onStateChange: notifyStateChange,
   } = deps;
+
+  const onStateChange = (
+    terminalId: string,
+    state: TerminalSession["agentState"],
+    toolName?: string,
+  ) => {
+    const terminal = terminals.get(terminalId);
+    const changed =
+      terminal && updateTerminalAttention(terminal, state, sessions.get(terminalId)?.lastToolName);
+    notifyStateChange?.(terminalId, state, toolName);
+    if (changed) {
+      persistRegistry();
+      onTerminalUpdated?.(terminalId);
+    }
+  };
 
   // Hook payloads never say which model answered; the Claude transcript does.
   // Read it once per terminal so a terminal created without --model still
@@ -331,6 +347,11 @@ export const createHookProcessor = (deps: {
         session.stateTracker.forceState("waiting_for_user");
         onStateChange?.(octogentSessionId, "waiting_for_user");
         broadcastMessage(session, { type: "state", state: "waiting_for_user" });
+      } else if (toolName) {
+        session.agentState = "processing";
+        session.stateTracker.forceState("processing");
+        onStateChange(octogentSessionId, "processing", toolName);
+        broadcastMessage(session, { type: "state", state: "processing", toolName });
       }
 
       return { ok: true };

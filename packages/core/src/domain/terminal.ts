@@ -57,6 +57,9 @@ export type TerminalSnapshot = {
   agentEffortTier?: string;
   /** Model the agent reported in its own transcript; fills in when no model was requested. */
   agentModelObserved?: string;
+  attentionSince?: string;
+  attentionKind?: "permission" | "user";
+  attentionToolName?: string;
   agentRuntimeState?: AgentRuntimeState;
   lifecycleState?: TerminalLifecycleState;
   lifecycleReason?: string;

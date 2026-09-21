@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -349,6 +349,58 @@ describe("headless worker cleanup", () => {
     stopTurn();
     return { terminalId, pty };
   };
+
+  it.each(["permission", "user"])("ignores repaint activity while waiting for %s", async (kind) => {
+    vi.stubEnv("OCTOGENT_TERMINAL_STALL_MS", "60000");
+    const { terminalId, pty } = startWorker();
+    runtime.handleHook("user-prompt-submit", { prompt: "continue" }, terminalId);
+    runtime.handleHook(
+      "pre-tool-use",
+      { tool_name: kind === "user" ? "AskUserQuestion" : "Read" },
+      terminalId,
+    );
+    if (kind === "permission") {
+      runtime.handleHook("notification", { notification_type: "permission_prompt" }, terminalId);
+    }
+    const waiting = runtime.listTerminalSnapshots()[0];
+    expect(waiting?.lifecycleState).toBe("running");
+    expect(waiting?.attentionKind).toBe(kind);
+    const since = waiting?.attentionSince;
+    expect(since).toBeDefined();
+    const readRecord = () =>
+      JSON.parse(readFileSync(join(workspaceCwd, ".octogent/state/tentacles.json"), "utf8"))
+        .terminals[0];
+    vi.advanceTimersByTime(1000);
+    await vi.waitFor(() => expect(readRecord().attentionKind).toBe(kind));
+    const lastActiveAt = readRecord().lastActiveAt;
+    for (let i = 0; i < 90; i++) {
+      pty.emit("data", "\rpermission dialog repaint");
+      vi.advanceTimersByTime(1000);
+    }
+    await vi.waitFor(() => expect(readRecord().lifecycleState).toBe("stalled"));
+    expect(readRecord().lastActiveAt).toBe(lastActiveAt);
+    expect(runtime.listTerminalSnapshots()[0]).toMatchObject({
+      lifecycleState: "stalled",
+      attentionSince: since,
+      lifecycleReason: `waiting for ${kind}: ${kind === "user" ? "AskUserQuestion" : "Read"} (since ${since})`,
+    });
+    runtime.handleHook("pre-tool-use", { tool_name: "Read" }, terminalId);
+    pty.emit("data", "esc to interrupt");
+    // Keep processing active across the output activity throttle.
+    for (let i = 0; i < 5; i++) {
+      pty.emit("data", "working");
+      vi.advanceTimersByTime(1000);
+    }
+    const outputAt = new Date().toISOString();
+    pty.emit("data", "working");
+    vi.advanceTimersByTime(200);
+    await vi.waitFor(() => expect(readRecord().lastActiveAt).toBe(outputAt));
+    expect(runtime.listTerminalSnapshots()[0]).toMatchObject({
+      lifecycleState: "running",
+      agentRuntimeState: "processing",
+    });
+    expect(runtime.listTerminalSnapshots()[0]?.attentionSince).toBeUndefined();
+  });
 
   it("delivers a later channel message after a completed worker outlives the idle grace", () => {
     const { terminalId, pty } = startWorker();

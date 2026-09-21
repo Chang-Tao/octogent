@@ -20,6 +20,7 @@ const TERMINAL_ID = "t-1";
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
@@ -114,6 +115,7 @@ const makeHarness = (
     recordToolUse,
     onTerminalUpdated,
     onStateChange,
+    persistRegistry,
   };
 };
 
@@ -333,7 +335,7 @@ describe("stop hook for codex sessions", () => {
 
     expect(session.agentState).toBe("idle");
     expect(session.stateTracker.currentState).toBe("idle");
-    expect(onStateChange).toHaveBeenCalledWith(TERMINAL_ID, "idle");
+    expect(onStateChange).toHaveBeenCalledWith(TERMINAL_ID, "idle", undefined);
     expect(broadcasts).toContainEqual({ type: "state", state: "idle" });
     expect(evaluateSessionCompletion).toHaveBeenCalledWith(TERMINAL_ID);
     expect(deliverChannelMessages).toHaveBeenCalledWith(TERMINAL_ID);
@@ -521,7 +523,7 @@ describe("stop hook for claude-code sessions", () => {
     // Claude sessions return to idle via the idle_prompt notification, not the
     // stop hook; forcing idle here would race the real notification.
     expect(session.agentState).toBe("processing");
-    expect(onStateChange).not.toHaveBeenCalledWith(TERMINAL_ID, "idle");
+    expect(onStateChange).not.toHaveBeenCalledWith(TERMINAL_ID, "idle", undefined);
     expect(broadcasts).not.toContainEqual({ type: "state", state: "idle" });
     expect(evaluateSessionCompletion).toHaveBeenCalledWith(TERMINAL_ID);
     expect(deliverChannelMessages).toHaveBeenCalledWith(TERMINAL_ID);
@@ -596,3 +598,40 @@ describe.each(["codex", "claude-code"] as const)(
     });
   },
 );
+
+describe("waiting attention", () => {
+  it("persists permission attention once, captures the tool, and clears on submit", () => {
+    vi.useFakeTimers();
+    const { processor, terminal, onTerminalUpdated, persistRegistry } = makeHarness({
+      lastToolName: "Read",
+    });
+    processor.handleHook("notification", { notification_type: "permission_prompt" }, TERMINAL_ID);
+    expect(terminal.attentionKind).toBe("permission");
+    expect(persistRegistry).toHaveBeenCalled();
+    expect(terminal.attentionToolName).toBe("Read");
+    expect(Number.isFinite(Date.parse(terminal.attentionSince ?? ""))).toBe(true);
+    expect(onTerminalUpdated).toHaveBeenCalledWith(TERMINAL_ID);
+    const since = terminal.attentionSince;
+    vi.advanceTimersByTime(120_000);
+    onTerminalUpdated.mockClear();
+    processor.handleHook("notification", { notification_type: "permission_prompt" }, TERMINAL_ID);
+    expect(terminal.attentionSince).toBe(since);
+    expect(onTerminalUpdated).not.toHaveBeenCalled();
+    processor.handleHook("user-prompt-submit", { prompt: "continue" }, TERMINAL_ID);
+    expect(terminal.attentionKind).toBeUndefined();
+    expect(terminal.attentionSince).toBeUndefined();
+    expect(terminal.attentionToolName).toBeUndefined();
+    expect(onTerminalUpdated).toHaveBeenCalledWith(TERMINAL_ID);
+  });
+
+  it("tracks AskUserQuestion and clears when another tool starts", () => {
+    const { processor, terminal, session, onTerminalUpdated } = makeHarness();
+    processor.handleHook("pre-tool-use", { tool_name: "AskUserQuestion" }, TERMINAL_ID);
+    expect(terminal.attentionKind).toBe("user");
+    expect(terminal.attentionToolName).toBe("AskUserQuestion");
+    expect(onTerminalUpdated).toHaveBeenCalledWith(TERMINAL_ID);
+    processor.handleHook("pre-tool-use", { tool_name: "Read" }, TERMINAL_ID);
+    expect(session.agentState).toBe("processing");
+    expect(terminal.attentionSince).toBeUndefined();
+  });
+});

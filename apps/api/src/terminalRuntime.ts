@@ -4,6 +4,7 @@ import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
 import { ensureDirectoryTrusted } from "./claudeTrust";
+import { isWaitingForAttention, updateTerminalAttention } from "./terminalRuntime/attention";
 
 import type { TerminalSnapshot } from "@octogent/core";
 import type { WebSocket } from "ws";
@@ -163,6 +164,7 @@ export const createTerminalRuntime = ({
       return;
     }
 
+    updateTerminalAttention(terminal, "idle");
     terminal.lifecycleState = "running";
     terminal.lifecycleReason = undefined;
     terminal.lifecycleUpdatedAt = startedAt;
@@ -188,6 +190,7 @@ export const createTerminalRuntime = ({
       return;
     }
 
+    updateTerminalAttention(terminal, "idle");
     terminal.lifecycleState = details.reason === "pty_exit" ? "exited" : "stopped";
     terminal.lifecycleReason = details.reason;
     terminal.lifecycleUpdatedAt = details.endedAt;
@@ -254,15 +257,20 @@ export const createTerminalRuntime = ({
 
   const broadcastTerminalStateChanged = (
     terminalId: string,
-    agentRuntimeState: string,
+    agentRuntimeState: TerminalSession["agentState"],
     toolName?: string,
   ) => {
-    // Reliability: stamp lastActiveAt on every state change so the stall
-    // detector below can spot agents whose claude is hung at a dialog
-    // (process alive, but no transcript activity).
+    // A repeated waiting notification is still the same dialog, not progress.
+    // Other state changes refresh activity so resumed work recovers promptly.
     const terminal = terminals.get(terminalId);
     if (terminal) {
-      terminal.lastActiveAt = new Date().toISOString();
+      const attentionChanged = updateTerminalAttention(
+        terminal,
+        agentRuntimeState,
+        sessions.get(terminalId)?.lastToolName,
+      );
+      const waiting = isWaitingForAttention(agentRuntimeState);
+      terminal.lastActiveAt = waiting ? terminal.attentionSince : new Date().toISOString();
       // Auto-recover from a previously-stalled state if the agent
       // resumes — flip lifecycleState back to running.
       // A finished terminal that starts acting again (a new instruction, a
@@ -280,7 +288,7 @@ export const createTerminalRuntime = ({
           lifecycleState: "running",
         });
       }
-      if (terminal.lifecycleState === "stalled") {
+      if (terminal.lifecycleState === "stalled" && !waiting) {
         terminal.lifecycleState = "running";
         terminal.lifecycleReason = undefined;
         terminal.lifecycleUpdatedAt = terminal.lastActiveAt;
@@ -289,6 +297,10 @@ export const createTerminalRuntime = ({
           terminalId,
           lifecycleState: "running",
         });
+      }
+      if (attentionChanged) {
+        persistRegistry();
+        broadcastTerminalUpdated(terminalId);
       }
     }
     broadcastTerminalEvent({
@@ -325,10 +337,11 @@ export const createTerminalRuntime = ({
       // Mark stalled. Don't kill the PTY — operator decides whether to
       // restart, kill, or send input. This is just a visibility signal.
       terminal.lifecycleState = "stalled";
-      terminal.lifecycleReason = `no transcript activity for ${Math.round(
-        (now - lastActivity) / 1000,
-      )}s`;
+      terminal.lifecycleReason = terminal.attentionKind
+        ? `waiting for ${terminal.attentionKind}${terminal.attentionToolName ? `: ${terminal.attentionToolName}` : ""} (since ${terminal.attentionSince})`
+        : `no transcript activity for ${Math.round((now - lastActivity) / 1000)}s`;
       terminal.lifecycleUpdatedAt = new Date(now).toISOString();
+      persistRegistry();
       broadcastTerminalEvent({
         type: "terminal-lifecycle-changed",
         terminalId: terminal.terminalId,
@@ -608,7 +621,11 @@ export const createTerminalRuntime = ({
     maxConcurrentSessions: configuredMaxConcurrentSessions,
     sessionIdleGraceMs: resolveSessionIdleGraceMs(process.env.OCTOGENT_TERMINAL_IDLE_GRACE_MS),
     onStateChange: broadcastTerminalStateChanged,
-    onOutputActivity: touchTerminalActivity,
+    onOutputActivity: (terminalId) => {
+      // Dialog repainting is not progress; hook-driven tool activity still is.
+      if (isWaitingForAttention(sessions.get(terminalId)?.agentState ?? "")) return;
+      touchTerminalActivity(terminalId);
+    },
     onSessionStart: markTerminalRunning,
     onSessionEnd: markTerminalEnded,
     onTerminalUpdated: (terminalId) => {
@@ -787,6 +804,9 @@ export const createTerminalRuntime = ({
       ...(terminal.completedAt ? { completedAt: terminal.completedAt } : {}),
       ...(terminal.completionSummary ? { completionSummary: terminal.completionSummary } : {}),
       ...(session ? { agentRuntimeState: session.agentState } : {}),
+      ...(terminal.attentionSince ? { attentionSince: terminal.attentionSince } : {}),
+      ...(terminal.attentionKind ? { attentionKind: terminal.attentionKind } : {}),
+      ...(terminal.attentionToolName ? { attentionToolName: terminal.attentionToolName } : {}),
       lifecycleState,
       ...(terminal.lifecycleReason ? { lifecycleReason: terminal.lifecycleReason } : {}),
       ...(terminal.lifecycleUpdatedAt ? { lifecycleUpdatedAt: terminal.lifecycleUpdatedAt } : {}),

@@ -85,3 +85,9 @@ That is expected. Channel messages are in-memory only and do not persist across 
 That is also expected. PTY sessions can survive a reconnect window, but they do not survive an API restart.
 
 After restart, terminals that were persisted as running are marked `stale` when Octogent cannot reattach them to an in-memory PTY session. Use `octogent terminal list` to inspect lifecycle state, `octogent terminal stop <terminal-id>` or `octogent terminal kill <terminal-id>` for a recorded process, and `octogent terminal prune` to remove stale, stopped, or exited records from the UI.
+
+## A worker is waiting on a dialog
+
+Use `octogent terminal list` to look for `waiting=permission:Read 7m` or `waiting=user 3m`. `octogent terminal result <id>` shows the wait kind, known tool, and when waiting began. Attention does not immediately change the lifecycle: it remains `running` until the stall threshold (`OCTOGENT_TERMINAL_STALL_MS`, default 120000 ms), checked every 30 seconds. Dialog repainting does not refresh activity; a stalled dialog reports a reason such as `waiting for permission: Read (since ...)`.
+
+`octogent terminal wait <id>` exits `3` and prints the affected result block after 60 seconds of waiting for input, checked at each poll. Set `--attention-after <seconds>` to adjust this or `0` to disable it. Open the worker’s terminal, review the permission request or question, respond, and run `wait` again. The PTY remains alive; a needs-attention exit does not stop it. Wait metadata clears when the runtime leaves the waiting state. Avoid starting a duplicate worker for the same task.

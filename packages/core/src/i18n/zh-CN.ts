@@ -46,6 +46,10 @@ export const zhCN: TranslationMap = {
   "cli.error.terminalNotFound": "错误：未找到终端 {id}。",
   "cli.error.invalidNumberFlag": "错误：{flag} 需要一个秒数。",
   "cli.wait.timeout": "等待超时，仍未完成：{ids}",
+  "cli.result.attention": "需要处理",
+  "cli.result.attentionPermission": "等待权限确认",
+  "cli.result.attentionUser": "等待用户回答",
+  "cli.result.attentionSince": "自 {since} 起",
   "cli.result.state": "状态",
   "cli.result.summary": "摘要",
   "cli.result.summaryLine":

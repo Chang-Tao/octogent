@@ -312,6 +312,16 @@ const parseV3Terminals = (
     if (typeof entry.autoRenamePromptContext === "string") {
       terminal.autoRenamePromptContext = entry.autoRenamePromptContext;
     }
+    if (
+      (entry.attentionKind === "permission" || entry.attentionKind === "user") &&
+      typeof entry.attentionSince === "string" &&
+      Number.isFinite(Date.parse(entry.attentionSince))
+    ) {
+      terminal.attentionKind = entry.attentionKind;
+      terminal.attentionSince = entry.attentionSince;
+      if (typeof entry.attentionToolName === "string")
+        terminal.attentionToolName = entry.attentionToolName;
+    }
     if (typeof entry.lastActiveAt === "string") terminal.lastActiveAt = entry.lastActiveAt;
     if (isTerminalLifecycleState(entry.lifecycleState)) {
       terminal.lifecycleState = entry.lifecycleState;
