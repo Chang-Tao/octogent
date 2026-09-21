@@ -53,7 +53,14 @@ const appendToServerLog = (args: Parameters<typeof console.log>): void => {
     return;
   }
   try {
-    const line = `${maskSecrets(format(...args))}\n`;
+    // Every line is stamped: a post-mortem is mostly "what happened around
+    // 10:33?", and the console copy has no clock at all. Multi-line messages
+    // (the startup banner) keep one stamp per line so grep by time works.
+    const stamp = new Date().toISOString();
+    const line = `${maskSecrets(format(...args))
+      .split("\n")
+      .map((part) => `${stamp} ${part}`)
+      .join("\n")}\n`;
     rotateIfNeeded(Buffer.byteLength(line));
     appendFileSync(serverLogPath, line, "utf8");
   } catch (error) {

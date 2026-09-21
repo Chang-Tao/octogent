@@ -105,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- The API server always keeps a log file at `<project state>/logs/server.log`
+  (timestamped lines, 5 MB rotation with three generations, access tokens
+  masked). Verbose hook traffic goes to the file even when
+  `OCTOGENT_VERBOSE_LOGS` is off, so a post-mortem no longer depends on
+  having switched it on in advance; `OCTOGENT_SERVER_LOG=off|<path>` controls
+  it and `octogent logs [--lines N] [--follow]` reads it. Three September
+  post-mortems had no server log because stdout lived on a terminal.
 - A worker waiting on a dialog is no longer invisible. The runtime records
   since when and on what it waits (`attentionSince` / `attentionKind` /
   `attentionToolName` on the snapshot), dialog repaints stop counting as

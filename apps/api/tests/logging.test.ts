@@ -61,6 +61,15 @@ describe("logging", () => {
 
     expect(logPath).toBe(join(projectStateDir, "logs", "server.log"));
     expect(readFileSync(logPath as string, "utf8")).toContain("server started\n");
+    // Each file line is timestamped, including every line of a multi-line message.
+    log("line one\nline two");
+    const stamped = readFileSync(logPath as string, "utf8")
+      .trimEnd()
+      .split("\n");
+    for (const entry of stamped) {
+      expect(entry).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z /);
+    }
+    expect(stamped.at(-1)).toMatch(/Z line two$/);
   });
 
   it("writes verbose lines to the file without printing them by default", () => {
@@ -104,7 +113,7 @@ describe("logging", () => {
     logVerbose("next generation");
 
     expect(readFileSync(`${logPath}.1`, "utf8")).toHaveLength(SERVER_LOG_MAX_BYTES);
-    expect(readFileSync(logPath, "utf8")).toBe("next generation\n");
+    expect(readFileSync(logPath, "utf8")).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z next generation\n$/);
   });
 
   it("masks access tokens in file output", () => {
