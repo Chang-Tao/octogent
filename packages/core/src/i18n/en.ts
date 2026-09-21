@@ -50,6 +50,10 @@ export const en: TranslationMap = {
   "cli.error.terminalNotFound": "Error: terminal {id} not found.",
   "cli.error.invalidNumberFlag": "Error: {flag} needs a number of seconds.",
   "cli.wait.timeout": "Timed out waiting for: {ids}",
+  "cli.result.attention": "Needs attention",
+  "cli.result.attentionPermission": "waiting for permission",
+  "cli.result.attentionUser": "waiting for user",
+  "cli.result.attentionSince": "since {since}",
   "cli.result.state": "State",
   "cli.result.summary": "Summary",
   "cli.result.summaryLine":

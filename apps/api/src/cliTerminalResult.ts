@@ -46,6 +46,9 @@ export type TerminalResult = {
   terminalId: string;
   lifecycleState: string;
   lifecycleReason: string | null;
+  attentionSince: string | null;
+  attentionKind: "permission" | "user" | null;
+  attentionToolName: string | null;
   agentProvider: string | null;
   model: string | null;
   completionSummary: {
@@ -81,6 +84,9 @@ export const buildTerminalResult = (
     terminalId: asString(snapshot.terminalId) ?? "",
     lifecycleState,
     lifecycleReason: asString(snapshot.lifecycleReason),
+    attentionSince: asString(snapshot.attentionSince),
+    attentionKind: attentionKind(snapshot),
+    attentionToolName: asString(snapshot.attentionToolName),
     agentProvider: asString(snapshot.agentProvider),
     model: asString(snapshot.agentModel) ?? asString(snapshot.agentModelObserved),
     completionSummary: summary
@@ -103,6 +109,7 @@ export type TerminalWaitArgs =
       ok: true;
       terminalIds: string[];
       timeoutMs: number;
+      attentionAfterMs: number;
       intervalMs: number;
       json: boolean;
     }
@@ -115,13 +122,15 @@ export type TerminalWaitArgs =
 const DEFAULT_WAIT_INTERVAL_MS = 5_000;
 
 /**
- * `wait <id> [<id>...] [--timeout <seconds>] [--interval <seconds>] [--json]`.
+ * `wait <id> [<id>...] [--timeout <seconds>] [--interval <seconds>]
+ * [--attention-after <seconds>] [--json]`.
  * A timeout of 0 (the default) waits forever; the interval never drops below
  * one second so a tight loop cannot hammer the API.
  */
 export const parseTerminalWaitArgs = (rest: string[]): TerminalWaitArgs => {
   const terminalIds: string[] = [];
   let timeoutMs = 0;
+  let attentionAfterMs = 60_000;
   let intervalMs = DEFAULT_WAIT_INTERVAL_MS;
   let json = false;
   for (let index = 0; index < rest.length; index++) {
@@ -130,14 +139,16 @@ export const parseTerminalWaitArgs = (rest: string[]): TerminalWaitArgs => {
       json = true;
       continue;
     }
-    if (token === "--timeout" || token === "--interval") {
+    if (token === "--timeout" || token === "--interval" || token === "--attention-after") {
       const raw = rest[index + 1];
-      const parsed = raw === undefined ? Number.NaN : Number(raw);
-      if (!Number.isFinite(parsed) || parsed < 0) {
+      const parsed = raw === undefined || raw.trim() === "" ? Number.NaN : Number(raw);
+      if (!Number.isFinite(parsed * 1000) || parsed < 0) {
         return { ok: false, errorKey: "cli.error.invalidNumberFlag", flag: token };
       }
       if (token === "--timeout") {
         timeoutMs = Math.floor(parsed * 1000);
+      } else if (token === "--attention-after") {
+        attentionAfterMs = Math.floor(parsed * 1000);
       } else {
         intervalMs = Math.max(1_000, Math.floor(parsed * 1000));
       }
@@ -152,5 +163,38 @@ export const parseTerminalWaitArgs = (rest: string[]): TerminalWaitArgs => {
   if (terminalIds.length === 0) {
     return { ok: false, errorKey: "cli.error.terminalIdRequired" };
   }
-  return { ok: true, terminalIds, timeoutMs, intervalMs, json };
+  return { ok: true, terminalIds, timeoutMs, attentionAfterMs, intervalMs, json };
+};
+
+const attentionKind = (snapshot: Record<string, unknown>): "permission" | "user" | null =>
+  snapshot.attentionKind === "permission" || snapshot.attentionKind === "user"
+    ? snapshot.attentionKind
+    : null;
+
+export const needsAttention = (
+  snapshot: Record<string, unknown>,
+  nowMs: number,
+  afterMs: number,
+): boolean => {
+  if (
+    afterMs <= 0 ||
+    !attentionKind(snapshot) ||
+    isSettledLifecycle(snapshot.lifecycleState ?? snapshot.state)
+  )
+    return false;
+  const since = Date.parse(asString(snapshot.attentionSince) ?? "");
+  return Number.isFinite(since) && nowMs - since >= afterMs;
+};
+
+export const formatTerminalAttention = (
+  snapshot: Record<string, unknown>,
+  nowMs: number,
+): string | null => {
+  const kind = attentionKind(snapshot);
+  const since = Date.parse(asString(snapshot.attentionSince) ?? "");
+  if (!kind || !Number.isFinite(since)) return null;
+  const seconds = Math.max(0, Math.floor((nowMs - since) / 1000));
+  const age = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
+  const tool = asString(snapshot.attentionToolName);
+  return `${kind}${tool ? `:${tool}` : ""} ${age}`;
 };

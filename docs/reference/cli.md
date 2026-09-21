@@ -98,6 +98,8 @@ Options:
 octogent terminal list
 ```
 
+While an agent waits on a dialog, the line appends `waiting=permission:Read 7m` or `waiting=user 3m` (tool name when known, elapsed wait).
+
 Shows each terminal ID, lifecycle state, recorded process ID when available, lifecycle reason, and display name. Archived records are hidden by default; pass `--archived` to list only archived records.
 
 ## Stop or kill a terminal
@@ -152,11 +154,15 @@ Removes the worktree directory and branch of every archived worktree terminal wh
 ## Wait for workers and read their answers
 
 ```bash
-octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <seconds>] [--interval <seconds>] [--json]
+octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <seconds>] [--interval <seconds>] [--attention-after <seconds>] [--json]
 octogent terminal result <terminal-id> [--json]
 ```
 
-`wait` polls until every listed terminal has settled — `awaiting-review`, `completed`, `stopped`, `exited`, or `stale` — printing each state change on the way, then prints each terminal's result block. The exit code is `0` when all of them ended in `awaiting-review` or `completed`, `1` when any ended another way, and `2` on timeout (`--timeout 0`, the default, waits forever; `--interval` defaults to 5 seconds and never goes below 1). `result` prints the same block immediately without waiting.
+`wait` polls until every listed terminal has settled — `awaiting-review`, `completed`, `stopped`, `exited`, or `stale` — printing each state change on the way, then prints each terminal's result block. The exit code is `0` when all of them ended in `awaiting-review` or `completed`, `1` when any ended another way, `2` on timeout, and `3` when a worker needs attention (`--timeout 0`, the default, waits forever; `--interval` defaults to 5 seconds and never goes below 1). `result` prints the same block immediately without waiting.
+
+`--attention-after` defaults to 60 seconds; `0` disables attention exits. On each poll, if any unsettled worker has waited for permission or user input at least that long, `wait` prints the affected workers’ result blocks and exits `3`, before checking the timeout. The age is measured from the start of the dialog, even if it predates this command. Exit `1` also covers invalid arguments and API errors.
+
+The block includes a localized attention line with the wait kind, tool name when known, and start time. JSON exposes `attentionKind`, `attentionSince` (ISO time), and `attentionToolName` (null when absent).
 
 The block holds the lifecycle state and reason, the agent and model, the completion summary when there is one (commits, files, branch, merged flag), and the agent's final message as stored from its Stop hook. `--json` prints one JSON object per terminal for scripts. This is how a headless coordinator collects a worker's answer without attaching to its terminal; a worker that wrote its deliverable to a file (a `RESULT.md` under its tentacle, say) usually names the path in that final message.
 

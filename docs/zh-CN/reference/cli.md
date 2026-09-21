@@ -98,6 +98,8 @@ octogent terminal create [options]
 octogent terminal list
 ```
 
+代理等待对话框时，行尾追加 `waiting=permission:Read 7m` 或 `waiting=user 3m`（已知的工具名和等待时长）。
+
 显示每个终端的 ID、生命周期状态、可用时的进程 ID、生命周期原因和显示名。已归档记录默认隐藏；传入 `--archived` 可仅列出已归档记录。
 
 ## 停止或杀死终端
@@ -147,11 +149,15 @@ octogent worktree gc --dry-run
 ## 等待工作代理并读取它的回答
 
 ```bash
-octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <秒>] [--interval <秒>] [--json]
+octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <秒>] [--interval <秒>] [--attention-after <秒>] [--json]
 octogent terminal result <terminal-id> [--json]
 ```
 
-`wait` 轮询直到列出的每个终端都已尘埃落定——`awaiting-review`、`completed`、`stopped`、`exited` 或 `stale`——过程中打印每次状态变化，最后打印每个终端的结果块。全部以 `awaiting-review` 或 `completed` 结束时退出码为 `0`，任一以其他方式结束为 `1`，超时为 `2`（`--timeout 0` 即默认值表示一直等；`--interval` 默认 5 秒、最小 1 秒）。`result` 不等待，立即打印同样的结果块。
+`wait` 轮询直到列出的每个终端都已尘埃落定——`awaiting-review`、`completed`、`stopped`、`exited` 或 `stale`——过程中打印每次状态变化，最后打印每个终端的结果块。全部以 `awaiting-review` 或 `completed` 结束时退出码为 `0`，任一以其他方式结束为 `1`，超时为 `2`，工人需要处理时为 `3`（`--timeout 0` 即默认值表示一直等；`--interval` 默认 5 秒、最小 1 秒）。`result` 不等待，立即打印同样的结果块。
+
+`--attention-after` 默认 60 秒，设为 `0` 禁用需要处理时的退出。每次轮询时，只要有尚未结束的工人等待权限或用户输入达到该时长，`wait` 就打印这些工人的结果块并退出 `3`，优先于超时检查。时长从对话框开始等待时算起，即使早于本次命令。退出码 `1` 也用于参数或 API 错误。
+
+结果块增加本地化的“需要处理”行，显示等待类型、已知的工具名和开始时间。JSON 提供 `attentionKind`、`attentionSince`（ISO 时间）和 `attentionToolName`（没有时为 null）。
 
 结果块包含生命周期状态与原因、代理与模型、完成摘要（有提交时：提交数、文件数、分支、是否已合并），以及代理在 Stop 钩子里留下的最终回答。`--json` 按终端各输出一个 JSON 对象，方便脚本使用。无界面的协调者就靠它拿到工作代理的答复，不必自己挂终端的 WebSocket；把成果写进文件（例如触手目录下的 `RESULT.md`）的工作代理，通常会在最终回答里给出路径。
 

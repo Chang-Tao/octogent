@@ -9,7 +9,9 @@ import { parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
   buildTerminalResult,
+  formatTerminalAttention,
   isSettledLifecycle,
+  needsAttention,
   parseTerminalWaitArgs,
 } from "./cliTerminalResult";
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
@@ -480,7 +482,10 @@ const terminalList = async () => {
       const provider =
         typeof terminal.agentProvider === "string" ? ` agent=${terminal.agentProvider}` : "";
       const model = modelValue ? ` model=${modelValue}` : "";
-      console.log(`  ${terminalId}  ${lifecycle}${pid}${provider}${model}${reason}  ${name}`);
+      const attention = formatTerminalAttention(terminal, Date.now());
+      console.log(
+        `  ${terminalId}  ${lifecycle}${pid}${provider}${model}${reason}  ${name}${attention ? ` waiting=${attention}` : ""}`,
+      );
     }
   } catch {
     apiError();
@@ -523,6 +528,11 @@ const printTerminalResult = (result: TerminalResult, json: boolean) => {
   console.log(
     `  ${t(locale, "cli.result.state")}: ${result.lifecycleState}${result.lifecycleReason ? ` (${result.lifecycleReason})` : ""}`,
   );
+  if (result.attentionKind && result.attentionSince) {
+    console.log(
+      `  ${t(locale, "cli.result.attention")}: ${t(locale, result.attentionKind === "permission" ? "cli.result.attentionPermission" : "cli.result.attentionUser")}${result.attentionToolName ? `: ${result.attentionToolName}` : ""} (${t(locale, "cli.result.attentionSince", { since: result.attentionSince })})`,
+    );
+  }
   // Shared-mode workers never commit, so their summary is all zeros; printing
   // it read as "no output" in a real review (2026-09-09).
   const hasSummary =
@@ -590,7 +600,7 @@ const terminalWait = async () => {
     console.error(t(locale, parsed.errorKey, parsed.flag ? { flag: parsed.flag } : undefined));
     process.exit(1);
   }
-  const { terminalIds, timeoutMs, intervalMs, json } = parsed;
+  const { terminalIds, timeoutMs, attentionAfterMs, intervalMs, json } = parsed;
   const apiBase = resolveRuntimeApiBase();
   const startedAt = Date.now();
   const lastSeen = new Map<string, string>();
@@ -619,6 +629,15 @@ const terminalWait = async () => {
         if (!isSettledLifecycle(state)) {
           pending.push(terminalId);
         }
+      }
+      const attention = terminalIds
+        .map((id) => byId.get(id) as SnapshotRecord)
+        .filter((snapshot) => needsAttention(snapshot, Date.now(), attentionAfterMs));
+      if (attention.length > 0) {
+        for (const snapshot of attention) {
+          printTerminalResult(await resolveTerminalResult(apiBase, snapshot), json);
+        }
+        process.exit(3);
       }
       if (pending.length === 0) {
         let allWell = true;
@@ -1060,6 +1079,8 @@ const main = async () => {
   octogent terminal wait <id> [<id>...] Wait until the terminals settle, then print their answers
     --timeout <seconds>                Give up after this long (default 0 = wait forever)
     --interval <seconds>               Poll interval (default 5)
+    --attention-after <seconds>        Exit when a dialog needs attention (default 60; 0 disables)
+    Exit codes: 0 = all finished well; 1 = other ending or error; 2 = timeout; 3 = needs attention
     --json                             One JSON object per terminal
   octogent terminal result <id>        Print a terminal's state, summary, and final answer
     --json                             JSON instead of text

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildTerminalResult,
+  formatTerminalAttention,
   isFinishedWell,
   isSettledLifecycle,
   lastAssistantMessage,
+  needsAttention,
   parseTerminalWaitArgs,
 } from "../src/cliTerminalResult";
 
@@ -14,6 +16,7 @@ describe("parseTerminalWaitArgs", () => {
       ok: true,
       terminalIds: ["t-1", "t-2"],
       timeoutMs: 0,
+      attentionAfterMs: 60_000,
       intervalMs: 5_000,
       json: false,
     });
@@ -21,7 +24,14 @@ describe("parseTerminalWaitArgs", () => {
 
   it("reads --timeout and --interval in seconds and --json", () => {
     expect(parseTerminalWaitArgs(["t-1", "--timeout", "600", "--interval", "2", "--json"])).toEqual(
-      { ok: true, terminalIds: ["t-1"], timeoutMs: 600_000, intervalMs: 2_000, json: true },
+      {
+        ok: true,
+        terminalIds: ["t-1"],
+        timeoutMs: 600_000,
+        attentionAfterMs: 60_000,
+        intervalMs: 2_000,
+        json: true,
+      },
     );
   });
 
@@ -83,6 +93,9 @@ describe("buildTerminalResult", () => {
       terminalId: "issue37-review-worker",
       lifecycleState: "completed",
       lifecycleReason: null,
+      attentionKind: null,
+      attentionSince: null,
+      attentionToolName: null,
       agentProvider: "codex",
       model: "gpt-5.6-sol",
       completionSummary: {
@@ -123,5 +136,69 @@ describe("buildTerminalResult", () => {
       ]),
     ).toBe("first");
     expect(lastAssistantMessage("nope")).toBeNull();
+  });
+});
+
+describe("terminal attention", () => {
+  const since = "2026-09-21T12:03:04.000Z";
+  const snapshot = {
+    lifecycleState: "running",
+    attentionKind: "permission",
+    attentionSince: since,
+    attentionToolName: "Read",
+  };
+  const now = Date.parse(since) + 7 * 60_000;
+
+  it("parses attention seconds, including disabling", () => {
+    expect(parseTerminalWaitArgs(["t", "--attention-after", "2.5"])).toMatchObject({
+      ok: true,
+      attentionAfterMs: 2500,
+    });
+    expect(parseTerminalWaitArgs(["t", "--attention-after", "0"])).toMatchObject({
+      ok: true,
+      attentionAfterMs: 0,
+    });
+    for (const raw of ["-1", "NaN", "Infinity", "", "1e309"]) {
+      expect(parseTerminalWaitArgs(["t", "--attention-after", raw])).toMatchObject({ ok: false });
+    }
+    expect(parseTerminalWaitArgs(["t", "--attention-after"])).toMatchObject({ ok: false });
+  });
+
+  it("decides using wait age, ignoring disabled, invalid and settled snapshots", () => {
+    expect(needsAttention(snapshot, now, 60_000)).toBe(true);
+    expect(
+      needsAttention(
+        { ...snapshot, attentionKind: "user", lifecycleState: "stalled" },
+        now,
+        60_000,
+      ),
+    ).toBe(true);
+    expect(needsAttention(snapshot, now, 0)).toBe(false);
+    expect(needsAttention(snapshot, Date.parse(since) + 59_999, 60_000)).toBe(false);
+    expect(needsAttention(snapshot, Date.parse(since) + 60_000, 60_000)).toBe(true);
+    for (const change of [
+      { attentionSince: "bad" },
+      { attentionSince: undefined },
+      { attentionKind: "bad" },
+      { lifecycleState: "stopped" },
+    ]) {
+      expect(needsAttention({ ...snapshot, ...change }, now, 60_000)).toBe(false);
+    }
+  });
+
+  it("exposes result fields and formats list age", () => {
+    expect(buildTerminalResult(snapshot, [])).toMatchObject({
+      attentionKind: "permission",
+      attentionSince: since,
+      attentionToolName: "Read",
+    });
+    expect(formatTerminalAttention(snapshot, now)).toBe("permission:Read 7m");
+    expect(
+      formatTerminalAttention(
+        { attentionKind: "user", attentionSince: since },
+        Date.parse(since) + 180_000,
+      ),
+    ).toBe("user 3m");
+    expect(formatTerminalAttention({}, now)).toBeNull();
   });
 });

@@ -87,3 +87,9 @@ Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**
 重启后，之前持久化为 running 的终端在 Octogent 无法接回内存中的 PTY 会话时会被标记为 `stale`。用 `octogent terminal list` 查看生命周期状态，用 `octogent terminal stop <terminal-id>` 或 `octogent terminal kill <terminal-id>` 处理记录中的进程，用 `octogent terminal prune` 从 UI 中移除 stale、stopped 或 exited 的记录。
 
 > 本文件是 [../../reference/troubleshooting.md](../../reference/troubleshooting.md) 的中文翻译版本。如有歧义，以英文原文为准。
+
+## 工人正在等待对话框
+
+用 `octogent terminal list` 查找 `waiting=permission:Read 7m` 或 `waiting=user 3m`。`octogent terminal result <id>` 显示等待类型、已知工具和开始等待的时间。需要处理不会立即改变生命周期：到达停滞阈值前仍为 `running`（`OCTOGENT_TERMINAL_STALL_MS`，默认 120000 毫秒，每 30 秒检查一次）。对话框重绘不会刷新活动时间；停滞后原因类似 `waiting for permission: Read (since ...)`。
+
+`octogent terminal wait <id>` 在等待输入达到 60 秒后的轮询中打印相关结果块并退出 `3`。用 `--attention-after <秒>` 调整时长，或设为 `0` 禁用。打开该工人的终端，检查权限请求或问题，作出回答，再运行 `wait`。PTY 仍存活，需要处理时退出不会停止会话。运行时离开等待状态后会清除等待信息。不要为同一任务重复启动工人。
