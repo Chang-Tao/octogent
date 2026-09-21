@@ -28,6 +28,12 @@ Octogent 在 Claude 或 Codex 上报 `SessionStart` 时发送 `--initial-prompt`
 
 重试后再过 10 秒仍未确认，终端快照和 `octogent terminal list` 会显示 `reason=initial prompt not acknowledged`。生命周期保持 `running`，后续由常规停滞检测处理；迟到的确认会清除此原因。用 `OCTOGENT_VERBOSE_LOGS=1` 启动 API，可查看钩子到达记录以及 `initial-prompt retry` / `initial-prompt not acknowledged after retry` 日志。检查工作代理的终端是否卡在启动、更新、信任或登录提示，解决后再重新发送任务。重发前先检查终端和日志，避免重复执行已经开始的工作。
 
+## Claude 工作代理刚启动就卡住（读取工作目录之外的文件）
+
+Claude Code 会在会话首次读取工作目录之外的路径时显示一次性对话框 `Read outside the working directories`。Octogent 会把 `<workspace>/.octogent/tentacles` 加入 Claude 工作树终端的工作目录，因此读取其中的任务简报和 tentacle 文档不会触发该对话框；读取其他外部路径仍可能触发它。
+
+在任意交互式 `claude` 会话中回答一次该对话框，即可为当前用户确定此选项；Claude 会把选择保存在用户设置中。如果曾选择阻止读取，对话框本身会提示：从用户设置中移除 `permissions.blockReadsOutsideWorkingDirectories` 即可撤销 Block 选项。
+
 ## 工作树终端创建失败
 
 确认：

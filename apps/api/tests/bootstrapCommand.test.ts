@@ -83,6 +83,84 @@ describe("resolveBootstrapCommand", () => {
     );
   });
 
+  it("adds additional directories to Claude worktree terminals", () => {
+    expect(
+      resolveBootstrapCommand(
+        "claude-code",
+        {},
+        {
+          workspaceMode: "worktree",
+          claudeAdditionalDirs: ["/workspace/.octogent/tentacles"],
+        },
+      ),
+    ).toBe("claude --permission-mode auto --add-dir '/workspace/.octogent/tentacles'");
+  });
+
+  it("does not add Claude directories to shared terminals", () => {
+    expect(
+      resolveBootstrapCommand(
+        "claude-code",
+        {},
+        {
+          workspaceMode: "shared",
+          claudeAdditionalDirs: ["/workspace/.octogent/tentacles"],
+        },
+      ),
+    ).toBe("claude --permission-mode auto");
+  });
+
+  it("does not add Claude directories to Codex terminals", () => {
+    expect(
+      resolveBootstrapCommand(
+        "codex",
+        {},
+        {
+          workspaceMode: "worktree",
+          claudeAdditionalDirs: ["/workspace/.octogent/tentacles"],
+        },
+      ),
+    ).toBe("codex --sandbox danger-full-access --ask-for-approval never");
+  });
+
+  it("quotes Claude directories containing spaces", () => {
+    expect(
+      resolveBootstrapCommand(
+        "claude-code",
+        {},
+        {
+          workspaceMode: "worktree",
+          claudeAdditionalDirs: ["/workspace with spaces/.octogent/tentacles"],
+        },
+      ),
+    ).toBe("claude --permission-mode auto --add-dir '/workspace with spaces/.octogent/tentacles'");
+  });
+
+  it("escapes single quotes in Claude directories", () => {
+    expect(
+      resolveBootstrapCommand(
+        "claude-code",
+        {},
+        {
+          workspaceMode: "worktree",
+          claudeAdditionalDirs: ["/workspace/it's/.octogent/tentacles"],
+        },
+      ),
+    ).toBe("claude --permission-mode auto --add-dir '/workspace/it'\\''s/.octogent/tentacles'");
+  });
+
+  it("omits Claude directories containing newlines or NUL", () => {
+    expect(
+      resolveBootstrapCommand(
+        "claude-code",
+        {},
+        {
+          workspaceMode: "worktree",
+          claudeAdditionalDirs: ["/workspace/new\nline", "/workspace/nul\0byte"],
+        },
+      ),
+    ).toBe("claude --permission-mode auto");
+  });
+
   it("passes a requested model to Claude", () => {
     expect(resolveBootstrapCommand("claude-code", {}, { agentModel: "opus" })).toBe(
       "claude --permission-mode auto --model opus",
