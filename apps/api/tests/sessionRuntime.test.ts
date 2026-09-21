@@ -434,6 +434,61 @@ describe("createSessionRuntime", () => {
     runtime.close();
   });
 
+  it("records a provider error banner once, however often it repaints", () => {
+    const terminal: PersistedTerminal = {
+      terminalId: "worker",
+      tentacleId: "worker",
+      tentacleName: "worker",
+      createdAt: new Date().toISOString(),
+      workspaceMode: "shared",
+      agentProvider: "codex",
+      lifecycleState: "running",
+    };
+    const terminals = new Map([["worker", terminal]]);
+    const pty = new FakePty();
+    spawnMock.mockReturnValue(pty);
+    const onTerminalUpdated = vi.fn();
+    const logVerbose = vi.spyOn(logging, "logVerbose").mockImplementation(() => {});
+    const runtime = createSessionRuntime({
+      websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions: new Map<string, TerminalSession>(),
+      getTentacleWorkspaceCwd: () => process.cwd(),
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: process.cwd(),
+      transcriptDirectoryPath: createTemporaryDirectory(),
+      onTerminalUpdated,
+    });
+    runtime.startSession("worker");
+
+    const banner =
+      "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Sep 15th, 2026 11:51 AM.";
+    pty.emitData(`\x1b[31m■\x1b[39m ${banner.slice(0, 30)}`);
+    expect(onTerminalUpdated).not.toHaveBeenCalled();
+    pty.emitData(`${banner.slice(30)}\r\n`);
+    for (let frame = 0; frame < 5; frame++) {
+      pty.emitData(`\x1b[8;1H■ ${banner}\x1b[9;1H› `);
+    }
+
+    expect(onTerminalUpdated).toHaveBeenCalledExactlyOnceWith("worker");
+    expect(terminal).toMatchObject({
+      lifecycleState: "running",
+      lifecycleReason: `provider error: ${banner}`,
+      providerError: { kind: "usage-limit", message: banner, at: expect.any(String) },
+    });
+    expect(logVerbose).toHaveBeenCalledWith(
+      expect.stringMatching(/provider error.*worker.*usage-limit/i),
+    );
+
+    // A different wall is news again.
+    pty.emitData("\r\n  ⎿  API Error: Connection lost mid-response\r\n");
+    expect(onTerminalUpdated).toHaveBeenCalledTimes(2);
+    expect(terminal.providerError?.kind).toBe("api-error");
+
+    runtime.close();
+    logVerbose.mockRestore();
+  });
+
   it("closes idle sessions after the configured grace timeout", () => {
     vi.useFakeTimers();
 

@@ -11,9 +11,14 @@ import type {
   TentacleWorkspaceMode,
   TerminalLifecycleState,
   TerminalNameOrigin,
+  TerminalProviderError,
   TerminalRegistryDocument,
 } from "./types";
-import { isTerminalAgentProvider, isTerminalCompletionSoundId } from "./types";
+import {
+  isTerminalAgentProvider,
+  isTerminalCompletionSoundId,
+  isTerminalProviderErrorKind,
+} from "./types";
 
 const REGISTRY_PERSIST_DEBOUNCE_MS = 100;
 
@@ -67,6 +72,15 @@ const parseTerminalCompletionSummary = (value: unknown): PersistedTerminal["comp
     workspaceMode: value.workspaceMode === "worktree" ? "worktree" : "shared",
   };
 };
+
+const parseTerminalProviderError = (value: unknown): TerminalProviderError | undefined =>
+  isRecord(value) &&
+  isTerminalProviderErrorKind(value.kind) &&
+  typeof value.message === "string" &&
+  typeof value.at === "string" &&
+  Number.isFinite(Date.parse(value.at))
+    ? { kind: value.kind, message: value.message, at: value.at }
+    : undefined;
 
 const inferTerminalNameOrigin = (terminalId: string, tentacleName: string): TerminalNameOrigin => {
   if (tentacleName === terminalId || /^Octogent Terminal \d+$/.test(tentacleName)) {
@@ -322,6 +336,8 @@ const parseV3Terminals = (
       if (typeof entry.attentionToolName === "string")
         terminal.attentionToolName = entry.attentionToolName;
     }
+    const providerError = parseTerminalProviderError(entry.providerError);
+    if (providerError) terminal.providerError = providerError;
     if (typeof entry.lastActiveAt === "string") terminal.lastActiveAt = entry.lastActiveAt;
     if (isTerminalLifecycleState(entry.lifecycleState)) {
       terminal.lifecycleState = entry.lifecycleState;

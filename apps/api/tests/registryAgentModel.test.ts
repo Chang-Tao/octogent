@@ -93,3 +93,42 @@ describe("terminal registry attention fields", () => {
     }
   });
 });
+
+describe("terminal registry provider error", () => {
+  it.each([
+    [
+      {
+        kind: "usage-limit",
+        message: "You've hit your usage limit.",
+        at: "2026-09-21T12:03:04.000Z",
+      },
+      true,
+    ],
+    [{ kind: "quota", message: "x", at: "2026-09-21T12:03:04.000Z" }, false],
+    [{ kind: "auth", message: 42, at: "2026-09-21T12:03:04.000Z" }, false],
+    [{ kind: "auth", message: "Please run /login", at: "bad" }, false],
+    ["api-error", false],
+  ])("loads %j only when well-formed", (providerError, kept) => {
+    const dir = mkdtempSync(join(tmpdir(), "octogent-registry-provider-error-"));
+    tempDirs.push(dir);
+    const path = join(dir, "tentacles.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: TERMINAL_REGISTRY_VERSION,
+        terminals: [
+          {
+            terminalId: "t",
+            tentacleId: "t",
+            tentacleName: "t",
+            createdAt: "2026-09-21T12:00:00.000Z",
+            workspaceMode: "shared",
+            providerError,
+          },
+        ],
+      }),
+    );
+    const terminal = loadTerminalRegistry(path).terminals.get("t");
+    expect(terminal?.providerError).toEqual(kept ? providerError : undefined);
+  });
+});

@@ -42,6 +42,7 @@ import { createGitOperations } from "./terminalRuntime/gitOperations";
 import { createHookProcessor } from "./terminalRuntime/hookProcessor";
 import { resolveSessionIdleGraceMs } from "./terminalRuntime/idleGrace";
 import { type EffortTier, resolveAgentModelSelection } from "./terminalRuntime/modelSelection";
+import { clearProviderError, providerErrorReason } from "./terminalRuntime/providerErrors";
 import {
   createTerminalRegistryPersistence,
   loadTerminalRegistry,
@@ -165,6 +166,8 @@ export const createTerminalRuntime = ({
     }
 
     updateTerminalAttention(terminal, "idle");
+    // A banner belongs to the agent process that printed it.
+    terminal.providerError = undefined;
     terminal.lifecycleState = "running";
     terminal.lifecycleReason = undefined;
     terminal.lifecycleUpdatedAt = startedAt;
@@ -331,7 +334,11 @@ export const createTerminalRuntime = ({
       }
       if (terminal.lifecycleState === "stalled" && !waiting) {
         terminal.lifecycleState = "running";
-        terminal.lifecycleReason = undefined;
+        // A new prompt is not proof the provider recovered; only real
+        // progress clears the error, so its reason outlives the stall.
+        terminal.lifecycleReason = terminal.providerError
+          ? providerErrorReason(terminal.providerError)
+          : undefined;
         terminal.lifecycleUpdatedAt = terminal.lastActiveAt;
         broadcastTerminalEvent({
           type: "terminal-lifecycle-changed",
@@ -378,9 +385,11 @@ export const createTerminalRuntime = ({
       // Mark stalled. Don't kill the PTY — operator decides whether to
       // restart, kill, or send input. This is just a visibility signal.
       terminal.lifecycleState = "stalled";
-      terminal.lifecycleReason = terminal.attentionKind
-        ? `waiting for ${terminal.attentionKind}${terminal.attentionToolName ? `: ${terminal.attentionToolName}` : ""} (since ${terminal.attentionSince})`
-        : `no transcript activity for ${Math.round((now - lastActivity) / 1000)}s`;
+      terminal.lifecycleReason = terminal.providerError
+        ? providerErrorReason(terminal.providerError)
+        : terminal.attentionKind
+          ? `waiting for ${terminal.attentionKind}${terminal.attentionToolName ? `: ${terminal.attentionToolName}` : ""} (since ${terminal.attentionSince})`
+          : `no transcript activity for ${Math.round((now - lastActivity) / 1000)}s`;
       terminal.lifecycleUpdatedAt = new Date(now).toISOString();
       persistRegistry();
       broadcastTerminalEvent({
@@ -648,6 +657,15 @@ export const createTerminalRuntime = ({
     }
   };
 
+  // A tool call or a Stop verdict proves the provider answered again.
+  const clearTerminalProviderError = (terminalId: string) => {
+    const terminal = terminals.get(terminalId);
+    if (!terminal || !clearProviderError(terminal)) return;
+    logVerbose(`[Session] provider error cleared session=${terminalId}`);
+    persistRegistry();
+    broadcastTerminalUpdated(terminalId);
+  };
+
   const sessionRuntime = createSessionRuntime({
     websocketServer,
     terminals,
@@ -707,6 +725,7 @@ export const createTerminalRuntime = ({
 
     const completedAt = new Date().toISOString();
     terminal.verdictFlippedBack = undefined;
+    terminal.providerError = undefined;
     terminal.lifecycleState = verdict.outcome;
     terminal.lifecycleReason = undefined;
     terminal.lifecycleUpdatedAt = completedAt;
@@ -754,6 +773,7 @@ export const createTerminalRuntime = ({
     onTerminalUpdated: broadcastTerminalUpdated,
     recordToolUse: (terminalId, toolName) => {
       touchTerminalActivity(terminalId);
+      clearTerminalProviderError(terminalId);
       sessionRuntime.appendSessionTranscriptEvent(terminalId, {
         type: "tool_use",
         toolName,
@@ -849,6 +869,7 @@ export const createTerminalRuntime = ({
       ...(terminal.attentionSince ? { attentionSince: terminal.attentionSince } : {}),
       ...(terminal.attentionKind ? { attentionKind: terminal.attentionKind } : {}),
       ...(terminal.attentionToolName ? { attentionToolName: terminal.attentionToolName } : {}),
+      ...(terminal.providerError ? { providerError: terminal.providerError } : {}),
       lifecycleState,
       ...(terminal.lifecycleReason ? { lifecycleReason: terminal.lifecycleReason } : {}),
       ...(terminal.lifecycleUpdatedAt ? { lifecycleUpdatedAt: terminal.lifecycleUpdatedAt } : {}),

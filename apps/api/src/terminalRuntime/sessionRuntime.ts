@@ -38,6 +38,11 @@ import {
   transcriptFilenameForSession,
 } from "./conversations";
 import { broadcastMessage, getTerminalId, sendMessage } from "./protocol";
+import {
+  type ProviderErrorMatch,
+  createProviderErrorScanner,
+  recordProviderError,
+} from "./providerErrors";
 import { createShellEnvironment, ensureNodePtySpawnHelperExecutable } from "./ptyEnvironment";
 import { renderScreen } from "./screenRender";
 import { screenTail } from "./screenText";
@@ -580,6 +585,19 @@ export const createSessionRuntime = ({
     }
   };
 
+  // Identical repaints are dropped by recordProviderError, so only a new
+  // banner reaches the registry and the UI.
+  const noteProviderError = (session: TerminalSession, match: ProviderErrorMatch) => {
+    const terminal = terminals.get(session.terminalId);
+    if (!terminal || !recordProviderError(terminal, match, new Date().toISOString())) {
+      return;
+    }
+    logVerbose(
+      `[Session] provider error session=${session.terminalId} kind=${match.kind}: ${match.message}`,
+    );
+    onTerminalUpdated?.(session.terminalId);
+  };
+
   const scheduleIdleCloseIfNeeded = (session: TerminalSession, sessionId: string) => {
     if (session.isClosed || sessions.get(sessionId) !== session) {
       return;
@@ -723,6 +741,7 @@ export const createSessionRuntime = ({
       pendingInput: "",
       hasTranscriptEnded: false,
       keepAliveWithoutClients: Boolean(terminalRecord?.initialPrompt),
+      providerErrorScanner: createProviderErrorScanner(),
     };
     if (debugLog) {
       session.debugLog = debugLog;
@@ -758,6 +777,10 @@ export const createSessionRuntime = ({
         data: chunk,
       });
       emitStateIfChanged(session, sessionId, nextState);
+      const providerError = session.providerErrorScanner?.push(chunk);
+      if (providerError) {
+        noteProviderError(session, providerError);
+      }
       if (
         onOutputActivity &&
         now - (session.lastOutputActivityAt ?? 0) >= OUTPUT_ACTIVITY_THROTTLE_MS

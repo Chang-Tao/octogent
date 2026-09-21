@@ -11,11 +11,16 @@ import type {
   TerminalLifecycleState,
   TerminalProviderError,
 } from "@octogent/core";
-import { isTerminalAgentProvider, isTerminalCompletionSoundId } from "@octogent/core";
+import {
+  isTerminalAgentProvider,
+  isTerminalCompletionSoundId,
+  isTerminalProviderErrorKind,
+} from "@octogent/core";
 import type { IPty } from "node-pty";
 import type { WebSocket } from "ws";
 
 import type { AgentRuntimeState, AgentStateTracker } from "../agentStateDetection";
+import type { ProviderErrorScanner } from "./providerErrors";
 
 export type TerminalStateMessage = {
   type: "state";
@@ -95,6 +100,7 @@ export type TerminalSession = {
   hasSeenProcessing?: boolean;
   lastOutputActivityAt?: number;
   lastToolName?: string | undefined;
+  providerErrorScanner?: ProviderErrorScanner;
 };
 
 export type TerminalNameOrigin = "generated" | "user" | "prompt";
@@ -107,8 +113,10 @@ export {
   type TentacleWorkspaceMode,
   type TerminalAgentProvider,
   type TerminalLifecycleState,
+  type TerminalProviderError,
   isTerminalAgentProvider,
   isTerminalCompletionSoundId,
+  isTerminalProviderErrorKind,
 };
 
 export type TerminalSessionStartDetails = {
