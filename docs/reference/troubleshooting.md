@@ -108,4 +108,4 @@ octogent terminal input <id> --keys esc
 octogent terminal result <id> --screen
 ```
 
-`channel send` waits for idle and cannot answer a dialog inside a busy turn; `terminal input` writes directly to a live PTY. Use `result --screen` or `screen` to investigate usage limits, startup failures, and exits; ended sessions show the save time. A session that never started may have no screen. Restart does not restore the PTY; only screens saved during normal teardown are available.
+`channel send` waits for idle and cannot answer a dialog inside a busy turn; `terminal input` writes directly to a live PTY. Use `result --screen` or `screen` to investigate usage limits, startup failures, and exits; ended sessions show the save time. The screen is an emulator replay of the retained scrollback, so a dialog shows as painted, but output older than the scrollback buffer is not included. A session that never started may have no screen. Restart does not restore the PTY; only screens saved during normal teardown are available.

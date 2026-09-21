@@ -22,7 +22,13 @@ vi.mock("../src/terminalRuntime/ptyEnvironment", () => ({
   ensureNodePtySpawnHelperExecutable: ensureSpawnHelperMock,
 }));
 
+vi.mock("../src/terminalRuntime/screenRender", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/terminalRuntime/screenRender")>();
+  return { renderScreen: vi.fn(actual.renderScreen) };
+});
+
 import * as logging from "../src/logging";
+import { renderScreen } from "../src/terminalRuntime/screenRender";
 import { createSessionRuntime } from "../src/terminalRuntime/sessionRuntime";
 import type { PersistedTerminal, TerminalSession } from "../src/terminalRuntime/types";
 
@@ -103,6 +109,14 @@ const createUpgradeRequest = (tentacleId: string) =>
 const parseSentMessages = (socket: FakeWebSocket) =>
   socket.sentMessages.map((raw) => JSON.parse(raw) as { type: string; data?: string });
 
+const renderScreenMock = vi.mocked(renderScreen);
+
+// xterm parses writes on a timer, so fake-timer tests have to let it run.
+const settle = async <T>(pending: Promise<T>): Promise<T> => {
+  await vi.advanceTimersByTimeAsync(0);
+  return pending;
+};
+
 describe("createSessionRuntime", () => {
   const temporaryDirectories: string[] = [];
 
@@ -116,6 +130,7 @@ describe("createSessionRuntime", () => {
     createShellEnvironmentMock.mockClear();
     ensureSpawnHelperMock.mockClear();
     spawnMock.mockReset();
+    renderScreenMock.mockClear();
   });
 
   afterEach(() => {
@@ -127,7 +142,7 @@ describe("createSessionRuntime", () => {
   });
 
   it.each(["closeSession", "stopSession", "killSession", "exit", "close"] as const)(
-    "saves the processed screen on %s and accepts input in busy states",
+    "saves the rendered screen on %s and accepts input in busy states",
     async (ending) => {
       vi.useFakeTimers();
       const directory = createTemporaryDirectory();
@@ -157,8 +172,10 @@ describe("createSessionRuntime", () => {
       });
       runtime.startSession("worker");
       pty.write.mockClear();
-      pty.emitData("\x1b]0;Claude\x07\x1b[31mRead outside?\x1b[0m\r\n1. Yes\r\n1. Yes");
-      expect(runtime.getScreen("worker", 2)).toMatchObject({
+      pty.emitData(
+        "\x1b]0;Claude\x07\x1b[31mRead outside?\x1b[0m\r\n1. No\x1b[1;1H\x1b[2KRead outside?\x1b[2;1H1. Yes",
+      );
+      expect(await settle(runtime.getScreen("worker", 2))).toMatchObject({
         text: "Read outside?\n1. Yes",
         savedAt: null,
       });
@@ -182,14 +199,16 @@ describe("createSessionRuntime", () => {
       if (ending === "exit") pty.emitExit({ exitCode: 1, signal: 0 });
       else if (ending === "close") runtime.close();
       else runtime[ending]("worker");
-      expect(readFileSync(join(directory, "worker.screen.txt"), "utf8")).toBe(
-        "Read outside?\n1. Yes",
+      await vi.waitFor(() =>
+        expect(readFileSync(join(directory, "worker.screen.txt"), "utf8")).toBe(
+          "Read outside?\n1. Yes",
+        ),
       );
-      expect(runtime.getScreen("worker", 1)).toMatchObject({
+      expect(await runtime.getScreen("worker", 1)).toMatchObject({
         text: "1. Yes",
         savedAt: expect.any(String),
       });
-      expect(runtime.getScreen("../worker")).toBeNull();
+      expect(await runtime.getScreen("../worker")).toBeNull();
       await vi.advanceTimersByTimeAsync(1);
       await vi.waitFor(() =>
         expect(readFileSync(join(directory, "worker.jsonl"), "utf8")).toContain('"input_submit"'),
@@ -230,8 +249,8 @@ describe("createSessionRuntime", () => {
     pty.emitData(Array.from({ length: 205 }, (_, i) => `line ${i}`).join("\r\n"));
     runtime.submitInput("worker", { text: "1", enter: true });
     runtime.stopSession("worker");
-    expect(runtime.getScreen("worker", 200)?.text.split("\n")).toHaveLength(200);
-    expect(runtime.getScreen("worker", 200)?.text).toMatch(/^line 5\n/);
+    expect((await runtime.getScreen("worker", 200))?.text.split("\n")).toHaveLength(200);
+    expect((await runtime.getScreen("worker", 200))?.text).toMatch(/^line 5\n/);
     const replacement = new FakePty();
     spawnMock.mockReturnValue(replacement);
     runtime.startSession("worker");
@@ -241,8 +260,71 @@ describe("createSessionRuntime", () => {
     rmSync(transcriptDirectoryPath, { recursive: true, force: true });
     writeFileSync(transcriptDirectoryPath, "not a directory");
     expect(() => runtime.closeSession("worker")).not.toThrow();
+    // The deferred rendered save hits the same unwritable path and must stay silent.
+    await vi.advanceTimersByTimeAsync(1);
     expect(sessions.size).toBe(0);
     expect(replacement.kill).toHaveBeenCalledOnce();
+    runtime.close();
+  });
+
+  it("keeps the stripped screen when rendering fails and ignores a stale render", async () => {
+    const directory = createTemporaryDirectory();
+    const screenFile = join(directory, "worker.screen.txt");
+    const sessions = new Map<string, TerminalSession>();
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        "worker",
+        {
+          terminalId: "worker",
+          tentacleId: "worker",
+          tentacleName: "worker",
+          createdAt: new Date().toISOString(),
+          workspaceMode: "shared",
+        },
+      ],
+    ]);
+    const runtime = createSessionRuntime({
+      websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions,
+      getTentacleWorkspaceCwd: () => directory,
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: directory,
+      transcriptDirectoryPath: directory,
+    });
+    const runSession = (output: string) => {
+      const pty = new FakePty();
+      spawnMock.mockReturnValue(pty);
+      runtime.startSession("worker");
+      runtime.resizeSession("worker", 100, 30);
+      pty.emitData(output);
+      runtime.stopSession("worker");
+    };
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    renderScreenMock.mockRejectedValueOnce(new Error("renderer unavailable"));
+    runSession("Working 100%\rLimit reached\x1b[K");
+    expect(renderScreenMock).toHaveBeenLastCalledWith(expect.any(String), {
+      lines: 200,
+      cols: 100,
+      rows: 30,
+    });
+    await flush();
+    expect(readFileSync(screenFile, "utf8")).toBe("Limit reached");
+
+    let finishStaleRender: (text: string) => void = () => {};
+    renderScreenMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishStaleRender = resolve;
+        }),
+    );
+    runSession("first session");
+    runSession("second\x1b[1;1Hfirst");
+    await vi.waitFor(() => expect(readFileSync(screenFile, "utf8")).toBe("firstd"));
+    finishStaleRender("first session");
+    await flush();
+    expect(readFileSync(screenFile, "utf8")).toBe("firstd");
     runtime.close();
   });
 

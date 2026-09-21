@@ -127,5 +127,5 @@ Deck 路由把 `.octogent/tentacles/<tentacle-id>/` 当作面向代理上下文�
 
 ## 终端屏幕与直接输入
 
-- `GET /api/terminals/:terminalId/screen?lines=40&raw=1`：`lines` 默认 40，必须为 1–200 的整数；省略 `raw=1` 时返回处理后的文本。返回 `{ "text": "...", "savedAt": null, "raw": true }`。没有实时会话时读取 `<stateDir>/state/transcripts/<terminalId>.screen.txt`，`savedAt` 为文件修改时间（ISO），`raw` 为 `false`。保存最多 200 行处理后的文本，尽力在所有正常会话结束路径写入；强制结束服务无法保证保存。无屏幕返回 `404`，无效行数返回 `400`。
+- `GET /api/terminals/:terminalId/screen?lines=40&raw=1`：`lines` 默认 40，必须为 1–200 的整数；省略 `raw=1` 时返回渲染后的屏幕：保留的滚动历史在无头终端模拟器中回放的结果，受滚动缓冲区大小限制。返回 `{ "text": "...", "savedAt": null, "raw": true }`。没有实时会话时读取 `<stateDir>/state/transcripts/<terminalId>.screen.txt`，`savedAt` 为文件修改时间（ISO），`raw` 为 `false`。保存最多 200 行渲染后的文本（渲染失败或服务先退出时为剥离后的文本），尽力在所有正常会话结束路径写入；强制结束服务无法保证保存。无屏幕返回 `404`，无效行数返回 `400`。
 - `POST /api/terminals/:terminalId/input`：请求 `{ "text": "1", "enter": true, "keys": ["tab"] }`，字段可省略，但必须有输入。先直接输入文本，再按顺序发送按键；`enter: true` 在 150 毫秒后追加回车（会话结束会取消）。按键仅允许 `enter`、`esc`、`up`、`down`、`tab`、`ctrl-c`、`1`–`9`。不使用括号粘贴，不等待空闲；接受后记录 `input_submit` 事件并返回 `200 { "ok": true }`。无存活会话返回 `404`；无效字段、未知按键或解码输入超过 4096 字节返回 `400`；JSON 请求体超过 4096 字节返回 `413`。使用与其他终端修改接口相同的认证、Host 和 Origin 检查。

@@ -110,4 +110,4 @@ octogent terminal input <id> --keys esc
 octogent terminal result <id> --screen
 ```
 
-`channel send` 等待空闲，无法回答忙碌回合中的对话框；`terminal input` 直接写入存活的 PTY。使用量耗尽、启动失败或退出后的诊断，可用 `result --screen` 或 `screen` 查看；已结束会话的屏幕会标注保存时间。未启动的会话可能没有屏幕；重启不会恢复 PTY，只有正常清理时保存的屏幕可用。
+`channel send` 等待空闲，无法回答忙碌回合中的对话框；`terminal input` 直接写入存活的 PTY。使用量耗尽、启动失败或退出后的诊断，可用 `result --screen` 或 `screen` 查看；已结束会话的屏幕会标注保存时间。屏幕是保留的滚动历史在终端模拟器中的回放，对话框按绘制结果显示，但超出滚动缓冲区的更早输出不包含在内。未启动的会话可能没有屏幕；重启不会恢复 PTY，只有正常清理时保存的屏幕可用。

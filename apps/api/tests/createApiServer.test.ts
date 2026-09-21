@@ -460,12 +460,15 @@ describe("createApiServer", () => {
     expect(created.status).toBe(201);
     const { terminalId } = (await created.json()) as { terminalId: string };
     const url = `${baseUrl}/api/terminals/${terminalId}`;
-    output("old\r\n\x1b[31mLimit reached\x1b[0m\r\nLimit reached\r\nTry later");
-    const screen = await fetch(`${url}/screen?lines=2`);
+    output("old\r\n\x1b[31mLimit reached\x1b[0m\r\nTry later\x1b[1;1H\x1b[2KUsage");
+    const screen = await fetch(`${url}/screen?lines=3`);
     expect(screen.status).toBe(200);
-    expect(await screen.json()).toMatchObject({ text: "Limit reached\nTry later", savedAt: null });
+    expect(await screen.json()).toMatchObject({
+      text: "Usage\nLimit reached\nTry later",
+      savedAt: null,
+    });
     expect(await (await fetch(`${url}/screen?lines=2&raw=1`)).json()).toMatchObject({
-      text: "Limit reached\r\nTry later",
+      text: "\x1b[31mLimit reached\x1b[0m\r\nTry later\x1b[1;1H\x1b[2KUsage",
       raw: true,
     });
     for (const lines of ["0", "-1", "1.5", "NaN", "201"]) {
@@ -495,10 +498,12 @@ describe("createApiServer", () => {
     ).toBe(404);
     expect((await fetch(`${baseUrl}/api/terminals/missing/screen`)).status).toBe(404);
     exit({ exitCode: 1, signal: 0 });
-    expect(await (await fetch(`${url}/screen?lines=2`)).json()).toMatchObject({
-      text: "Limit reached\nTry later",
-      savedAt: expect.any(String),
-    });
+    await vi.waitFor(async () =>
+      expect(await (await fetch(`${url}/screen?lines=2`)).json()).toMatchObject({
+        text: "Limit reached\nTry later",
+        savedAt: expect.any(String),
+      }),
+    );
     expect((await send({ text: "1" })).status).toBe(404);
     await stopServer?.();
     stopServer = null;

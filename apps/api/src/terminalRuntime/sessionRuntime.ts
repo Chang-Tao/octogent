@@ -24,6 +24,8 @@ import {
   AGENT_PASTE_START,
   DEFAULT_AGENT_PROVIDER,
   TERMINAL_BOOTSTRAP_COMMANDS,
+  TERMINAL_DEFAULT_COLS,
+  TERMINAL_DEFAULT_ROWS,
   TERMINAL_MAX_CONCURRENT_SESSIONS,
   TERMINAL_SCROLLBACK_MAX_BYTES,
   TERMINAL_SESSION_IDLE_GRACE_MS,
@@ -37,6 +39,7 @@ import {
 } from "./conversations";
 import { broadcastMessage, getTerminalId, sendMessage } from "./protocol";
 import { createShellEnvironment, ensureNodePtySpawnHelperExecutable } from "./ptyEnvironment";
+import { renderScreen } from "./screenRender";
 import { screenTail } from "./screenText";
 import { toErrorMessage } from "./systemClients";
 import { parseTerminalInput } from "./terminalInput";
@@ -101,8 +104,6 @@ export const createSessionRuntime = ({
   onSessionEnd,
   onTerminalUpdated,
 }: CreateSessionRuntimeOptions) => {
-  const DEFAULT_PTY_COLS = 120;
-  const DEFAULT_PTY_ROWS = 35;
   const sessionLimit = Number.isFinite(maxConcurrentSessions)
     ? Math.max(1, Math.floor(maxConcurrentSessions))
     : TERMINAL_MAX_CONCURRENT_SESSIONS;
@@ -350,16 +351,7 @@ export const createSessionRuntime = ({
       return;
     }
 
-    try {
-      ensureTranscriptDirectory(transcriptDirectoryPath);
-      writeFileSync(
-        screenPath(sessionId),
-        screenTail(session.scrollbackChunks.join(""), 200),
-        "utf8",
-      );
-    } catch {
-      // A full disk or unwritable transcript directory must never prevent PTY cleanup.
-    }
+    saveLastScreen(sessionId, session);
     session.isClosed = true;
     clearIdleCloseTimer(session);
     clearPromptTimers(session);
@@ -696,8 +688,8 @@ export const createSessionRuntime = ({
     let pty: IPty;
     try {
       pty = spawn(shellLaunch.command, shellLaunch.args, {
-        cols: DEFAULT_PTY_COLS,
-        rows: DEFAULT_PTY_ROWS,
+        cols: TERMINAL_DEFAULT_COLS,
+        rows: TERMINAL_DEFAULT_ROWS,
         cwd: tentacleCwd,
         env: createShellEnvironment({
           octogentSessionId: sessionId,
@@ -720,8 +712,8 @@ export const createSessionRuntime = ({
       pty,
       clients: new Set(),
       directListeners: new Set(),
-      cols: DEFAULT_PTY_COLS,
-      rows: DEFAULT_PTY_ROWS,
+      cols: TERMINAL_DEFAULT_COLS,
+      rows: TERMINAL_DEFAULT_ROWS,
       agentState: stateTracker.currentState,
       stateTracker,
       isBootstrapCommandSent: false,
@@ -992,11 +984,54 @@ export const createSessionRuntime = ({
   const screenPath = (terminalId: string) =>
     join(transcriptDirectoryPath, `${encodeURIComponent(terminalId)}.screen.txt`);
 
-  const getScreen = (terminalId: string, lines = 40, raw = false) => {
+  // Replays the same history the browser terminal receives, so both views agree.
+  const renderSessionScreen = (session: TerminalSession, lines: number) =>
+    renderScreen(stripBrokenLeadingAnsi(session.scrollbackChunks.join("")), {
+      lines,
+      cols: session.cols,
+      rows: session.rows,
+    });
+
+  const SAVED_SCREEN_LINES = 200;
+  // A slow render of an earlier session must not overwrite a later session's screen.
+  const pendingScreenRenders = new Map<string, Promise<string>>();
+
+  const saveLastScreen = (terminalId: string, session: TerminalSession) => {
+    const path = screenPath(terminalId);
+    const write = (text: string) => {
+      try {
+        ensureTranscriptDirectory(transcriptDirectoryPath);
+        writeFileSync(path, text, "utf8");
+      } catch {
+        // A full disk or unwritable transcript directory must never prevent PTY cleanup.
+      }
+    };
+    // The stripped text lands synchronously so a server that exits before the
+    // emulator finishes still leaves a screen; the rendered one replaces it.
+    write(screenTail(session.scrollbackChunks.join(""), SAVED_SCREEN_LINES));
+    const render = renderSessionScreen(session, SAVED_SCREEN_LINES);
+    pendingScreenRenders.set(terminalId, render);
+    void render
+      .then((text) => {
+        if (pendingScreenRenders.get(terminalId) === render) write(text);
+      })
+      .catch(() => {
+        // The stripped text already on disk is the fallback.
+      })
+      .finally(() => {
+        if (pendingScreenRenders.get(terminalId) === render) {
+          pendingScreenRenders.delete(terminalId);
+        }
+      });
+  };
+
+  const getScreen = async (terminalId: string, lines = 40, raw = false) => {
     const session = sessions.get(terminalId);
     if (session && !session.isClosed) {
       return {
-        text: screenTail(session.scrollbackChunks.join(""), lines, raw),
+        text: raw
+          ? screenTail(session.scrollbackChunks.join(""), lines, true)
+          : await renderSessionScreen(session, lines),
         savedAt: null,
         raw,
       };
@@ -1004,7 +1039,8 @@ export const createSessionRuntime = ({
     try {
       const path = screenPath(terminalId);
       return {
-        text: screenTail(readFileSync(path, "utf8"), lines),
+        // Saved screens are already plain text, so only the tail is taken.
+        text: screenTail(readFileSync(path, "utf8"), lines, true),
         savedAt: statSync(path).mtime.toISOString(),
         raw: false,
       };
