@@ -105,6 +105,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Channel deliveries are confirmed by the agent. "Delivered" used to mean
+  "bytes written to the PTY": a Codex "switch to a cheaper model?" dialog that
+  no hook reports swallowed a follow-up (and switched the model) while
+  `channel send` said delivered. A delivered batch is now unconfirmed until
+  the agent's next `user-prompt-submit` hook; when hooks are known to work it
+  is re-sent once after 10 s, then marked `failed: not acknowledged` with a
+  lifecycle reason. `channel list` shows `pending` / `delivered (unconfirmed)`
+  / `confirmed` / `failed`, and the initial prompt keeps first claim on an
+  acknowledgement. Verified with a live Claude worker.
 - A headless coordinator can now see and answer a worker's terminal.
   `octogent terminal screen <id> [--lines N] [--raw]` replays the retained PTY
   output through a headless terminal emulator (`@xterm/headless`) and prints
