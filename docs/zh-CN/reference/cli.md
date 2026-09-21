@@ -179,11 +179,21 @@ octogent channel send <terminal-id> "message"
 
 代表某个工作代理或父终端发送时，使用 `--from <terminal-id>`。省略 `--from` 时，若命令运行在 Octogent 托管的终端里，CLI 会回退使用 `OCTOGENT_SESSION_ID`。
 
+命令会先说明消息是已投递（写进了空闲代理的终端）还是已排队（代理正忙），再提示用 `channel list` 查看代理是否已确认收到。投递本身不能证明代理收到，详见[代理间消息传递](../guides/inter-agent-messaging.md#已投递不等于已收到)。
+
 ## 列出消息
 
 ```bash
 octogent channel list <terminal-id>
 ```
+
+每条发往该终端、经当前运行的 API 进程发送的消息占一行：
+
+```text
+  [msg-3] from=terminal-1 status=delivered (unconfirmed): Need review on the parser change
+```
+
+`status` 取值为 `pending`（排队中）、`delivered (unconfirmed)`（已写入、尚无回执）、`confirmed`（代理的下一次提示词提交已到达）或 `failed: <原因>`（两次投递都未确认时为 `failed: not acknowledged`）。
 
 > 本文件是 [../../reference/cli.md](../../reference/cli.md) 的中文翻译版本。如有歧义，以英文原文为准。
 
