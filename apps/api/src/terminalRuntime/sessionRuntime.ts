@@ -41,6 +41,7 @@ type CreateSessionRuntimeOptions = {
   websocketServer: WebSocketServer;
   terminals: Map<string, PersistedTerminal>;
   sessions: Map<string, TerminalSession>;
+  workspaceCwd?: string;
   resolveTerminalSession?: (terminalId: string) => {
     sessionId: string;
     tentacleId: string;
@@ -73,6 +74,7 @@ export const createSessionRuntime = ({
   websocketServer,
   terminals,
   sessions,
+  workspaceCwd,
   resolveTerminalSession,
   getTentacleWorkspaceCwd,
   getApiBaseUrl,
@@ -597,12 +599,18 @@ export const createSessionRuntime = ({
     session.isBootstrapCommandSent = true;
     const terminal = terminals.get(session.terminalId);
     const provider = terminal?.agentProvider ?? DEFAULT_AGENT_PROVIDER;
+    const tentaclesDirectory = workspaceCwd
+      ? join(workspaceCwd, ".octogent", "tentacles")
+      : undefined;
 
     const bootstrapCommand = resolveBootstrapCommand(provider, process.env, {
       ...(terminal?.workspaceMode ? { workspaceMode: terminal.workspaceMode } : {}),
       ...(terminal?.agentModel ? { agentModel: terminal.agentModel } : {}),
       ...(terminal?.agentReasoningEffort
         ? { codexReasoningEffort: terminal.agentReasoningEffort }
+        : {}),
+      ...(tentaclesDirectory && existsSync(tentaclesDirectory)
+        ? { claudeAdditionalDirs: [tentaclesDirectory] }
         : {}),
     });
     appendDebugLog(session, `bootstrap session=${sessionId} command=${bootstrapCommand}`);

@@ -28,6 +28,12 @@ Octogent sends `--initial-prompt` when Claude or Codex reports `SessionStart`, w
 
 If the retry is also unacknowledged after 10 seconds, terminal snapshots and `octogent terminal list` show `reason=initial prompt not acknowledged`. The lifecycle stays `running` until the usual stall detector acts; a late acknowledgement clears this reason. Start the API with `OCTOGENT_VERBOSE_LOGS=1` to see hook arrivals and `initial-prompt retry` / `initial-prompt not acknowledged after retry` logs. Inspect the worker's terminal for startup, update, trust, or sign-in prompts and resolve them before sending the task again. Check the terminal and logs first to avoid duplicating work that already started.
 
+## A Claude worker froze right after starting (reads outside the working directories)
+
+Claude Code can show a one-time `Read outside the working directories` dialog when a session first reads a path outside its working directories. Octogent adds `<workspace>/.octogent/tentacles` to Claude worktree terminals, so reading task briefs and tentacle docs there does not trigger the dialog. Reads from other outside paths can still raise it.
+
+Answer the dialog once in any interactive `claude` session to settle the choice for that user; Claude stores it in the user settings. If reads were blocked, the dialog notes that removing `permissions.blockReadsOutsideWorkingDirectories` from those settings undoes the Block choice.
+
 ## Worktree terminal creation fails
 
 Verify:

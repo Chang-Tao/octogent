@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -373,6 +373,52 @@ describe("createSessionRuntime", () => {
 
     expect(pty.write).toHaveBeenCalledTimes(1);
     expect(sessions.has(tentacleId)).toBe(false);
+
+    runtime.close();
+  });
+
+  it("adds the existing tentacles directory to a worktree Claude bootstrap", () => {
+    const tentacleId = "tentacle-1";
+    const workspaceCwd = createTemporaryDirectory();
+    const tentaclesDirectory = join(workspaceCwd, ".octogent", "tentacles");
+    mkdirSync(tentaclesDirectory, { recursive: true });
+    mkdirSync(join(workspaceCwd, ".octogent", "worktrees", tentacleId), { recursive: true });
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        tentacleId,
+        {
+          terminalId: tentacleId,
+          tentacleId,
+          tentacleName: tentacleId,
+          createdAt: new Date().toISOString(),
+          workspaceMode: "worktree",
+          agentProvider: "claude-code",
+        },
+      ],
+    ]);
+    const sessions = new Map<string, TerminalSession>();
+    const websocketServer = new FakeWebSocketServer();
+    const pty = new FakePty();
+    spawnMock.mockReturnValue(pty);
+
+    const runtime = createSessionRuntime({
+      websocketServer: websocketServer as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions,
+      workspaceCwd,
+      getTentacleWorkspaceCwd: () => join(workspaceCwd, ".octogent", "worktrees", tentacleId),
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: workspaceCwd,
+      transcriptDirectoryPath: createTemporaryDirectory(),
+      sessionIdleGraceMs: 60_000,
+      scrollbackMaxBytes: 1024,
+    });
+
+    expect(runtime.startSession(tentacleId)).toBe(true);
+    expect(pty.write).toHaveBeenNthCalledWith(
+      1,
+      `claude --permission-mode auto --add-dir '${tentaclesDirectory}'\r`,
+    );
 
     runtime.close();
   });

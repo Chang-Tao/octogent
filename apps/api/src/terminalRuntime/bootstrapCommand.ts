@@ -74,6 +74,14 @@ type BootstrapOptions = {
   /** Validated at terminal creation by modelSelection; empty means default. */
   agentModel?: string;
   codexReasoningEffort?: string;
+  claudeAdditionalDirs?: string[];
+};
+
+const quotePosixShellArgument = (value: string): string | null => {
+  if (/[\0\r\n]/.test(value)) {
+    return null;
+  }
+  return `'${value.replaceAll("'", `'\\''`)}'`;
 };
 
 export const resolveBootstrapCommand = (
@@ -88,5 +96,13 @@ export const resolveBootstrapCommand = (
     return `codex --sandbox ${resolveCodexSandboxMode(env, options.workspaceMode)} --ask-for-approval ${resolveCodexApprovalPolicy(env)}${modelFlags}`;
   }
   const modelFlag = options.agentModel ? ` --model ${options.agentModel}` : "";
-  return `claude --permission-mode ${resolveClaudePermissionMode(env)}${modelFlag}`;
+  const additionalDirectoryFlags =
+    provider === "claude-code" && options.workspaceMode === "worktree"
+      ? (options.claudeAdditionalDirs ?? [])
+          .map(quotePosixShellArgument)
+          .filter((directory): directory is string => directory !== null)
+          .map((directory) => ` --add-dir ${directory}`)
+          .join("")
+      : "";
+  return `claude --permission-mode ${resolveClaudePermissionMode(env)}${modelFlag}${additionalDirectoryFlags}`;
 };

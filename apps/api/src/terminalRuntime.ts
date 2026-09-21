@@ -598,6 +598,7 @@ export const createTerminalRuntime = ({
     websocketServer,
     terminals,
     sessions,
+    workspaceCwd,
     resolveTerminalSession,
     getTentacleWorkspaceCwd: worktreeManager.getTentacleWorkspaceCwd,
     getApiBaseUrl,
