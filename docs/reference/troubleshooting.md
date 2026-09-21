@@ -109,3 +109,17 @@ octogent terminal result <id> --screen
 ```
 
 `channel send` waits for idle and cannot answer a dialog inside a busy turn; `terminal input` writes directly to a live PTY. Use `result --screen` or `screen` to investigate usage limits, startup failures, and exits; ended sessions show the save time. The screen is an emulator replay of the retained scrollback, so a dialog shows as painted, but output older than the scrollback buffer is not included. A session that never started may have no screen. Restart does not restore the PTY; only screens saved during normal teardown are available.
+
+## The worker hit a usage limit or an API error
+
+Agent CLIs report provider failures only on screen: Codex ends a usage-limited turn without a Stop hook, and Claude prints an API error and then waits. Octogent watches each terminal's PTY output for those banners — usage limits, rate limits, API errors such as a lost connection or an overloaded service, and sign-in failures — and records the first matching line on the terminal as `providerError` (`kind`, `message`, `at`). A banner counts only at the start of a line, so a worker writing about limits in its own prose is not flagged, and retry notices the CLI is still working through are ignored. The same banner repainting does not restart its clock.
+
+While the error stands, the lifecycle stays `running` with the reason `provider error: <message>`, and a stall that follows keeps that reason instead of `no transcript activity`. `octogent terminal list` appends `error=usage-limit` (or `rate-limit`, `api-error`, `auth`), and `octogent terminal result <id>` prints a provider error line after the attention line. `octogent terminal wait` exits `3` once a provider error has stood for 30 seconds, sooner than the dialog threshold, because waiting does not lift a limit; `--attention-after 0` disables this as well. The error clears when the agent makes real progress again — its next tool call, or a Stop hook that yields a completion verdict — and a restarted session starts without one. A new prompt alone does not clear it, since the agent may hit the same wall.
+
+What to do depends on the kind:
+
+- `usage-limit`: do not re-dispatch to the same provider. The banner usually names the reset time; wait for it, or create the worker again with another `--agent-provider` or `--model`.
+- `rate-limit` or `api-error`: usually transient. After a short pause, send `continue` with `octogent channel send <id> "continue"` and check that the next tool call clears the error.
+- `auth`: sign the CLI in again on the host (run `/login` inside `claude`, or `codex login`); the worker cannot recover by itself.
+
+Detection reads screen text, so a tool result whose first line is itself such a banner (a worker printing an error log, say) can raise it too; the next tool call clears it. `octogent terminal create` also warns when the server's last usage reading already shows the chosen provider out of quota; see [CLI reference](cli.md#create-a-terminal).

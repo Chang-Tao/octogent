@@ -102,13 +102,15 @@ Options:
 - `--prompt-template`: prompt template name
 - `--prompt-variables`: JSON object of prompt template variables
 
+After a successful create, the CLI prints a warning to stderr when the server's last usage reading shows the chosen provider out of quota: for Codex, its 5-hour or weekly window at 100% or its account limit flag; for Claude, its 5-hour or weekly window, or the weekly bucket of the requested model, at 100%. A reading whose reset time has passed is ignored. Only readings the server already fetched for its usage routes are used — creating a terminal never calls a usage service — so with no reading nothing is printed.
+
 ## List terminals
 
 ```bash
 octogent terminal list
 ```
 
-While an agent waits on a dialog, the line appends `waiting=permission:Read 7m` or `waiting=user 3m` (tool name when known, elapsed wait).
+While an agent waits on a dialog, the line appends `waiting=permission:Read 7m` or `waiting=user 3m` (tool name when known, elapsed wait). When the agent CLI has printed a provider error banner, it appends `error=usage-limit`, `error=rate-limit`, `error=api-error`, or `error=auth`; see [Troubleshooting](troubleshooting.md#the-worker-hit-a-usage-limit-or-an-api-error).
 
 Shows each terminal ID, lifecycle state, recorded process ID when available, lifecycle reason, and display name. Archived records are hidden by default; pass `--archived` to list only archived records.
 
@@ -170,9 +172,9 @@ octogent terminal result <terminal-id> [--json] [--screen]
 
 `wait` polls until every listed terminal has settled — `awaiting-review`, `completed`, `stopped`, `exited`, or `stale` — printing each state change on the way, then prints each terminal's result block. The exit code is `0` when all of them ended in `awaiting-review` or `completed`, `1` when any ended another way, `2` on timeout, and `3` when a worker needs attention (`--timeout 0`, the default, waits forever; `--interval` defaults to 5 seconds and never goes below 1). `result` prints the same block immediately without waiting.
 
-`--attention-after` defaults to 60 seconds; `0` disables attention exits. On each poll, if any unsettled worker has waited for permission or user input at least that long, `wait` prints the affected workers’ result blocks and exits `3`, before checking the timeout. The age is measured from the start of the dialog, even if it predates this command. Exit `1` also covers invalid arguments and API errors.
+`--attention-after` defaults to 60 seconds; `0` disables attention exits. On each poll, if any unsettled worker has waited for permission or user input at least that long, `wait` prints the affected workers’ result blocks and exits `3`, before checking the timeout. The age is measured from the start of the dialog, even if it predates this command. An unsettled worker whose provider error (a usage limit, rate limit, API error, or sign-in failure) has stood for 30 seconds also needs attention, whatever `--attention-after` says, unless it is `0`. Exit `1` also covers invalid arguments and API errors.
 
-The block includes a localized attention line with the wait kind, tool name when known, and start time. JSON exposes `attentionKind`, `attentionSince` (ISO time), and `attentionToolName` (null when absent).
+The block includes a localized attention line with the wait kind, tool name when known, and start time. JSON exposes `attentionKind`, `attentionSince` (ISO time), and `attentionToolName` (null when absent). A recorded provider error adds a line after it with the kind, the banner, and when it appeared; JSON exposes it as `providerError` (`{ kind, message, at }`, or null).
 
 The block holds the lifecycle state and reason, the agent and model, the completion summary when there is one (commits, files, branch, merged flag), and the agent's final message as stored from its Stop hook. `--json` prints one JSON object per terminal for scripts. This is how a headless coordinator collects a worker's answer without attaching to its terminal; a worker that wrote its deliverable to a file (a `RESULT.md` under its tentacle, say) usually names the path in that final message.
 

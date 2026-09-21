@@ -22,6 +22,8 @@ Most HTTP routes either read/write persisted files or create runtime records. We
 - `POST /api/terminals/:terminalId/archive` - archives a non-running terminal record (running terminals get `409`); files such as transcripts and completion summaries are kept
 - `WS /api/terminals/:terminalId/ws` - streams live terminal IO over WebSocket
 
+Terminal snapshots carry `providerError` (`{ kind, message, at }`, kind one of `usage-limit`, `rate-limit`, `api-error`, `auth`) while a provider banner the agent CLI printed stands; it clears on the agent's next tool call or completion verdict. `POST /api/terminals` adds `usageWarning` (`{ provider, bucket, usedPercent, resetAt }`) when the usage reading the server last fetched shows the chosen provider out of quota.
+
 Terminal snapshots include `lifecycleState` when known. Supported lifecycle states are `registered`, `running`, `stopped`, `exited`, and `stale`. Stale terminals are records that were persisted as running but could not be reattached to a live Octogent PTY session after startup.
 
 Creating a terminal registers metadata first. A PTY starts immediately only when an initial prompt is provided, a WebSocket attaches, or an internal direct listener starts the session. Worktree terminals also create their worktree before the terminal record is exposed.
