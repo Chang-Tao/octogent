@@ -36,7 +36,9 @@ export const createHookProcessor = (deps: {
   releaseSessionKeepAlive: (terminalId: string) => boolean;
   reviveSessionTranscript: (terminalId: string) => boolean;
   sendInitialPromptNow: (sessionId: string) => void;
-  acknowledgeInitialPrompt: (sessionId: string) => void;
+  /** True when the submit belonged to the initial prompt. */
+  acknowledgeInitialPrompt: (sessionId: string) => boolean;
+  acknowledgeChannelMessages: (terminalId: string) => void;
   evaluateSessionCompletion: (terminalId: string) => void;
   recordToolUse?: (terminalId: string, toolName: string) => void;
   /** Push a fresh snapshot to UI clients after a hook changed the record outside a lifecycle event. */
@@ -58,6 +60,7 @@ export const createHookProcessor = (deps: {
     reviveSessionTranscript,
     sendInitialPromptNow,
     acknowledgeInitialPrompt,
+    acknowledgeChannelMessages,
     evaluateSessionCompletion,
     recordToolUse,
     onTerminalUpdated,
@@ -231,6 +234,13 @@ export const createHookProcessor = (deps: {
       `[Hook] Received hook: ${hookName} octogentSession=${octogentSessionId ?? "(none)"}`,
     );
 
+    // Any hook at all shows this session's hooks are wired, so a prompt that
+    // later goes unacknowledged was lost rather than merely unreported.
+    const hookSession = octogentSessionId ? sessions.get(octogentSessionId) : undefined;
+    if (hookSession) {
+      hookSession.hasSeenHook = true;
+    }
+
     if (!payload || typeof payload !== "object") {
       return { ok: true };
     }
@@ -367,8 +377,12 @@ export const createHookProcessor = (deps: {
         return { ok: true };
       }
 
+      // One submit confirms one injection. An unconfirmed initial prompt claims
+      // it first, so a channel batch pasted meanwhile cannot take its receipt.
+      if (!acknowledgeInitialPrompt(octogentSessionId)) {
+        acknowledgeChannelMessages(octogentSessionId);
+      }
       // Update last-active timestamp (determines active/inactive on the canvas).
-      acknowledgeInitialPrompt(octogentSessionId);
       terminal.lastActiveAt = new Date().toISOString();
       noteObservedModel(terminal.terminalId, hookPayloadRecord);
 

@@ -23,3 +23,6 @@ export const DEFAULT_TERMINAL_INACTIVITY_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000;
 export const AGENT_PASTE_START = "\x1b[200~";
 export const AGENT_PASTE_END = "\x1b[201~";
 export const AGENT_INJECT_SUBMIT_DELAY_MS = 150;
+// How long an injected prompt may go without the agent's prompt-submit hook
+// before it counts as lost (swallowed by a dialog, say) and is sent once more.
+export const AGENT_INJECT_ACK_TIMEOUT_MS = 10_000;
