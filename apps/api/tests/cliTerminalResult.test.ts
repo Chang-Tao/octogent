@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PROVIDER_ERROR_ATTENTION_MS,
   buildTerminalResult,
+  formatProviderErrorLine,
   formatTerminalAttention,
+  formatTerminalListLine,
   isFinishedWell,
   isSettledLifecycle,
   lastAssistantMessage,
@@ -96,6 +99,7 @@ describe("buildTerminalResult", () => {
       attentionKind: null,
       attentionSince: null,
       attentionToolName: null,
+      providerError: null,
       agentProvider: "codex",
       model: "gpt-5.6-sol",
       completionSummary: {
@@ -200,5 +204,70 @@ describe("terminal attention", () => {
       ),
     ).toBe("user 3m");
     expect(formatTerminalAttention({}, now)).toBeNull();
+  });
+});
+
+describe("provider errors", () => {
+  const at = "2026-09-21T12:03:04.000Z";
+  const providerError = {
+    kind: "usage-limit",
+    message: "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage.",
+    at,
+  };
+  const snapshot = {
+    terminalId: "worker",
+    tentacleName: "Worker",
+    lifecycleState: "running",
+    lifecycleReason: `provider error: ${providerError.message}`,
+    agentProvider: "codex",
+    providerError,
+  };
+
+  it("exposes the error in the result and drops malformed ones", () => {
+    expect(buildTerminalResult(snapshot, []).providerError).toEqual(providerError);
+    for (const broken of [
+      { ...providerError, kind: "quota" },
+      { ...providerError, message: 1 },
+      { ...providerError, at: "bad" },
+      "usage-limit",
+    ]) {
+      expect(buildTerminalResult({ ...snapshot, providerError: broken }, []).providerError).toBe(
+        null,
+      );
+    }
+  });
+
+  it("appends error=<kind> to the list line", () => {
+    expect(formatTerminalListLine(snapshot, Date.parse(at))).toBe(
+      `  worker  running agent=codex reason=provider error: ${providerError.message}  Worker error=usage-limit`,
+    );
+    expect(
+      formatTerminalListLine({ ...snapshot, providerError: undefined }, Date.parse(at)),
+    ).not.toContain("error=");
+  });
+
+  it("formats the result line in both languages", () => {
+    expect(formatProviderErrorLine(providerError, "en")).toBe(
+      `Provider error: usage-limit — ${providerError.message} (since ${at})`,
+    );
+    expect(formatProviderErrorLine(providerError, "zh-CN")).toBe(
+      `服务商错误: usage-limit — ${providerError.message} (自 ${at} 起)`,
+    );
+  });
+
+  it("needs attention once the error is 30 s old, unless settled or disabled", () => {
+    const since = Date.parse(at);
+    expect(PROVIDER_ERROR_ATTENTION_MS).toBe(30_000);
+    expect(needsAttention(snapshot, since + 29_999, 60_000)).toBe(false);
+    expect(needsAttention(snapshot, since + 30_000, 60_000)).toBe(true);
+    // The provider wall does not wait for the longer dialog threshold.
+    expect(needsAttention(snapshot, since + 30_000, 600_000)).toBe(true);
+    expect(needsAttention({ ...snapshot, lifecycleState: "stalled" }, since + 30_000, 60_000)).toBe(
+      true,
+    );
+    expect(needsAttention({ ...snapshot, lifecycleState: "exited" }, since + 30_000, 60_000)).toBe(
+      false,
+    );
+    expect(needsAttention(snapshot, since + 30_000, 0)).toBe(false);
   });
 });

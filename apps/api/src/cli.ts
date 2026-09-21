@@ -9,7 +9,8 @@ import { parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
   buildTerminalResult,
-  formatTerminalAttention,
+  formatProviderErrorLine,
+  formatTerminalListLine,
   isSettledLifecycle,
   needsAttention,
   parseTerminalWaitArgs,
@@ -513,28 +514,7 @@ const terminalList = async () => {
     }
 
     for (const terminal of terminals) {
-      const terminalId = String(terminal.terminalId ?? "");
-      const name = String(terminal.tentacleName ?? terminal.label ?? terminalId);
-      const lifecycle = String(terminal.lifecycleState ?? terminal.state ?? "unknown");
-      const pid =
-        typeof terminal.processId === "number" && Number.isFinite(terminal.processId)
-          ? ` pid=${terminal.processId}`
-          : "";
-      const reason =
-        typeof terminal.lifecycleReason === "string" ? ` reason=${terminal.lifecycleReason}` : "";
-      const modelValue =
-        typeof terminal.agentModel === "string"
-          ? terminal.agentModel
-          : typeof terminal.agentModelObserved === "string"
-            ? terminal.agentModelObserved
-            : null;
-      const provider =
-        typeof terminal.agentProvider === "string" ? ` agent=${terminal.agentProvider}` : "";
-      const model = modelValue ? ` model=${modelValue}` : "";
-      const attention = formatTerminalAttention(terminal, Date.now());
-      console.log(
-        `  ${terminalId}  ${lifecycle}${pid}${provider}${model}${reason}  ${name}${attention ? ` waiting=${attention}` : ""}`,
-      );
+      console.log(formatTerminalListLine(terminal, Date.now()));
     }
   } catch {
     apiError();
@@ -581,6 +561,9 @@ const printTerminalResult = (result: TerminalResult, json: boolean) => {
     console.log(
       `  ${t(locale, "cli.result.attention")}: ${t(locale, result.attentionKind === "permission" ? "cli.result.attentionPermission" : "cli.result.attentionUser")}${result.attentionToolName ? `: ${result.attentionToolName}` : ""} (${t(locale, "cli.result.attentionSince", { since: result.attentionSince })})`,
     );
+  }
+  if (result.providerError) {
+    console.log(`  ${formatProviderErrorLine(result.providerError, locale)}`);
   }
   // Shared-mode workers never commit, so their summary is all zeros; printing
   // it read as "no output" in a real review (2026-09-09).

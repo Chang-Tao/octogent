@@ -65,6 +65,7 @@ export const en: TranslationMap = {
   "cli.result.attentionPermission": "waiting for permission",
   "cli.result.attentionUser": "waiting for user",
   "cli.result.attentionSince": "since {since}",
+  "cli.result.providerError": "Provider error",
   "cli.result.state": "State",
   "cli.result.summary": "Summary",
   "cli.result.summaryLine":

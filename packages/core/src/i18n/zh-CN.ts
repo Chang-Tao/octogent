@@ -61,6 +61,7 @@ export const zhCN: TranslationMap = {
   "cli.result.attentionPermission": "等待权限确认",
   "cli.result.attentionUser": "等待用户回答",
   "cli.result.attentionSince": "自 {since} 起",
+  "cli.result.providerError": "服务商错误",
   "cli.result.state": "状态",
   "cli.result.summary": "摘要",
   "cli.result.summaryLine":

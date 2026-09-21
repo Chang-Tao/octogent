@@ -1,3 +1,10 @@
+import {
+  type Locale,
+  type TerminalProviderError,
+  isTerminalProviderErrorKind,
+  t,
+} from "@octogent/core";
+
 import type { TerminalScreen } from "./cliTerminalScreen";
 
 /**
@@ -51,6 +58,7 @@ export type TerminalResult = {
   attentionSince: string | null;
   attentionKind: "permission" | "user" | null;
   attentionToolName: string | null;
+  providerError: TerminalProviderError | null;
   agentProvider: string | null;
   model: string | null;
   completionSummary: {
@@ -68,6 +76,23 @@ export type TerminalResult = {
 
 const asString = (value: unknown): string | null => (typeof value === "string" ? value : null);
 const asNumber = (value: unknown): number => (typeof value === "number" ? value : 0);
+
+/** The snapshot's provider error, or null when absent or malformed. */
+export const readProviderError = (
+  snapshot: Record<string, unknown>,
+): TerminalProviderError | null => {
+  const value = snapshot.providerError as Record<string, unknown> | undefined;
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !isTerminalProviderErrorKind(value.kind) ||
+    typeof value.message !== "string" ||
+    !Number.isFinite(Date.parse(asString(value.at) ?? ""))
+  ) {
+    return null;
+  }
+  return { kind: value.kind, message: value.message, at: value.at as string };
+};
 
 export const buildTerminalResult = (
   snapshot: Record<string, unknown>,
@@ -92,6 +117,7 @@ export const buildTerminalResult = (
     attentionSince: asString(snapshot.attentionSince),
     attentionKind: attentionKind(snapshot),
     attentionToolName: asString(snapshot.attentionToolName),
+    providerError: readProviderError(snapshot),
     agentProvider: asString(snapshot.agentProvider),
     model: asString(snapshot.agentModel) ?? asString(snapshot.agentModelObserved),
     completionSummary: summary
@@ -176,17 +202,25 @@ const attentionKind = (snapshot: Record<string, unknown>): "permission" | "user"
     ? snapshot.attentionKind
     : null;
 
+/**
+ * How long a provider error must stand before `wait` gives up on the worker.
+ * Shorter than the dialog default: nothing on the worker's side will lift a
+ * usage limit, and a coordinator that keeps waiting just re-dispatches into
+ * the same wall. The grace covers a banner the CLI recovers from by itself.
+ */
+export const PROVIDER_ERROR_ATTENTION_MS = 30_000;
+
 export const needsAttention = (
   snapshot: Record<string, unknown>,
   nowMs: number,
   afterMs: number,
 ): boolean => {
-  if (
-    afterMs <= 0 ||
-    !attentionKind(snapshot) ||
-    isSettledLifecycle(snapshot.lifecycleState ?? snapshot.state)
-  )
-    return false;
+  if (afterMs <= 0 || isSettledLifecycle(snapshot.lifecycleState ?? snapshot.state)) return false;
+  const providerError = readProviderError(snapshot);
+  if (providerError && nowMs - Date.parse(providerError.at) >= PROVIDER_ERROR_ATTENTION_MS) {
+    return true;
+  }
+  if (!attentionKind(snapshot)) return false;
   const since = Date.parse(asString(snapshot.attentionSince) ?? "");
   return Number.isFinite(since) && nowMs - since >= afterMs;
 };
@@ -203,3 +237,29 @@ export const formatTerminalAttention = (
   const tool = asString(snapshot.attentionToolName);
   return `${kind}${tool ? `:${tool}` : ""} ${age}`;
 };
+
+/** One `octogent terminal list` line. */
+export const formatTerminalListLine = (
+  snapshot: Record<string, unknown>,
+  nowMs: number,
+): string => {
+  const terminalId = String(snapshot.terminalId ?? "");
+  const name = String(snapshot.tentacleName ?? snapshot.label ?? terminalId);
+  const lifecycle = String(snapshot.lifecycleState ?? snapshot.state ?? "unknown");
+  const pid =
+    typeof snapshot.processId === "number" && Number.isFinite(snapshot.processId)
+      ? ` pid=${snapshot.processId}`
+      : "";
+  const reason =
+    typeof snapshot.lifecycleReason === "string" ? ` reason=${snapshot.lifecycleReason}` : "";
+  const modelValue = asString(snapshot.agentModel) ?? asString(snapshot.agentModelObserved);
+  const provider =
+    typeof snapshot.agentProvider === "string" ? ` agent=${snapshot.agentProvider}` : "";
+  const model = modelValue ? ` model=${modelValue}` : "";
+  const attention = formatTerminalAttention(snapshot, nowMs);
+  const providerError = readProviderError(snapshot);
+  return `  ${terminalId}  ${lifecycle}${pid}${provider}${model}${reason}  ${name}${attention ? ` waiting=${attention}` : ""}${providerError ? ` error=${providerError.kind}` : ""}`;
+};
+
+export const formatProviderErrorLine = (error: TerminalProviderError, locale: Locale): string =>
+  `${t(locale, "cli.result.providerError")}: ${error.kind} — ${error.message} (${t(locale, "cli.result.attentionSince", { since: error.at })})`;
