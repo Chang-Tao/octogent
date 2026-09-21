@@ -1,6 +1,17 @@
 import type { TranslationMap } from "./types";
 
 export const en: TranslationMap = {
+  "cli.screen.unavailable": "No live or saved terminal screen available.",
+  "cli.screen.savedAt": "saved at {time}",
+  "cli.screen.heading": "Terminal screen",
+  "cli.input.sent": "Input sent to terminal {id}",
+  "cli.error.screenArgs": "Usage: terminal screen <id> [--lines 1–200] [--raw]",
+  "cli.error.inputArgs":
+    "Usage: terminal input <id> [<text>] [--enter] [--keys enter,esc,up,down,tab,ctrl-c,1–9] (max 4096 bytes)",
+  "cli.error.inputFailed": "Terminal input failed (HTTP {status}). A live session is required.",
+  "cli.help.resultScreen": "Append the last 20 screen lines",
+  "cli.help.screenInput":
+    "octogent terminal screen <id> [--lines N] [--raw]  Read screen (default 40 lines)\n  octogent terminal input <id> [<text>] [--enter] [--keys name,...]  Send direct PTY input",
   // ── CLI ──────────────────────────────────────────────
   "cli.init.initialized": "Initialized Octogent project {displayName} at {path}",
   "cli.init.ready": "Run `octogent` to start the dashboard.",

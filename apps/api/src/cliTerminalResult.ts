@@ -1,3 +1,5 @@
+import type { TerminalScreen } from "./cliTerminalScreen";
+
 /**
  * Pure helpers behind `octogent terminal wait` and `octogent terminal result`.
  *
@@ -61,6 +63,7 @@ export type TerminalResult = {
   } | null;
   lastAssistantMessage: string | null;
   finishedWell: boolean;
+  screen?: TerminalScreen | null;
 };
 
 const asString = (value: unknown): string | null => (typeof value === "string" ? value : null);
@@ -69,6 +72,7 @@ const asNumber = (value: unknown): number => (typeof value === "number" ? value 
 export const buildTerminalResult = (
   snapshot: Record<string, unknown>,
   turns: unknown,
+  screen?: TerminalScreen | null,
 ): TerminalResult => {
   const lifecycleState = asString(snapshot.lifecycleState) ?? asString(snapshot.state) ?? "unknown";
   const summary = snapshot.completionSummary as Record<string, unknown> | undefined;
@@ -81,6 +85,7 @@ export const buildTerminalResult = (
         }))
     : [];
   return {
+    ...(screen !== undefined ? { screen } : {}),
     terminalId: asString(snapshot.terminalId) ?? "",
     lifecycleState,
     lifecycleReason: asString(snapshot.lifecycleReason),

@@ -165,7 +165,7 @@ Removes the worktree directory and branch of every archived worktree terminal wh
 
 ```bash
 octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <seconds>] [--interval <seconds>] [--attention-after <seconds>] [--json]
-octogent terminal result <terminal-id> [--json]
+octogent terminal result <terminal-id> [--json] [--screen]
 ```
 
 `wait` polls until every listed terminal has settled — `awaiting-review`, `completed`, `stopped`, `exited`, or `stale` — printing each state change on the way, then prints each terminal's result block. The exit code is `0` when all of them ended in `awaiting-review` or `completed`, `1` when any ended another way, `2` on timeout, and `3` when a worker needs attention (`--timeout 0`, the default, waits forever; `--interval` defaults to 5 seconds and never goes below 1). `result` prints the same block immediately without waiting.
@@ -189,3 +189,17 @@ Use `--from <terminal-id>` when sending on behalf of a worker or parent terminal
 ```bash
 octogent channel list <terminal-id>
 ```
+
+## Inspect a screen and send direct input
+
+```bash
+octogent terminal screen <id> [--lines N] [--raw]
+octogent terminal input <id> [<text>] [--enter] [--keys <name,...>]
+octogent terminal result <id> --screen [--json]
+```
+
+`screen` prints the last 40 lines by default (`--lines` accepts 1–200), stripping ANSI/OSC, applying carriage-return overwrites, and collapsing consecutive duplicate lines. This is a text view of bounded scrollback, not a full terminal emulator. `--raw` returns the unprocessed live tail. On session teardown, the last 200 processed lines are saved best-effort to `<stateDir>/state/transcripts/<terminalId>.screen.txt`. Without a live session, the saved screen is returned with a “saved at <time>” label. Saved screens contain processed text even with `--raw`. No available screen gives exit code 1; a session that never started or an abruptly killed server may have no saved screen.
+
+`input` works while the agent is busy or waiting for permission. Text is typed directly without bracketed paste, followed by `--keys` in order, then `--enter` sends a carriage return after 150 ms. Allowed keys: `enter`, `esc`, `up`, `down`, `tab`, `ctrl-c`, and `1`–`9`; all others are rejected. Text may be omitted for key-only input; place text beginning with `--` after a `--` separator. Both the JSON request body and decoded input are limited to 4096 bytes (JSON overhead counts toward the body limit). A live PTY is required; this does not start a session. Every accepted request records an `input_submit` audit event. Closing the session before delayed Enter cancels that Enter.
+
+`result --screen` appends 20 lines; with `--json`, it adds `screen: { text, savedAt, raw }` (`null` when unavailable). Live screens have `savedAt: null`; saved screens carry an ISO timestamp.

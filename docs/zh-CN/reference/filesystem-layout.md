@@ -84,3 +84,5 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
 隔离的执行检出目录在 `.octogent/worktrees/` 下，其分支生命周期应视为创建它的那个终端的一部分。
 
 > 本文件是 [../../reference/filesystem-layout.md](../../reference/filesystem-layout.md) 的中文翻译版本。如有歧义，以英文原文为准。
+
+`transcripts/<terminalId>.screen.txt` 在会话结束时尽力保存最后 200 行处理后的 PTY 文本，供 `terminal screen` 回退读取。

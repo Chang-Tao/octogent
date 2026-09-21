@@ -14,6 +14,12 @@ import {
   needsAttention,
   parseTerminalWaitArgs,
 } from "./cliTerminalResult";
+import {
+  fetchTerminalScreen,
+  formatScreen,
+  runTerminalInput,
+  runTerminalScreen,
+} from "./cliTerminalScreen";
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
 import { resolveRootVersion } from "./healthSnapshot";
 import {
@@ -602,6 +608,10 @@ const printTerminalResult = (result: TerminalResult, json: boolean) => {
   } else {
     console.log(`    ${t(locale, "cli.result.noAnswer")}`);
   }
+  if (result.screen !== undefined) {
+    console.log(`  ${t(locale, "cli.screen.heading")}:`);
+    console.log(formatScreen(result.screen, locale));
+  }
 };
 
 const resolveTerminalResult = async (
@@ -629,7 +639,10 @@ const terminalResult = async () => {
       console.error(t(locale, "cli.error.terminalNotFound", { id: terminalId }));
       process.exit(1);
     }
-    printTerminalResult(await resolveTerminalResult(apiBase, snapshot), json);
+    const result = await resolveTerminalResult(apiBase, snapshot);
+    if (args.includes("--screen"))
+      result.screen = await fetchTerminalScreen(apiBase, terminalId, 20);
+    printTerminalResult(result, json);
   } catch {
     apiError();
   }
@@ -1079,6 +1092,19 @@ const main = async () => {
     if (args[1] === "wait") {
       return terminalWait();
     }
+    if (args[1] === "screen" || args[1] === "input") {
+      try {
+        await (args[1] === "screen" ? runTerminalScreen : runTerminalInput)(
+          args.slice(2),
+          resolveRuntimeApiBase(),
+          locale,
+        );
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+      }
+      return;
+    }
     if (args[1] === "result") {
       return terminalResult();
     }
@@ -1130,8 +1156,10 @@ const main = async () => {
     --attention-after <seconds>        Exit when a dialog needs attention (default 60; 0 disables)
     Exit codes: 0 = all finished well; 1 = other ending or error; 2 = timeout; 3 = needs attention
     --json                             One JSON object per terminal
+  ${t(locale, "cli.help.screenInput")}
   octogent terminal result <id>        Print a terminal's state, summary, and final answer
     --json                             JSON instead of text
+    --screen                           ${t(locale, "cli.help.resultScreen")}
   octogent worktree gc                 Reclaim worktrees and branches of merged, archived terminals
     --dry-run                          List reclaimable worktrees without removing them
   octogent channel send <id> <msg>     Send a channel message

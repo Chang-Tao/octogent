@@ -96,4 +96,16 @@ After restart, terminals that were persisted as running are marked `stale` when 
 
 Use `octogent terminal list` to look for `waiting=permission:Read 7m` or `waiting=user 3m`. `octogent terminal result <id>` shows the wait kind, known tool, and when waiting began. Attention does not immediately change the lifecycle: it remains `running` until the stall threshold (`OCTOGENT_TERMINAL_STALL_MS`, default 120000 ms), checked every 30 seconds. Dialog repainting does not refresh activity; a stalled dialog reports a reason such as `waiting for permission: Read (since ...)`.
 
-`octogent terminal wait <id>` exits `3` and prints the affected result block after 60 seconds of waiting for input, checked at each poll. Set `--attention-after <seconds>` to adjust this or `0` to disable it. Open the worker’s terminal, review the permission request or question, respond, and run `wait` again. The PTY remains alive; a needs-attention exit does not stop it. Wait metadata clears when the runtime leaves the waiting state. Avoid starting a duplicate worker for the same task.
+`octogent terminal wait <id>` exits `3` and prints the affected result block after 60 seconds of waiting for input, checked at each poll. Set `--attention-after <seconds>` to adjust this or `0` to disable it. Run `octogent terminal screen <id>`, review the permission request or question, respond with `terminal input`, and run `wait` again. The PTY remains alive; a needs-attention exit does not stop it. Wait metadata clears when the runtime leaves the waiting state. Avoid starting a duplicate worker for the same task.
+
+
+Inspect a stuck worker, then choose a response based on the actual dialog (`1` below is an example, not a recommendation to approve every permission):
+
+```bash
+octogent terminal screen <id> --lines 40
+octogent terminal input <id> "1" --enter
+octogent terminal input <id> --keys esc
+octogent terminal result <id> --screen
+```
+
+`channel send` waits for idle and cannot answer a dialog inside a busy turn; `terminal input` writes directly to a live PTY. Use `result --screen` or `screen` to investigate usage limits, startup failures, and exits; ended sessions show the save time. A session that never started may have no screen. Restart does not restore the PTY; only screens saved during normal teardown are available.

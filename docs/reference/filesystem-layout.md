@@ -82,3 +82,5 @@ If something is agent-facing context, keep it in the tentacle folder.
 If something is runtime-owned state, expect it under the global project state directory.
 
 If something is an isolated execution checkout, expect it under `.octogent/worktrees/` and treat its branch lifecycle as part of the terminal that created it.
+
+`transcripts/<terminalId>.screen.txt` stores the last 200 processed PTY lines best-effort on session teardown, for `terminal screen` fallback.

@@ -258,11 +258,12 @@ octogent terminal delete first-worker --with-worktree
 这一节写给“派活的人”——既可以是你自己，也可以是一个通过 shell 调用命令的 AI 协调者（Claude Code 或 Codex 会话）。协调者本身不必是 Octogent 终端；下面每一步都只用 CLI，不需要浏览器，也不需要自己去接 API 或 WebSocket。
 
 1. **派发**：先 `octogent tentacle create`，再为每个工人 `octogent terminal create`，**总是带 `--tentacle-id`**，并用 `--terminal-id` 给工人起一个你后面直接引用的 ID。任务书里写明成果交付在哪里：建议让工人把结论写到 `.octogent/tentacles/<触手ID>/RESULT.md`，并在最后一句回答里给出路径。
-2. **等待**：`octogent terminal wait <工人ID> [<工人ID>...] --timeout 600`。它阻塞到工人尘埃落定，打印每个工人的状态、摘要和最终回答；退出码 0 表示都到了待审阅或已完成，1 表示有工人以其他方式结束，2 表示超时（会话仍在，可继续等）。退出码 3 表示有工人等待权限确认或用户回答至少 60 秒（`--attention-after <秒>`；0 禁用）。阅读打印的结果，打开该工人的终端，检查并回答对话框，然后重新运行 `wait`；不要重复派发同一任务。
-3. **读回答**：`octogent terminal result <工人ID>` 随时打印同样的结果块；脚本用 `--json`。回答里提到的文件（如 `RESULT.md`）自己读。
-4. **追问**：`octogent channel send <工人ID> "..."`。带初始任务的工人回合结束后仍保持会话，消息在它空闲时投递（`send` 会回显已投递或已排队）；然后再次 `wait` 拿新回答。
-5. **审阅与合并**：工作树任务看分支——`git diff main..octogent/<工人ID>`，通过后 `git merge --no-ff octogent/<工人ID>`；共享工作区任务直接看它改动的文件。
-6. **收尾**：每个工人都由你主动结束——`octogent terminal delete <工人ID> --with-worktree`（已合并时）或 `octogent terminal stop <工人ID>`。工人不会自己退出，服务默认最多 32 个并发会话。
+2. **等待**：`octogent terminal wait <工人ID> [<工人ID>...] --timeout 600`。它阻塞到工人尘埃落定，打印每个工人的状态、摘要和最终回答；退出码 0 表示都到了待审阅或已完成，1 表示有工人以其他方式结束，2 表示超时（会话仍在，可继续等）。退出码 3 表示有工人等待权限确认或用户回答至少 60 秒（`--attention-after <秒>`；0 禁用）。阅读打印的结果，用 `terminal screen` 查看并用 `terminal input` 回答对话框，然后重新运行 `wait`；不要重复派发同一任务。
+3. **工人卡住**：先 `octogent terminal screen <工人ID>`，阅读对话框或额度错误，再按需 `octogent terminal input <工人ID> "1" --enter` 或 `--keys esc`。按实际提示选择回答，不要盲目批准权限；`channel send` 等待空闲，不能回答此类对话框。异常结束时用 `terminal result <工人ID> --screen` 查看保存的尾部。
+4. **读回答**：`octogent terminal result <工人ID>` 随时打印同样的结果块；脚本用 `--json`。回答里提到的文件（如 `RESULT.md`）自己读。
+5. **追问**：`octogent channel send <工人ID> "..."`。带初始任务的工人回合结束后仍保持会话，消息在它空闲时投递（`send` 会回显已投递或已排队）；然后再次 `wait` 拿新回答。
+6. **审阅与合并**：工作树任务看分支——`git diff main..octogent/<工人ID>`，通过后 `git merge --no-ff octogent/<工人ID>`；共享工作区任务直接看它改动的文件。
+7. **收尾**：每个工人都由你主动结束——`octogent terminal delete <工人ID> --with-worktree`（已合并时）或 `octogent terminal stop <工人ID>`。工人不会自己退出，服务默认最多 32 个并发会话。
 
 协调者常犯的错：
 

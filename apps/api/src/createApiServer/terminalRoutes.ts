@@ -8,6 +8,7 @@ import {
   type TerminalNameOrigin,
 } from "../terminalRuntime";
 import type { EffortTier } from "../terminalRuntime/modelSelection";
+import { MAX_TERMINAL_INPUT_BYTES } from "../terminalRuntime/terminalInput";
 import type { ApiRouteHandler } from "./routeHelpers";
 import {
   readJsonBodyOrWriteError,
@@ -453,5 +454,56 @@ export const handleTerminalArchiveCompletedRoute: ApiRouteHandler = async (
     { archivedTerminalIds: runtime.archiveCompletedTerminals() },
     corsOrigin,
   );
+  return true;
+};
+
+const TERMINAL_SCREEN_INPUT_PATTERN = /^\/api\/terminals\/([^/]+)\/(screen|input)$/;
+
+export const handleTerminalScreenInputRoute: ApiRouteHandler = async (
+  { request, response, requestUrl, corsOrigin },
+  { runtime },
+) => {
+  const match = requestUrl.pathname.match(TERMINAL_SCREEN_INPUT_PATTERN);
+  if (!match) return false;
+  const terminalId = decodeURIComponent(match[1] ?? "");
+  const screen = match[2] === "screen";
+  if (request.method !== (screen ? "GET" : "POST")) {
+    writeMethodNotAllowed(response, corsOrigin);
+    return true;
+  }
+  if (screen) {
+    const lines = Number(requestUrl.searchParams.get("lines") ?? 40);
+    if (!Number.isInteger(lines) || lines < 1 || lines > 200) {
+      writeJson(response, 400, { error: "lines must be an integer from 1 to 200." }, corsOrigin);
+      return true;
+    }
+    const result = runtime.getScreen(terminalId, lines, requestUrl.searchParams.get("raw") === "1");
+    writeJson(
+      response,
+      result ? 200 : 404,
+      result ?? { error: "Terminal screen not found." },
+      corsOrigin,
+    );
+    return true;
+  }
+  const body = await readJsonBodyOrWriteError(
+    request,
+    response,
+    corsOrigin,
+    MAX_TERMINAL_INPUT_BYTES,
+  );
+  if (!body.ok) return true;
+  try {
+    const accepted = runtime.submitInput(terminalId, body.payload);
+    writeJson(
+      response,
+      accepted ? 200 : 404,
+      accepted ? { ok: true } : { error: "Live terminal not found." },
+      corsOrigin,
+    );
+  } catch (error) {
+    if (!(error instanceof RuntimeInputError)) throw error;
+    writeJson(response, 400, { error: error.message }, corsOrigin);
+  }
   return true;
 };

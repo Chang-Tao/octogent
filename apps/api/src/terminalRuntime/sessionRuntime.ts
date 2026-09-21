@@ -1,4 +1,13 @@
-import { type WriteStream, createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+  type WriteStream,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
@@ -28,7 +37,9 @@ import {
 } from "./conversations";
 import { broadcastMessage, getTerminalId, sendMessage } from "./protocol";
 import { createShellEnvironment, ensureNodePtySpawnHelperExecutable } from "./ptyEnvironment";
+import { screenTail } from "./screenText";
 import { toErrorMessage } from "./systemClients";
+import { parseTerminalInput } from "./terminalInput";
 import type {
   DirectSessionListener,
   PersistedTerminal,
@@ -339,6 +350,16 @@ export const createSessionRuntime = ({
       return;
     }
 
+    try {
+      ensureTranscriptDirectory(transcriptDirectoryPath);
+      writeFileSync(
+        screenPath(sessionId),
+        screenTail(session.scrollbackChunks.join(""), 200),
+        "utf8",
+      );
+    } catch {
+      // A full disk or unwritable transcript directory must never prevent PTY cleanup.
+    }
     session.isClosed = true;
     clearIdleCloseTimer(session);
     clearPromptTimers(session);
@@ -968,6 +989,53 @@ export const createSessionRuntime = ({
     return true;
   };
 
+  const screenPath = (terminalId: string) =>
+    join(transcriptDirectoryPath, `${encodeURIComponent(terminalId)}.screen.txt`);
+
+  const getScreen = (terminalId: string, lines = 40, raw = false) => {
+    const session = sessions.get(terminalId);
+    if (session && !session.isClosed) {
+      return {
+        text: screenTail(session.scrollbackChunks.join(""), lines, raw),
+        savedAt: null,
+        raw,
+      };
+    }
+    try {
+      const path = screenPath(terminalId);
+      return {
+        text: screenTail(readFileSync(path, "utf8"), lines),
+        savedAt: statSync(path).mtime.toISOString(),
+        raw: false,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const submitInput = (terminalId: string, payload: unknown): boolean => {
+    const { data, enter } = parseTerminalInput(payload);
+    const session = sessions.get(terminalId);
+    if (!session || session.isClosed || !session.pty) return false;
+    reviveSessionTranscript(terminalId);
+    if (data) writeInput(terminalId, data);
+    appendTranscriptEvent(session, terminalId, {
+      type: "input_submit",
+      submitId: randomUUID(),
+      text: data + (enter ? "\r" : ""),
+      timestamp: new Date().toISOString(),
+    });
+    if (enter) {
+      schedulePromptTimer(
+        session,
+        terminalId,
+        () => writeInput(terminalId, "\r"),
+        AGENT_INJECT_SUBMIT_DELAY_MS,
+      );
+    }
+    return true;
+  };
+
   const resizeSession = (terminalId: string, cols: number, rows: number): boolean => {
     const session = sessions.get(terminalId);
     if (!session || session.isClosed) {
@@ -1034,6 +1102,8 @@ export const createSessionRuntime = ({
   };
 
   return {
+    getScreen,
+    submitInput,
     closeSession,
     stopSession,
     killSession,
