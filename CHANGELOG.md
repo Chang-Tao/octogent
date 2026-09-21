@@ -105,6 +105,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Provider-side failures are visible. Banners the agent CLIs print when their
+  provider refuses work (usage limit, rate limit, API error, auth) are
+  recognized in the PTY text — neither CLI reports them through hooks — and
+  recorded as `providerError` on the terminal with a `provider error: …`
+  lifecycle reason; `terminal list` appends `error=<kind>`, `terminal result`
+  prints it, `terminal wait` exits 3 once it is 30 s old, and
+  `terminal create` warns when the cached usage reading shows the provider
+  exhausted. A coordinator had dispatched three rounds into an exhausted
+  Codex quota before switching model.
+- Codex's "Approaching rate limits — switch to a cheaper model?" prompt is
+  handled. It appears after a turn once the account nears its limit, no hook
+  reports it, and its default answer is "switch": a follow-up pasted into it
+  was swallowed and the worker silently moved from gpt-6-astra to
+  gpt-5.6-luna (seen on screen with `terminal screen`). Octogent now answers
+  "Keep current model" by default; `OCTOGENT_CODEX_RATE_LIMIT_PROMPT=keep|
+  switch|ask` chooses, and `ask` parks the worker as waiting for the user.
 - Channel deliveries are confirmed by the agent. "Delivered" used to mean
   "bytes written to the PTY": a Codex "switch to a cheaper model?" dialog that
   no hook reports swallowed a follow-up (and switched the model) while

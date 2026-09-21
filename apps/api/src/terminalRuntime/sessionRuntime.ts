@@ -19,6 +19,12 @@ import { type AgentRuntimeState, AgentStateTracker } from "../agentStateDetectio
 import { logVerbose } from "../logging";
 import { resolveBootstrapCommand } from "./bootstrapCommand";
 import {
+  CODEX_RATE_LIMIT_PROMPT_ANSWERS,
+  type CodexRateLimitPrompt,
+  createCodexRateLimitPromptScanner,
+  resolveCodexRateLimitPromptPolicy,
+} from "./codexRateLimitPrompt";
+import {
   AGENT_INJECT_ACK_TIMEOUT_MS,
   AGENT_INJECT_SUBMIT_DELAY_MS,
   AGENT_PASTE_END,
@@ -613,6 +619,45 @@ export const createSessionRuntime = ({
     return true;
   };
 
+  // Codex's "switch to a cheaper model?" prompt reports through no hook and
+  // swallows whatever is pasted next. By default the worker keeps the model
+  // its operator chose; "ask" parks it as waiting-for-user so `terminal wait`
+  // exits 3 and a person decides.
+  const CODEX_RATE_LIMIT_PROMPT_RESCAN_MS = 3_000;
+  const handleCodexRateLimitPrompt = (
+    sessionId: string,
+    session: TerminalSession,
+    prompt: CodexRateLimitPrompt,
+  ) => {
+    const policy = resolveCodexRateLimitPromptPolicy(process.env.OCTOGENT_CODEX_RATE_LIMIT_PROMPT);
+    logVerbose(
+      `[Session] codex rate-limit prompt session=${sessionId} suggested=${prompt.suggestedModel} policy=${policy}`,
+    );
+    if (policy === "ask") {
+      session.lastToolName = "codex rate-limit prompt";
+      session.agentState = "waiting_for_user";
+      session.stateTracker.forceState("waiting_for_user");
+      onStateChange?.(sessionId, "waiting_for_user", session.lastToolName);
+      broadcastMessage(session, { type: "state", state: "waiting_for_user" });
+      return;
+    }
+    session.pty?.write(CODEX_RATE_LIMIT_PROMPT_ANSWERS[policy]);
+    appendTranscriptEvent(session, sessionId, {
+      type: "input_submit",
+      submitId: randomUUID(),
+      text: `[auto] codex rate-limit prompt: ${policy} (suggested ${prompt.suggestedModel})`,
+      timestamp: new Date().toISOString(),
+    });
+    // The answered prompt is still in the tail until Codex repaints; look
+    // again only once it has had time to go away.
+    schedulePromptTimer(
+      session,
+      sessionId,
+      () => session.codexRateLimitPromptScanner?.reset(),
+      CODEX_RATE_LIMIT_PROMPT_RESCAN_MS,
+    );
+  };
+
   // Identical repaints are dropped by recordProviderError, so only a new
   // banner reaches the registry and the UI.
   const noteProviderError = (session: TerminalSession, match: ProviderErrorMatch) => {
@@ -770,6 +815,9 @@ export const createSessionRuntime = ({
       hasTranscriptEnded: false,
       keepAliveWithoutClients: Boolean(terminalRecord?.initialPrompt),
       providerErrorScanner: createProviderErrorScanner(),
+      ...(terminalRecord?.agentProvider === "codex"
+        ? { codexRateLimitPromptScanner: createCodexRateLimitPromptScanner() }
+        : {}),
     };
     if (debugLog) {
       session.debugLog = debugLog;
@@ -808,6 +856,10 @@ export const createSessionRuntime = ({
       const providerError = session.providerErrorScanner?.push(chunk);
       if (providerError) {
         noteProviderError(session, providerError);
+      }
+      const rateLimitPrompt = session.codexRateLimitPromptScanner?.push(chunk);
+      if (rateLimitPrompt) {
+        handleCodexRateLimitPrompt(sessionId, session, rateLimitPrompt);
       }
       if (
         onOutputActivity &&

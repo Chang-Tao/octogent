@@ -20,6 +20,7 @@ import type { IPty } from "node-pty";
 import type { WebSocket } from "ws";
 
 import type { AgentRuntimeState, AgentStateTracker } from "../agentStateDetection";
+import type { CodexRateLimitPromptScanner } from "./codexRateLimitPrompt";
 import type { ProviderErrorScanner } from "./providerErrors";
 
 export type TerminalStateMessage = {
@@ -103,6 +104,7 @@ export type TerminalSession = {
   lastOutputActivityAt?: number;
   lastToolName?: string | undefined;
   providerErrorScanner?: ProviderErrorScanner;
+  codexRateLimitPromptScanner?: CodexRateLimitPromptScanner;
 };
 
 export type TerminalNameOrigin = "generated" | "user" | "prompt";

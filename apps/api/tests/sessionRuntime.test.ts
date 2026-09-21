@@ -388,6 +388,78 @@ describe("createSessionRuntime", () => {
     runtime.close();
   });
 
+  describe("codex rate-limit prompt", () => {
+    // Trimmed live capture (2026-09-21): rows are painted by cursor address.
+    const PROMPT =
+      "\u001b[23;1H  \u001b[1mApproaching rate limits\u001b[24;1H\u001b[22m  Switch to gpt-5.6-luna for lower credit usage?\u001b[26;1H› 1. Switch to gpt-5.6-luna\u001b[27;1H  2. Keep current model\u001b[28;1H  3. Keep current model (never show again)";
+
+    const startCodexSession = (onStateChange = vi.fn()) => {
+      const terminalId = "codex-worker";
+      const terminals = new Map<string, PersistedTerminal>([
+        [
+          terminalId,
+          {
+            terminalId,
+            tentacleId: terminalId,
+            tentacleName: terminalId,
+            createdAt: new Date().toISOString(),
+            workspaceMode: "shared",
+            agentProvider: "codex",
+          },
+        ],
+      ]);
+      const sessions = new Map<string, TerminalSession>();
+      const websocketServer = new FakeWebSocketServer();
+      const pty = new FakePty();
+      spawnMock.mockReturnValue(pty);
+      const runtime = createSessionRuntime({
+        websocketServer: websocketServer as unknown as import("ws").WebSocketServer,
+        terminals,
+        sessions,
+        getTentacleWorkspaceCwd: () => process.cwd(),
+        isDebugPtyLogsEnabled: false,
+        ptyLogDir: process.cwd(),
+        transcriptDirectoryPath: createTemporaryDirectory(),
+        sessionIdleGraceMs: 60_000,
+        onStateChange,
+      });
+      websocketServer.nextSocket = new FakeWebSocket();
+      runtime.handleUpgrade(createUpgradeRequest(terminalId), {} as Duplex, Buffer.alloc(0));
+      pty.write.mockClear();
+      return { runtime, pty, sessions, terminalId, onStateChange };
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("keeps the operator's model by default: Down then Enter, once per paint", () => {
+      const { runtime, pty } = startCodexSession();
+
+      pty.emitData(PROMPT);
+      pty.emitData(PROMPT); // the TUI repaints; the answer must not be sent twice
+
+      expect(pty.write.mock.calls.map((call) => call[0])).toEqual(["\u001b[B\r"]);
+      runtime.close();
+    });
+
+    it("parks the worker as waiting-for-user when the policy is ask", () => {
+      vi.stubEnv("OCTOGENT_CODEX_RATE_LIMIT_PROMPT", "ask");
+      const { runtime, pty, sessions, terminalId, onStateChange } = startCodexSession();
+
+      pty.emitData(PROMPT);
+
+      expect(pty.write).not.toHaveBeenCalled();
+      expect(sessions.get(terminalId)?.agentState).toBe("waiting_for_user");
+      expect(onStateChange).toHaveBeenCalledWith(
+        terminalId,
+        "waiting_for_user",
+        "codex rate-limit prompt",
+      );
+      runtime.close();
+    });
+  });
+
   it("reports PTY output as activity, throttled to one tick per burst", () => {
     const tentacleId = "tentacle-1";
     const terminals = new Map<string, PersistedTerminal>([
