@@ -38,7 +38,7 @@ const readPackageVersion = (packageJsonPath: string): string | null => {
 // The API can run from src (dev) or a packaged layout, so the root version is
 // located by walking up: the workspace root wins inside the monorepo, and the
 // nearest versioned package.json covers a packaged install.
-const resolveRootVersion = (startDir: string): string => {
+export const resolveRootVersion = (startDir: string): string => {
   let nearestVersion: string | null = null;
   let current = startDir;
 
