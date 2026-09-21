@@ -278,15 +278,24 @@ export const FlowPrimaryView = ({
                 className={`flow-agent-dot ${agentDotClass(node)}`}
                 style={isShelved ? { background: node.color, color: node.color } : undefined}
               />
-            ) : (
+            ) : node.kind === "octoboss" ? (
               <OctopusGlyph
                 color={node.color}
-                animation={node.kind === "octoboss" ? "walk" : "idle"}
+                animation="walk"
                 expression="happy"
                 accessory="none"
-                scale={node.kind === "octoboss" ? 5 : 4}
+                scale={5}
               />
-            )}
+            ) : node.visuals ? (
+              <OctopusGlyph
+                color={node.visuals.color}
+                animation={node.visuals.animation}
+                expression={node.visuals.expression}
+                accessory={node.visuals.accessory}
+                {...(node.visuals.hairColor ? { hairColor: node.visuals.hairColor } : {})}
+                scale={4}
+              />
+            ) : null}
             <span className="flow-node-label">{node.label}</span>
           </button>
         );
