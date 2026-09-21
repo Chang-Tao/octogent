@@ -205,7 +205,7 @@ octogent channel send first-worker "请说明你核对了哪些命令；有疑�
 octogent channel list first-worker
 ```
 
-- `send` 回显 delivered（已写入终端）或 queued（忙时排队，空闲投递）；`list` 显示 `status=pending`、`delivered (unconfirmed)`、`confirmed`（代理已提交）或 `failed: not acknowledged`（粘贴两次都没回执——去看 `terminal screen`）。
+- `send` 回显 delivered（已写入终端）或 queued（忙时排队，空闲投递）；`list` 显示 `status=pending`、`delivered (awaiting receipt)`、`confirmed`（代理已提交）或 `failed: not acknowledged`（粘贴两次都没回执——去看 `terminal screen`）。
 - 代发加 `--from <发送方终端ID>`，省略则取环境中的 `OCTOGENT_SESSION_ID`（若存在）。
 - 带初始任务的工人默认跨回合保活；工作树 `completed` 且已合并时释放，`awaiting-review` 保持会话。
 - `terminal stop` 立即关闭；归档释放保活，之后按 `OCTOGENT_TERMINAL_IDLE_GRACE_MS`（默认五分钟）关闭。`OCTOGENT_TERMINAL_RETENTION_HOURS`（默认 72 小时）归档符合条件的 `completed`、`stopped`、`exited`，待审阅不自动归档。

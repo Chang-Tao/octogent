@@ -193,10 +193,10 @@ octogent channel list <terminal-id>
 每条发往该终端、经当前运行的 API 进程发送的消息占一行：
 
 ```text
-  [msg-3] from=terminal-1 status=delivered (unconfirmed): Need review on the parser change
+  [msg-3] from=terminal-1 status=delivered (awaiting receipt): Need review on the parser change
 ```
 
-`status` 取值为 `pending`（排队中）、`delivered (unconfirmed)`（已写入、尚无回执）、`confirmed`（代理的下一次提示词提交已到达）或 `failed: <原因>`（两次投递都未确认时为 `failed: not acknowledged`）。
+`status` 取值为 `pending`（排队中）、`delivered (awaiting receipt)`（已写入、尚无回执）、`confirmed`（代理的下一次提示词提交已到达）或 `failed: <原因>`（两次投递都未确认时为 `failed: not acknowledged`）。
 
 > 本文件是 [../../reference/cli.md](../../reference/cli.md) 的中文翻译版本。如有歧义，以英文原文为准。
 

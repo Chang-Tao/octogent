@@ -87,7 +87,7 @@ Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**
 “已投递”只表示文字写进了目标终端，不代表代理收到了；代理 TUI 里的对话框（比如用量上限或切换模型提示）可能吞掉粘贴内容和回车。运行 `octogent channel list <terminal-id>` 看状态：
 
 - `confirmed`：投递后代理提交过提示词，消息已到手；去它的终端看它正在怎么处理。
-- `delivered (unconfirmed)`：还没有回执。Octogent 每次投递等 10 秒，刚投递的消息可能还会重试；从未发来任何钩子的代理会一直保持未确认，因为那里没有东西能确认。
+- `delivered (awaiting receipt)`：还没有回执。Octogent 每次投递等 10 秒，刚投递的消息可能还会重试；从未发来任何钩子的代理会一直保持未确认，因为那里没有东西能确认。
 - `failed: not acknowledged`：Octogent 粘贴了两次，两次都没有回执。处于 `running` 的目标在 `octogent terminal list` 中还会显示 `reason=channel message not acknowledged`，`octogent logs` 里有对应的 `[Channel] ... not acknowledged` 日志。
 
 然后看代理界面上显示的是什么，直接作答：

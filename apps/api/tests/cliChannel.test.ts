@@ -4,8 +4,8 @@ import { channelMessageStatus, formatChannelMessageLine } from "../src/cliChanne
 describe("channel list status", () => {
   it.each([
     [{ delivered: false }, "pending"],
-    [{ delivered: true }, "delivered (unconfirmed)"],
-    [{ delivered: true, deliveryAttempts: 2 }, "delivered (unconfirmed)"],
+    [{ delivered: true }, "delivered (awaiting receipt)"],
+    [{ delivered: true, deliveryAttempts: 2 }, "delivered (awaiting receipt)"],
     [{ delivered: true, acknowledgedAt: "2026-09-21T08:00:02.000Z" }, "confirmed"],
     [
       { delivered: true, deliveryAttempts: 2, failed: "not acknowledged" },

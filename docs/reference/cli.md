@@ -198,10 +198,10 @@ octogent channel list <terminal-id>
 Prints one line per message sent to that terminal through the running API process:
 
 ```text
-  [msg-3] from=terminal-1 status=delivered (unconfirmed): Need review on the parser change
+  [msg-3] from=terminal-1 status=delivered (awaiting receipt): Need review on the parser change
 ```
 
-`status` is one of `pending` (queued), `delivered (unconfirmed)` (written, no receipt yet), `confirmed` (the agent's next prompt submit arrived), or `failed: <reason>` (`failed: not acknowledged` after two unconfirmed attempts).
+`status` is one of `pending` (queued), `delivered (awaiting receipt)` (written, no receipt yet), `confirmed` (the agent's next prompt submit arrived), or `failed: <reason>` (`failed: not acknowledged` after two unconfirmed attempts).
 
 ## Inspect a screen and send direct input
 

@@ -7,7 +7,9 @@ export const channelMessageStatus = (message: Record<string, unknown>): string =
   if (typeof message.acknowledgedAt === "string") {
     return "confirmed";
   }
-  return message.delivered === true ? "delivered (unconfirmed)" : "pending";
+  // No status may contain another: scripts grep for "confirmed", and
+  // "unconfirmed" matched it (it fooled a wait loop the day this shipped).
+  return message.delivered === true ? "delivered (awaiting receipt)" : "pending";
 };
 
 export const formatChannelMessageLine = (message: Record<string, unknown>): string =>

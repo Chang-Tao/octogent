@@ -44,7 +44,7 @@ Writing into the terminal does not prove the agent got the message: a dialog in 
 
 Two rules keep the receipt honest:
 
-- A session that has never sent a hook is not retried. Without hooks nothing is ever confirmed, and a retry would hand the agent the same message twice. Its messages stay "delivered (unconfirmed)".
+- A session that has never sent a hook is not retried. Without hooks nothing is ever confirmed, and a retry would hand the agent the same message twice. Its messages stay "delivered (awaiting receipt)".
 - One submit confirms one injection. While a terminal's initial prompt is still unconfirmed, the next submit belongs to it, not to a channel batch. While a batch waits for its receipt, later messages to that terminal stay pending, because a submit cannot say which of two batches it confirms.
 
 `octogent channel list <terminal-id>` shows each message's state:
@@ -52,7 +52,7 @@ Two rules keep the receipt honest:
 | Status | Meaning |
 | --- | --- |
 | `pending` | queued; not written into the terminal yet |
-| `delivered (unconfirmed)` | written into the terminal; the agent has not confirmed it (or cannot, without hooks) |
+| `delivered (awaiting receipt)` | written into the terminal; the agent has not confirmed it (or cannot, without hooks) |
 | `confirmed` | the agent's next prompt submit arrived after delivery |
 | `failed: not acknowledged` | written twice, confirmed neither time |
 

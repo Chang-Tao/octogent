@@ -52,7 +52,7 @@ Octogent 提供一套简单的本地通道系统，用于终端之间传递消�
 | 状态 | 含义 |
 | --- | --- |
 | `pending` | 已排队，尚未写入终端 |
-| `delivered (unconfirmed)` | 已写入终端，代理尚未确认（没有钩子时也无从确认） |
+| `delivered (awaiting receipt)` | 已写入终端，代理尚未确认（没有钩子时也无从确认） |
 | `confirmed` | 投递后代理的下一次提示词提交已到达 |
 | `failed: not acknowledged` | 写入了两次，两次都没有确认 |
 

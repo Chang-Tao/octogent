@@ -75,7 +75,7 @@ That is the normal answer while the target agent is busy. A channel message is i
 "Delivered" means the text was written into the target's terminal, not that the agent received it; a dialog in its TUI (a usage-limit or model-switch prompt, say) can take the paste and the Enter. Run `octogent channel list <terminal-id>` and read the status:
 
 - `confirmed`: the agent submitted a prompt after delivery, so it has the message; look at its terminal for what it is doing with it.
-- `delivered (unconfirmed)`: no receipt yet. Octogent waits 10 seconds per attempt, so a fresh delivery may still be retried; for an agent that has never sent a hook it stays unconfirmed, since nothing can confirm it there.
+- `delivered (awaiting receipt)`: no receipt yet. Octogent waits 10 seconds per attempt, so a fresh delivery may still be retried; for an agent that has never sent a hook it stays unconfirmed, since nothing can confirm it there.
 - `failed: not acknowledged`: Octogent pasted it twice and got no receipt either time. A `running` target also shows `reason=channel message not acknowledged` in `octogent terminal list`, and `octogent logs` has the `[Channel] ... not acknowledged` line.
 
 Then look at what the agent is showing and answer it directly:
