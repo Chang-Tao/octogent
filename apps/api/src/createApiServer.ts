@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 
 import { scanClaudeUsageChart } from "./claudeSessionScanner";
 import {
+  type ClaudeUsageSnapshot,
   invalidateUsageCache as invalidateUsageCacheDefault,
   readClaudeCliUsageSnapshot as readClaudeCliUsageSnapshotDefault,
   readClaudeOauthUsageSnapshot as readClaudeOauthUsageSnapshotDefault,
@@ -23,6 +24,7 @@ import { readGithubRepoSummary as readGithubRepoSummaryDefault } from "./githubR
 import { createHealthSnapshotSource } from "./healthSnapshot";
 import { createMonitorService } from "./monitor";
 import { createTerminalRuntime } from "./terminalRuntime";
+import { type CachedUsageSnapshots, rememberUsageSnapshot } from "./usageExhaustion";
 
 export const createApiServer = ({
   workspaceCwd,
@@ -119,6 +121,14 @@ export const createApiServer = ({
     scanUsageHeatmap ??
     ((scope: "all" | "project") => scanClaudeUsageChart(scope, resolvedWorkspaceCwd));
 
+  // Whatever the usage routes last fetched successfully; terminal create
+  // checks it for an exhausted quota without fetching anything itself.
+  const cachedUsage: CachedUsageSnapshots = { codex: null, claude: null };
+  const rememberClaudeUsage = (read: () => Promise<ClaudeUsageSnapshot>) =>
+    rememberUsageSnapshot(read, (snapshot) => {
+      cachedUsage.claude = snapshot;
+    });
+
   const codeIntelStore = createCodeIntelStore(resolvedStateDir);
   const healthSnapshotSource = createHealthSnapshotSource();
   let remoteBinding = false;
@@ -132,10 +142,13 @@ export const createApiServer = ({
     webDistDir,
     getApiBaseUrl,
     getApiPort,
-    readClaudeUsageSnapshot: readClaudeUsageSnapshotWithDefault,
-    readClaudeOauthUsageSnapshot: readClaudeOauthUsageSnapshotWithDefault,
-    readClaudeCliUsageSnapshot: readClaudeCliUsageSnapshotWithDefault,
-    readCodexUsageSnapshot,
+    readClaudeUsageSnapshot: rememberClaudeUsage(readClaudeUsageSnapshotWithDefault),
+    readClaudeOauthUsageSnapshot: rememberClaudeUsage(readClaudeOauthUsageSnapshotWithDefault),
+    readClaudeCliUsageSnapshot: rememberClaudeUsage(readClaudeCliUsageSnapshotWithDefault),
+    readCodexUsageSnapshot: rememberUsageSnapshot(readCodexUsageSnapshot, (snapshot) => {
+      cachedUsage.codex = snapshot;
+    }),
+    readCachedUsage: () => cachedUsage,
     readGithubRepoSummary: readGithubRepoSummaryWithDefault,
     scanUsageHeatmap: scanUsageHeatmapWithDefault,
     monitorService: monitorServiceWithDefault,

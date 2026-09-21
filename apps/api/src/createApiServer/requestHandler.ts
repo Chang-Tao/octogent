@@ -11,6 +11,7 @@ import type { GitHubRepoSummarySnapshot } from "../githubRepoSummary";
 import type { HealthSnapshot } from "../healthSnapshot";
 import { logVerbose } from "../logging";
 import type { MonitorService } from "../monitor";
+import type { CachedUsageSnapshots } from "../usageExhaustion";
 import { handleCodeIntelEventsRoute } from "./codeIntelRoutes";
 import {
   handleConversationExportRoute,
@@ -105,6 +106,7 @@ type CreateApiRequestHandlerOptions = {
   readClaudeOauthUsageSnapshot: () => Promise<ClaudeUsageSnapshot>;
   readClaudeCliUsageSnapshot: () => Promise<ClaudeUsageSnapshot>;
   readCodexUsageSnapshot: () => Promise<CodexUsageSnapshot>;
+  readCachedUsage: () => CachedUsageSnapshots;
   readGithubRepoSummary: () => Promise<GitHubRepoSummarySnapshot>;
   scanUsageHeatmap: (scope: "all" | "project") => Promise<UsageChartResponse>;
   monitorService: MonitorService;
@@ -223,6 +225,7 @@ export const createApiRequestHandler = ({
   readClaudeOauthUsageSnapshot,
   readClaudeCliUsageSnapshot,
   readCodexUsageSnapshot,
+  readCachedUsage,
   readGithubRepoSummary,
   scanUsageHeatmap,
   monitorService,
@@ -246,6 +249,7 @@ export const createApiRequestHandler = ({
     readClaudeOauthUsageSnapshot,
     readClaudeCliUsageSnapshot,
     readCodexUsageSnapshot,
+    readCachedUsage,
     readGithubRepoSummary,
     scanUsageHeatmap,
     monitorService,

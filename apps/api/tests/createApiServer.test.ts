@@ -932,6 +932,38 @@ describe("createApiServer", () => {
     await expect(response.json()).resolves.toEqual(codexSnapshot);
   });
 
+  it("warns on terminal create from the cached usage snapshot without reading it anew", async () => {
+    const readCodexUsageSnapshot = vi.fn(async () => ({
+      status: "ok" as const,
+      source: "oauth-api" as const,
+      fetchedAt: new Date().toISOString(),
+      primaryUsedPercent: 100,
+      primaryResetAt: new Date(Date.now() + 3_600_000).toISOString(),
+      secondaryUsedPercent: 30,
+    }));
+    const baseUrl = await startServer({ readCodexUsageSnapshot });
+    const create = async (agentProvider: string) => {
+      const response = await fetch(`${baseUrl}/api/terminals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceMode: "shared", agentProvider }),
+      });
+      expect(response.status).toBe(201);
+      return (await response.json()) as Record<string, unknown>;
+    };
+
+    // Nothing cached yet: no warning, and no usage read on the create path.
+    expect((await create("codex")).usageWarning).toBeUndefined();
+    expect(readCodexUsageSnapshot).not.toHaveBeenCalled();
+
+    await fetch(`${baseUrl}/api/codex/usage`);
+    expect(await create("codex")).toMatchObject({
+      usageWarning: { provider: "codex", bucket: "5-hour", usedPercent: 100 },
+    });
+    expect((await create("claude-code")).usageWarning).toBeUndefined();
+    expect(readCodexUsageSnapshot).toHaveBeenCalledTimes(1);
+  });
+
   it("returns claude usage snapshot for GET /api/claude/usage", async () => {
     const claudeSnapshot = {
       status: "ok",

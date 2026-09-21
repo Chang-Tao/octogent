@@ -29,6 +29,8 @@ export type CodexUsageSnapshot = {
   secondaryResetAt?: string | null;
   creditsBalance?: number | null;
   creditsUnlimited?: boolean | null;
+  /** The account-level flag Codex sets once a rate-limit window is spent. */
+  limitReached?: boolean | null;
 };
 
 export type GitHubCommitPoint = {

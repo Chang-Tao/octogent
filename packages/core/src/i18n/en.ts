@@ -26,6 +26,9 @@ export const en: TranslationMap = {
   "cli.created.terminal": "Created terminal {id} on tentacle {tentacleId}",
   "cli.created.terminalOctobossHint":
     "No --tentacle-id given, so this terminal reports directly to the octoboss. Pass --tentacle-id <id> to place it under a tentacle.",
+  "cli.created.usageExhausted":
+    "Warning: {provider}'s cached usage shows its {bucket} limit reached{reset} — this worker will likely stop at its first request.",
+  "cli.created.usageExhaustedReset": " (resets {time})",
   "cli.killed.terminal": "Killed terminal {id}",
   "cli.stopped.terminal": "Stopped terminal {id}",
   "cli.archived.terminal": "Archived terminal {id}",

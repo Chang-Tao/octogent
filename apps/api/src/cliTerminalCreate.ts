@@ -1,4 +1,4 @@
-import { TERMINAL_AGENT_PROVIDERS, isTerminalAgentProvider } from "@octogent/core";
+import { type Locale, TERMINAL_AGENT_PROVIDERS, isTerminalAgentProvider, t } from "@octogent/core";
 
 import type { EffortTier } from "./terminalRuntime/modelSelection";
 import { isEffortTier, isValidModelToken } from "./terminalRuntime/modelSelection";
@@ -106,4 +106,33 @@ export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResu
   if (agentEffort) body.agentEffort = agentEffort;
 
   return { ok: true, body };
+};
+
+/**
+ * The create response's quota warning as one line, or null without one. The
+ * server only sets it from usage it had already fetched, so its absence means
+ * "not known to be exhausted", not "fine".
+ */
+export const formatUsageWarning = (
+  response: Record<string, unknown>,
+  locale: Locale,
+): string | null => {
+  const warning = response.usageWarning as Record<string, unknown> | undefined;
+  if (
+    !warning ||
+    typeof warning !== "object" ||
+    typeof warning.provider !== "string" ||
+    typeof warning.bucket !== "string"
+  ) {
+    return null;
+  }
+  const reset =
+    typeof warning.resetAt === "string"
+      ? t(locale, "cli.created.usageExhaustedReset", { time: warning.resetAt })
+      : "";
+  return t(locale, "cli.created.usageExhausted", {
+    provider: warning.provider,
+    bucket: warning.bucket,
+    reset,
+  });
 };

@@ -5,7 +5,7 @@ import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
-import { parseTerminalCreateArgs } from "./cliTerminalCreate";
+import { formatUsageWarning, parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
   buildTerminalResult,
@@ -484,6 +484,10 @@ const terminalCreate = async () => {
       // Orchestrators keep creating a tentacle and then forgetting to attach
       // terminals to it; say where the terminal actually landed.
       console.log(t(locale, "cli.created.terminalOctobossHint"));
+    }
+    const usageWarning = formatUsageWarning(data, locale);
+    if (usageWarning) {
+      console.warn(usageWarning);
     }
   } catch {
     apiError();
