@@ -1,5 +1,11 @@
 # Troubleshooting
 
+## Diagnose a server problem
+
+Run `octogent logs` from the project directory to read the persistent server log, or `octogent logs --follow` to stream it. The default file is `~/.octogent/projects/<project-id>/logs/server.log`; Octogent prints the active path at startup. The file keeps verbose hook summaries even when the terminal stays quiet, rotates at 5 MB, and retains three older generations as `server.log.1` through `server.log.3`.
+
+Set `OCTOGENT_SERVER_LOG=<path>` before startup to use another location, or `OCTOGENT_SERVER_LOG=off` to disable it. Access tokens in LAN URLs are masked in the file, and hook request bodies are not recorded.
+
 ## `pnpm test` fails because of browser APIs
 
 Make sure the workspace dependencies are installed from the repo root:
@@ -26,7 +32,7 @@ If startup fails with `Terminal session limit reached`, Octogent already has the
 
 Octogent sends `--initial-prompt` when Claude or Codex reports `SessionStart`, with a fallback 15 seconds after the bootstrap command if readiness has not arrived. `UserPromptSubmit` acknowledges delivery. If `SessionStart` was seen but no acknowledgement arrives within 10 seconds of sending, Octogent retries the paste and Enter exactly once. Agents without a `SessionStart` hook are never retried, since missing hooks cannot distinguish a lost prompt from a delivered one.
 
-If the retry is also unacknowledged after 10 seconds, terminal snapshots and `octogent terminal list` show `reason=initial prompt not acknowledged`. The lifecycle stays `running` until the usual stall detector acts; a late acknowledgement clears this reason. Start the API with `OCTOGENT_VERBOSE_LOGS=1` to see hook arrivals and `initial-prompt retry` / `initial-prompt not acknowledged after retry` logs. Inspect the worker's terminal for startup, update, trust, or sign-in prompts and resolve them before sending the task again. Check the terminal and logs first to avoid duplicating work that already started.
+If the retry is also unacknowledged after 10 seconds, terminal snapshots and `octogent terminal list` show `reason=initial prompt not acknowledged`. The lifecycle stays `running` until the usual stall detector acts; a late acknowledgement clears this reason. Use `octogent logs` to find hook arrivals and `initial-prompt retry` / `initial-prompt not acknowledged after retry` lines; set `OCTOGENT_VERBOSE_LOGS=1` before startup only when you also want them in the terminal. Inspect the worker's terminal for startup, update, trust, or sign-in prompts and resolve them before sending the task again. Check the terminal and logs first to avoid duplicating work that already started.
 
 ## A Claude worker froze right after starting (reads outside the working directories)
 
@@ -58,7 +64,7 @@ Verify your X bearer token and API access.
 
 The Octogent transcript (`state/transcripts/<terminal>.jsonl`) records state *changes* (idle → processing and back), plus one `tool_use` event per tool call reported by the agent's PreToolUse hook. A long single turn therefore shows a stream of `tool_use` events rather than repeated `processing` lines. Activity for the stall detector counts prompt submissions, tool calls, and PTY output (throttled to one tick every few seconds), so an agent that is visibly working is never `stalled`; the verdict is reserved for a live PTY that has produced nothing for `OCTOGENT_TERMINAL_STALL_MS`.
 
-If a terminal still reads as stalled while its agent is working, check that the agent's hooks reach the API: run the API with `OCTOGENT_VERBOSE_LOGS=1` and look for `[Hook] Received hook` lines when the agent acts. Hooks live in `<workspace>/.claude/settings.json` for Claude and in the user-level `$CODEX_HOME/hooks.json` for Codex.
+If a terminal still reads as stalled while its agent is working, check that the agent's hooks reach the API: use `octogent logs --follow` and look for `[Hook] Received hook` lines when the agent acts. Hooks live in `<workspace>/.claude/settings.json` for Claude and in the user-level `$CODEX_HOME/hooks.json` for Codex.
 
 ## `channel send` says the message is queued
 
