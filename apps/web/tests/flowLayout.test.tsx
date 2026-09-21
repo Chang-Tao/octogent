@@ -9,6 +9,7 @@ import {
   project,
 } from "../src/app/flow/layout";
 import type { FlowCamera } from "../src/app/flow/layout";
+import { deriveOctopusVisuals } from "../src/app/octopusVisuals";
 
 type AnyTentacle = Parameters<typeof buildFlowLayout>[0]["tentacles"][number];
 type AnyTerminal = Parameters<typeof buildFlowLayout>[0]["terminals"][number];
@@ -168,6 +169,33 @@ describe("buildFlowLayout", () => {
 
     expect(nodes).toHaveLength(1);
     expect(nodes[0]).toMatchObject({ kind: "octoboss", level: 0 });
+    expect(nodes[0]?.visuals).toBeUndefined();
+  });
+
+  it("carries each tentacle's shared octopus visuals, including stored appearance", () => {
+    const stored = {
+      ...tentacle("api"),
+      octopus: {
+        animation: "bounce",
+        expression: "angry",
+        accessory: "mohawk",
+        hairColor: "#fefefe",
+      },
+    } as AnyTentacle;
+    const { nodes } = buildFlowLayout({ tentacles: [stored], terminals: [] });
+
+    const node = nodes.find((entry) => entry.kind === "tentacle");
+    expect(node?.visuals).toEqual(deriveOctopusVisuals(stored));
+  });
+
+  it("keeps a terminal whose tentacle is absent from the deck directly under the octoboss", () => {
+    const { nodes, edges } = buildFlowLayout({
+      tentacles: [],
+      terminals: [terminal("t-1", "terminal-only")],
+    });
+
+    expect(nodes.some((entry) => entry.kind === "tentacle")).toBe(false);
+    expect(edges).toContainEqual({ from: nodes[0]?.id, to: "flow:agent:t-1" });
   });
 
   it("spreads tentacles on level 1, connected to the octoboss", () => {

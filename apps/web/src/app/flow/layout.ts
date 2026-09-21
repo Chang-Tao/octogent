@@ -8,6 +8,7 @@ import type {
 } from "@octogent/core";
 
 import { tentacleColor } from "../fleetColors";
+import { type OctopusVisuals, deriveOctopusVisuals } from "../octopusVisuals";
 import type { TerminalView } from "../types";
 
 export type FlowNodeKind = "octoboss" | "tentacle" | "agent";
@@ -43,6 +44,8 @@ export type FlowNode = {
   agentModelObserved?: string;
   /** Tentacles: distinct providers across their agents, live ones first. */
   agentProviders?: TerminalAgentProvider[];
+  /** Tentacles only: the shared appearance used by every fleet surface. */
+  visuals?: OctopusVisuals;
 };
 
 export type FlowEdge = { from: string; to: string };
@@ -196,20 +199,19 @@ export const buildFlowLayout = ({
   const sortedTentacles = [...tentacles].sort((a, b) => a.tentacleId.localeCompare(b.tentacleId));
   sortedTentacles.forEach((entry, index) => {
     const providers = providersByTentacle.get(entry.tentacleId);
+    const visuals = deriveOctopusVisuals(entry);
     const node: FlowNode = {
       id: `flow:tentacle:${entry.tentacleId}`,
       kind: "tentacle",
       refId: entry.tentacleId,
       label: entry.displayName || entry.tentacleId,
-      // Same rule as the canvas: deck color when set, else a palette color
-      // from the id — tentacles created without a color used to all fall
-      // back to the octoboss gold here and became indistinguishable.
-      color: tentacleColor(entry.tentacleId, entry.color),
+      color: visuals.color,
       level: 1,
       x: LEVEL_SPACING_X,
       y: centeredOffset(index, sortedTentacles.length, SIBLING_SPACING_Y),
       z: LEVEL_DEPTH_Z,
       role: "tentacle",
+      visuals,
       todoTotal: entry.todoTotal,
       todoDone: entry.todoDone,
       ...(entry.description ? { description: entry.description } : {}),

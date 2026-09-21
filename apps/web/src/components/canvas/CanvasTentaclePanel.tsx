@@ -3,6 +3,7 @@ import { type Ref, useCallback, useMemo, useState } from "react";
 
 import type { DeckTentacleSummary, TentacleWorkspaceMode } from "@octogent/core";
 import type { GraphNode } from "../../app/canvas/types";
+import { deriveOctopusVisuals } from "../../app/octopusVisuals";
 import { useT } from "../../app/providers/LocaleProvider";
 import type { ConversationSessionSummary } from "../../app/types";
 import {
@@ -12,64 +13,7 @@ import {
   buildDeckTodoSolveUrl,
   buildDeckTodoToggleUrl,
 } from "../../runtime/runtimeEndpoints";
-import {
-  type OctopusAccessory,
-  type OctopusAnimation,
-  type OctopusExpression,
-  OctopusGlyph,
-} from "../EmptyOctopus";
-
-const OCTOPUS_COLORS = [
-  "#ff6b2b",
-  "#ff2d6b",
-  "#00ffaa",
-  "#bf5fff",
-  "#00c8ff",
-  "#ffee00",
-  "#39ff14",
-  "#ff4df0",
-  "#00fff7",
-  "#ff9500",
-];
-const ANIMATIONS: OctopusAnimation[] = ["sway", "walk", "jog", "bounce", "float", "swim-up"];
-const EXPRESSIONS: OctopusExpression[] = ["normal", "happy", "angry", "surprised"];
-const ACCESSORIES: OctopusAccessory[] = ["none", "none", "long", "mohawk", "side-sweep", "curly"];
-
-function hashStr(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-function seededRng(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-function deriveVisuals(tentacle: DeckTentacleSummary) {
-  const rng = seededRng(hashStr(tentacle.tentacleId));
-  const stored = tentacle.octopus;
-  return {
-    color:
-      tentacle.color ??
-      (OCTOPUS_COLORS[hashStr(tentacle.tentacleId) % OCTOPUS_COLORS.length] as string),
-    animation:
-      (stored?.animation as OctopusAnimation | null) ??
-      (ANIMATIONS[Math.floor(rng() * ANIMATIONS.length)] as OctopusAnimation),
-    expression:
-      (stored?.expression as OctopusExpression | null) ??
-      (EXPRESSIONS[Math.floor(rng() * EXPRESSIONS.length)] as OctopusExpression),
-    accessory:
-      (stored?.accessory as OctopusAccessory | null) ??
-      (ACCESSORIES[Math.floor(rng() * ACCESSORIES.length)] as OctopusAccessory),
-    hairColor: stored?.hairColor ?? undefined,
-  };
-}
+import { OctopusGlyph } from "../EmptyOctopus";
 
 type CanvasTentaclePanelProps = {
   node: GraphNode;
@@ -122,7 +66,7 @@ export const CanvasTentaclePanel = ({
   onRefreshTentacleData,
 }: CanvasTentaclePanelProps) => {
   const t = useT();
-  const visuals = useMemo(() => (tentacle ? deriveVisuals(tentacle) : null), [tentacle]);
+  const visuals = useMemo(() => (tentacle ? deriveOctopusVisuals(tentacle) : null), [tentacle]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [addingTodo, setAddingTodo] = useState(false);
