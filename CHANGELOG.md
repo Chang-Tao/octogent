@@ -105,6 +105,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- A headless coordinator can now see and answer a worker's terminal.
+  `octogent terminal screen <id> [--lines N] [--raw]` replays the retained PTY
+  output through a headless terminal emulator (`@xterm/headless`) and prints
+  the screen as a person would see it — TUIs paint dialogs with cursor
+  addressing, which a strip-the-escapes approach rendered as garbage; the last
+  screen is saved when a session ends (`<id>.screen.txt`) and served
+  afterwards. `octogent terminal input <id> [text] [--enter] [--keys …]`
+  writes to the PTY whatever the agent's state (allow-listed keys, 4 KB cap,
+  audited as an `input_submit` transcript event), and `terminal result
+  --screen` appends the screen tail. Verified end to end on a real Claude
+  permission dialog: `wait` exits 3 → `screen` shows the dialog → `input
+  --keys 3` answers it → `wait` exits 0.
+- A verdict that post-Stop activity flipped back to `running` is re-evaluated
+  once the agent has stayed idle for 20 s. Claude made two tool calls two
+  seconds after its Stop hook, no further Stop followed, and the finished
+  terminal slid into `stalled` while its coordinator waited (found through
+  the new server log).
 - The API server always keeps a log file at `<project state>/logs/server.log`
   (timestamped lines, 5 MB rotation with three generations, access tokens
   masked). Verbose hook traffic goes to the file even when
