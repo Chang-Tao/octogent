@@ -83,9 +83,10 @@ export const readJsonBodyOrWriteError = async (
   request: IncomingMessage,
   response: ServerResponse,
   corsOrigin: string | null,
+  maxBytes?: number,
 ): Promise<JsonBodyReadResult> => {
   try {
-    const payload = await readJsonBody(request);
+    const payload = await readJsonBody(request, maxBytes);
     return { ok: true, payload };
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) {

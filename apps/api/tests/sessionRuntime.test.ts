@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -124,6 +124,126 @@ describe("createSessionRuntime", () => {
       rmSync(directory, { recursive: true, force: true });
     }
     temporaryDirectories.length = 0;
+  });
+
+  it.each(["closeSession", "stopSession", "killSession", "exit", "close"] as const)(
+    "saves the processed screen on %s and accepts input in busy states",
+    async (ending) => {
+      vi.useFakeTimers();
+      const directory = createTemporaryDirectory();
+      const sessions = new Map<string, TerminalSession>();
+      const terminals = new Map<string, PersistedTerminal>([
+        [
+          "worker",
+          {
+            terminalId: "worker",
+            tentacleId: "worker",
+            tentacleName: "worker",
+            createdAt: new Date().toISOString(),
+            workspaceMode: "shared",
+          },
+        ],
+      ]);
+      const pty = new FakePty();
+      spawnMock.mockReturnValue(pty);
+      const runtime = createSessionRuntime({
+        websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+        terminals,
+        sessions,
+        getTentacleWorkspaceCwd: () => directory,
+        isDebugPtyLogsEnabled: false,
+        ptyLogDir: directory,
+        transcriptDirectoryPath: directory,
+      });
+      runtime.startSession("worker");
+      pty.write.mockClear();
+      pty.emitData("\x1b]0;Claude\x07\x1b[31mRead outside?\x1b[0m\r\n1. Yes\r\n1. Yes");
+      expect(runtime.getScreen("worker", 2)).toMatchObject({
+        text: "Read outside?\n1. Yes",
+        savedAt: null,
+      });
+      for (const state of ["processing", "waiting_for_permission"] as const) {
+        const session = sessions.get("worker");
+        if (session) session.agentState = state;
+        expect(
+          runtime.submitInput("worker", {
+            text: "1",
+            enter: true,
+            keys: ["tab", "esc", "up", "down", "ctrl-c", "9", "enter"],
+          }),
+        ).toBe(true);
+        expect(pty.write.mock.calls.at(-1)?.[0]).toBe("1\t\x1b\x1b[A\x1b[B\x039\r");
+        await vi.advanceTimersByTimeAsync(150);
+        expect(pty.write.mock.calls.at(-1)?.[0]).toBe("\r");
+      }
+      expect(runtime.submitInput("missing", { text: "x" })).toBe(false);
+      expect(() => runtime.submitInput("worker", { keys: ["delete"] })).toThrow();
+      expect(() => runtime.submitInput("worker", { text: "界".repeat(1400) })).toThrow();
+      if (ending === "exit") pty.emitExit({ exitCode: 1, signal: 0 });
+      else if (ending === "close") runtime.close();
+      else runtime[ending]("worker");
+      expect(readFileSync(join(directory, "worker.screen.txt"), "utf8")).toBe(
+        "Read outside?\n1. Yes",
+      );
+      expect(runtime.getScreen("worker", 1)).toMatchObject({
+        text: "1. Yes",
+        savedAt: expect.any(String),
+      });
+      expect(runtime.getScreen("../worker")).toBeNull();
+      await vi.advanceTimersByTimeAsync(1);
+      await vi.waitFor(() =>
+        expect(readFileSync(join(directory, "worker.jsonl"), "utf8")).toContain('"input_submit"'),
+      );
+      runtime.close();
+    },
+  );
+
+  it("bounds saved screens, tolerates write failures, and cancels Enter on replacement", async () => {
+    vi.useFakeTimers();
+    const directory = createTemporaryDirectory();
+    const transcriptDirectoryPath = join(directory, "transcripts");
+    const sessions = new Map<string, TerminalSession>();
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        "worker",
+        {
+          terminalId: "worker",
+          tentacleId: "worker",
+          tentacleName: "worker",
+          createdAt: new Date().toISOString(),
+          workspaceMode: "shared",
+        },
+      ],
+    ]);
+    const pty = new FakePty();
+    spawnMock.mockReturnValue(pty);
+    const runtime = createSessionRuntime({
+      websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions,
+      getTentacleWorkspaceCwd: () => directory,
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: directory,
+      transcriptDirectoryPath,
+    });
+    runtime.startSession("worker");
+    pty.emitData(Array.from({ length: 205 }, (_, i) => `line ${i}`).join("\r\n"));
+    runtime.submitInput("worker", { text: "1", enter: true });
+    runtime.stopSession("worker");
+    expect(runtime.getScreen("worker", 200)?.text.split("\n")).toHaveLength(200);
+    expect(runtime.getScreen("worker", 200)?.text).toMatch(/^line 5\n/);
+    const replacement = new FakePty();
+    spawnMock.mockReturnValue(replacement);
+    runtime.startSession("worker");
+    replacement.write.mockClear();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(replacement.write).not.toHaveBeenCalled();
+    rmSync(transcriptDirectoryPath, { recursive: true, force: true });
+    writeFileSync(transcriptDirectoryPath, "not a directory");
+    expect(() => runtime.closeSession("worker")).not.toThrow();
+    expect(sessions.size).toBe(0);
+    expect(replacement.kill).toHaveBeenCalledOnce();
+    runtime.close();
   });
 
   it("keeps a session alive across reconnects and replays scrollback history", () => {

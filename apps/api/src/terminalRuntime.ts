@@ -1448,6 +1448,9 @@ export const createTerminalRuntime = ({
       return sessionRuntime.writeInput(terminalId, data);
     },
 
+    getScreen: sessionRuntime.getScreen,
+    submitInput: sessionRuntime.submitInput,
+
     resizeTerminal(terminalId: string, cols: number, rows: number): boolean {
       return sessionRuntime.resizeSession(terminalId, cols, rows);
     },

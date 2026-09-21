@@ -427,6 +427,88 @@ describe("createApiServer", () => {
     return `http://${address.host}:${address.port}`;
   };
 
+  it("reads live and saved screens and sends bounded direct input through protected routes", async () => {
+    let output: (chunk: string) => void = () => {};
+    let exit: (event: { exitCode: number; signal: number }) => void = () => {};
+    const write = vi.fn();
+    spawnMock.mockReturnValue({
+      pid: 12345,
+      write,
+      kill: vi.fn(),
+      resize: vi.fn(),
+      onData: (listener: typeof output) => {
+        output = listener;
+        return { dispose: vi.fn() };
+      },
+      onExit: (listener: typeof exit) => {
+        exit = listener;
+        return { dispose: vi.fn() };
+      },
+    });
+    const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-screen-test-"));
+    temporaryDirectories.push(workspaceCwd);
+    const baseUrl = await startServer({ workspaceCwd });
+    const created = await fetch(`${baseUrl}/api/terminals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceMode: "shared",
+        name: "screen-worker",
+        initialPrompt: "hello",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const { terminalId } = (await created.json()) as { terminalId: string };
+    const url = `${baseUrl}/api/terminals/${terminalId}`;
+    output("old\r\n\x1b[31mLimit reached\x1b[0m\r\nLimit reached\r\nTry later");
+    const screen = await fetch(`${url}/screen?lines=2`);
+    expect(screen.status).toBe(200);
+    expect(await screen.json()).toMatchObject({ text: "Limit reached\nTry later", savedAt: null });
+    expect(await (await fetch(`${url}/screen?lines=2&raw=1`)).json()).toMatchObject({
+      text: "Limit reached\r\nTry later",
+      raw: true,
+    });
+    for (const lines of ["0", "-1", "1.5", "NaN", "201"]) {
+      expect((await fetch(`${url}/screen?lines=${lines}`)).status).toBe(400);
+    }
+    write.mockClear();
+    const send = (payload: unknown, origin?: string) =>
+      fetch(`${url}/input`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(origin ? { Origin: origin } : {}) },
+        body: JSON.stringify(payload),
+      });
+    expect((await send({ text: "1", enter: true, keys: ["tab"] })).status).toBe(200);
+    expect(write).toHaveBeenCalledWith("1\t");
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith("\r"));
+    expect((await send({ keys: ["unknown"] })).status).toBe(400);
+    expect((await send({ text: "x".repeat(4097) })).status).toBe(413);
+    expect((await send({ text: "1" }, "https://evil.example")).status).toBe(403);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/terminals/missing/input`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: '{"text":"1"}',
+        })
+      ).status,
+    ).toBe(404);
+    expect((await fetch(`${baseUrl}/api/terminals/missing/screen`)).status).toBe(404);
+    exit({ exitCode: 1, signal: 0 });
+    expect(await (await fetch(`${url}/screen?lines=2`)).json()).toMatchObject({
+      text: "Limit reached\nTry later",
+      savedAt: expect.any(String),
+    });
+    expect((await send({ text: "1" })).status).toBe(404);
+    await stopServer?.();
+    stopServer = null;
+    const restarted = await startServer({ workspaceCwd });
+    expect(
+      await (await fetch(`${restarted}/api/terminals/${terminalId}/screen?lines=2&raw=1`)).json(),
+    ).toMatchObject({ text: "Limit reached\nTry later", savedAt: expect.any(String), raw: false });
+    spawnMock.mockReset();
+  });
+
   const toWebSocketBaseUrl = (httpBaseUrl: string) =>
     httpBaseUrl.startsWith("https://")
       ? httpBaseUrl.replace("https://", "wss://")
