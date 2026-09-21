@@ -1,10 +1,12 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
 import { createApiServer } from "./createApiServer";
 import { resolveAccessToken } from "./createApiServer/remoteAuth";
+import { resolveRootVersion } from "./healthSnapshot";
 import { resolveListenHost } from "./listenHost";
+import { configureServerLogging, installUncaughtErrorLogging, log, logError } from "./logging";
 
 const parsePort = (value: string | undefined, fallback: number) => {
   if (!value) {
@@ -42,9 +44,14 @@ export const startApiServerFromEnv = async (env: NodeJS.ProcessEnv = process.env
 
   const host = resolveListenHost(env);
   const port = parsePort(env.OCTOGENT_API_PORT ?? env.PORT, 8787);
+  const workspaceCwd = env.OCTOGENT_WORKSPACE_CWD ?? process.cwd();
+  const projectStateDir = env.OCTOGENT_PROJECT_STATE_DIR ?? join(workspaceCwd, ".octogent");
+  const serverLogPath = configureServerLogging({ projectStateDir, env });
+  installUncaughtErrorLogging();
+  log(`Server log: ${serverLogPath ?? "off"}`);
   const apiServer = createApiServer({
-    workspaceCwd: env.OCTOGENT_WORKSPACE_CWD ?? process.cwd(),
-    projectStateDir: env.OCTOGENT_PROJECT_STATE_DIR,
+    workspaceCwd,
+    projectStateDir,
     promptsDir: env.OCTOGENT_PROMPTS_DIR,
     webDistDir: env.OCTOGENT_WEB_DIST_DIR,
     accessToken: resolveAccessToken(env),
@@ -71,14 +78,17 @@ export const startApiServerFromEnv = async (env: NodeJS.ProcessEnv = process.env
     void shutdown();
   });
 
-  console.log(t(locale, "startup.apiListening", { host, port: String(activePort) }));
+  log(
+    `Octogent version=${resolveRootVersion(import.meta.dirname ?? process.cwd())}${env.OCTOGENT_BUILD_COMMIT || env.GIT_COMMIT ? ` commit=${env.OCTOGENT_BUILD_COMMIT ?? env.GIT_COMMIT}` : ""} workspace=${workspaceCwd} port=${activePort} pid=${process.pid}`,
+    t(locale, "startup.apiListening", { host, port: String(activePort) }),
+  );
   return apiServer;
 };
 
 const entryPath = process.argv[1];
 if (entryPath && resolve(entryPath) === fileURLToPath(import.meta.url)) {
   startApiServerFromEnv().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
+    logError(error instanceof Error ? error.message : error);
     process.exit(1);
   });
 }

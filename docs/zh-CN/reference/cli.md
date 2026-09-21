@@ -32,6 +32,8 @@ octogent
 - `OCTOGENT_CODEX_APPROVAL_POLICY`：Codex 审批策略：`on-request` 或 `never`（默认 `never`，避免无人值守的终端卡在审批提示上）
 - `OCTOGENT_CODEX_CONFIG`：覆盖 Octogent 用于预置项目信任与钩子信任哈希的 Codex `config.toml` 路径（主要用于测试隔离）
 - `OCTOGENT_ACCESS_TOKEN`：开启远程访问时非回环客户端必须携带的访问令牌；未设置时每次启动自动生成并随局域网地址打印
+- `OCTOGENT_VERBOSE_LOGS`：设为 `1`，同时把详细的钩子和运行时摘要打印到终端。无论是否设置，详细摘要都会写入服务日志
+- `OCTOGENT_SERVER_LOG`：设为 `off` 可禁用服务日志；设为文件路径可覆盖默认的 `<project-state-dir>/logs/server.log`
 
 无界面服务器示例：
 
@@ -56,6 +58,14 @@ octogent init [project-name]
 ```bash
 octogent projects
 ```
+
+## 查看服务日志
+
+```bash
+octogent logs [--lines N] [--follow]
+```
+
+打印当前项目服务日志的最后 100 行。用 `--lines N` 指定其他正整数行数；用 `--follow` 持续输出新日志，日志轮转后也会继续跟随。
 
 ## 创建触手
 

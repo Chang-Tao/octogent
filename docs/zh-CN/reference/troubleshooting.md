@@ -1,5 +1,11 @@
 # 故障排查
 
+## 诊断服务问题
+
+在项目目录运行 `octogent logs` 查看持久化服务日志，或运行 `octogent logs --follow` 持续跟随。默认文件位于 `~/.octogent/projects/<project-id>/logs/server.log`；Octogent 启动时会打印实际路径。即使终端保持安静，文件仍会保存详细的钩子摘要；文件达到 5 MB 时轮转，并以 `server.log.1` 到 `server.log.3` 保留三代旧日志。
+
+启动前设置 `OCTOGENT_SERVER_LOG=<路径>` 可改用其他位置，设置 `OCTOGENT_SERVER_LOG=off` 可禁用。文件中的局域网 URL 访问令牌会被掩码，钩子请求正文不会被记录。
+
 ## `pnpm test` 因浏览器 API 报错
 
 确认在仓库根目录安装了工作区依赖：
@@ -26,7 +32,7 @@ pnpm install
 
 Octogent 在 Claude 或 Codex 上报 `SessionStart` 时发送 `--initial-prompt`；如果就绪信号一直未到，则在启动命令发出 15 秒后兜底发送。`UserPromptSubmit` 表示投递已确认。如果已收到 `SessionStart`，但发送后 10 秒内没有收到确认，Octogent 只会重试一次粘贴和回车。未收到 `SessionStart` 的代理不会重试，因为钩子缺失时无法判断提示词是丢失了还是已经送达。
 
-重试后再过 10 秒仍未确认，终端快照和 `octogent terminal list` 会显示 `reason=initial prompt not acknowledged`。生命周期保持 `running`，后续由常规停滞检测处理；迟到的确认会清除此原因。用 `OCTOGENT_VERBOSE_LOGS=1` 启动 API，可查看钩子到达记录以及 `initial-prompt retry` / `initial-prompt not acknowledged after retry` 日志。检查工作代理的终端是否卡在启动、更新、信任或登录提示，解决后再重新发送任务。重发前先检查终端和日志，避免重复执行已经开始的工作。
+重试后再过 10 秒仍未确认，终端快照和 `octogent terminal list` 会显示 `reason=initial prompt not acknowledged`。生命周期保持 `running`，后续由常规停滞检测处理；迟到的确认会清除此原因。用 `octogent logs` 查找钩子到达记录以及 `initial-prompt retry` / `initial-prompt not acknowledged after retry` 日志；只有希望终端也显示这些信息时，才需要在启动前设置 `OCTOGENT_VERBOSE_LOGS=1`。检查工作代理的终端是否卡在启动、更新、信任或登录提示，解决后再重新发送任务。重发前先检查终端和日志，避免重复执行已经开始的工作。
 
 ## Claude 工作代理刚启动就卡住（读取工作目录之外的文件）
 
@@ -70,7 +76,7 @@ gh auth status
 
 Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**变化**（idle → processing 及其反向），以及代理 PreToolUse 钩子上报的每次工具调用（`tool_use` 事件）。因此一轮很长的任务在转录里表现为一串 `tool_use` 事件，而不是反复的 `processing` 行。停滞检测所认的"活动"包括提交 prompt、工具调用和 PTY 输出（每几秒记一次），所以肉眼可见在干活的代理不会被判 `stalled`；这个判定只留给活着却在 `OCTOGENT_TERMINAL_STALL_MS` 内毫无输出的 PTY。
 
-如果代理明明在干活却仍被判 stalled，检查它的钩子是否到达了 API：用 `OCTOGENT_VERBOSE_LOGS=1` 启动 API，代理动作时应能看到 `[Hook] Received hook` 日志。Claude 的钩子在 `<workspace>/.claude/settings.json`，Codex 的在用户层 `$CODEX_HOME/hooks.json`。
+如果代理明明在干活却仍被判 stalled，检查它的钩子是否到达了 API：运行 `octogent logs --follow`，代理动作时应能看到 `[Hook] Received hook` 日志。Claude 的钩子在 `<workspace>/.claude/settings.json`，Codex 的在用户层 `$CODEX_HOME/hooks.json`。
 
 ## `channel send` 提示消息已排队
 

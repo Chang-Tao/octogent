@@ -40,13 +40,19 @@ Project-local Claude Code skills, when present, live under:
 
 ## Global state
 
-Per-project runtime state is stored under:
+Per-project runtime files are stored under:
 
 ```text
-~/.octogent/projects/<project-id>/state/
+~/.octogent/projects/<project-id>/
+  logs/
+    server.log
+    server.log.1
+    server.log.2
+    server.log.3
+  state/
 ```
 
-Notable files:
+Notable files under `state/`:
 
 - `tentacles.json`
 - `deck.json`
@@ -60,6 +66,8 @@ Notable files:
 `deck.json` stores Deck presentation metadata that is not part of the agent-facing tentacle files.
 
 `transcripts/*.jsonl` stores conversation transcript events separately from PTY scrollback. Scrollback is in memory and bounded; transcripts are persisted.
+
+`logs/server.log` records server startup facts, runtime summaries, and uncaught errors. It rotates at 5 MB and keeps three generations. `OCTOGENT_SERVER_LOG` can override or disable this location.
 
 ## Prompt storage
 

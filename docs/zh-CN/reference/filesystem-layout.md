@@ -40,13 +40,19 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
 
 ## 全局状态
 
-按项目划分的运行时状态存放在：
+按项目划分的运行时文件存放在：
 
 ```text
-~/.octogent/projects/<project-id>/state/
+~/.octogent/projects/<project-id>/
+  logs/
+    server.log
+    server.log.1
+    server.log.2
+    server.log.3
+  state/
 ```
 
-值得注意的文件：
+`state/` 下值得注意的文件：
 
 - `tentacles.json`
 - `deck.json`
@@ -60,6 +66,8 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
 `deck.json` 保存 Deck 的展示元数据，不属于面向代理的触手文件。
 
 `transcripts/*.jsonl` 独立于 PTY 回滚缓冲保存对话转录事件。回滚缓冲在内存中且有上限；转录会持久化。
+
+`logs/server.log` 记录服务启动信息、运行时摘要和未捕获错误。文件达到 5 MB 时轮转并保留三代；可用 `OCTOGENT_SERVER_LOG` 覆盖或禁用此位置。
 
 ## 提示词存储
 

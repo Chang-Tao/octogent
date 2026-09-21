@@ -32,6 +32,8 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_CODEX_APPROVAL_POLICY`: Codex approval policy: `on-request` or `never` (default: `never`, so unattended terminals are not stranded on approval prompts)
 - `OCTOGENT_CODEX_CONFIG`: Override the path of the Codex `config.toml` that Octogent seeds with project trust and hook trust hashes (mainly for test isolation)
 - `OCTOGENT_ACCESS_TOKEN`: Access token required from non-loopback clients when remote access is on; auto-generated per session (and printed with the LAN URL) when unset
+- `OCTOGENT_VERBOSE_LOGS`: Set to `1` to also print verbose hook and runtime summaries to the terminal. Verbose summaries are always written to the server log
+- `OCTOGENT_SERVER_LOG`: Set to `off` to disable the server log, or to a file path to override the default `<project-state-dir>/logs/server.log`
 
 Example for headless servers:
 
@@ -56,6 +58,14 @@ Use this when you want to initialize the project explicitly or set the project d
 ```bash
 octogent projects
 ```
+
+## Read the server log
+
+```bash
+octogent logs [--lines N] [--follow]
+```
+
+Prints the last 100 lines of the current project's server log. Use `--lines N` to choose another positive line count and `--follow` to keep streaming new lines, including across log rotation.
 
 ## Create a tentacle
 

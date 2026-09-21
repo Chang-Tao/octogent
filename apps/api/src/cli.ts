@@ -15,6 +15,7 @@ import {
   parseTerminalWaitArgs,
 } from "./cliTerminalResult";
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
+import { resolveRootVersion } from "./healthSnapshot";
 import {
   isRemoteAccessEnabled,
   isWildcardHost,
@@ -22,6 +23,13 @@ import {
   resolveListenHost,
   toConnectableHost,
 } from "./listenHost";
+import {
+  configureServerLogging,
+  installUncaughtErrorLogging,
+  log,
+  logError,
+  logWarn,
+} from "./logging";
 import {
   ensureOctogentGitignoreEntry,
   ensureProjectScaffold,
@@ -33,6 +41,12 @@ import {
   resolveProjectStateDir,
 } from "./projectPersistence";
 import { clearRuntimeMetadata, readRuntimeMetadata, writeRuntimeMetadata } from "./runtimeMetadata";
+import {
+  followServerLog,
+  parseServerLogsArgs,
+  readServerLogTail,
+  resolveServerLogPath,
+} from "./serverLogs";
 import {
   collectStartupPrerequisiteReport,
   formatStartupPrerequisiteReport,
@@ -218,6 +232,13 @@ const maybeOpenBrowser = (url: string) => {
 };
 
 const startServer = async () => {
+  const workspaceCwd = process.cwd();
+  const { isInitialized, projectDisplayName, projectStateDir } =
+    resolveStartupProjectContext(workspaceCwd);
+  const serverLogPath = configureServerLogging({ projectStateDir });
+  installUncaughtErrorLogging();
+  log(`  Server log: ${serverLogPath ?? "off"}`);
+
   const startupPrerequisiteReport = collectStartupPrerequisiteReport();
   const startupPrerequisiteLines = formatStartupPrerequisiteReport(
     startupPrerequisiteReport,
@@ -226,20 +247,17 @@ const startServer = async () => {
   if (startupPrerequisiteLines.length > 0) {
     for (const line of startupPrerequisiteLines) {
       if (startupPrerequisiteReport.errors.length > 0) {
-        console.error(line);
+        logError(line);
       } else {
-        console.warn(line);
+        logWarn(line);
       }
     }
     if (startupPrerequisiteReport.errors.length > 0) {
       process.exit(1);
     }
-    console.warn("");
+    logWarn("");
   }
 
-  const workspaceCwd = process.cwd();
-  const { isInitialized, projectDisplayName, projectStateDir } =
-    resolveStartupProjectContext(workspaceCwd);
   const promptsDir = resolveRuntimeAssetPath(["dist", "prompts"], ["prompts"]);
   const webDistDir = resolveRuntimeAssetPath(["dist", "web"], ["apps", "web", "dist"]);
   const listenHost = resolveListenHost(process.env);
@@ -287,21 +305,46 @@ const startServer = async () => {
     maybeOpenBrowser(apiBaseUrl);
   }
 
-  console.log();
-  console.log(`  ${t(locale, "cli.server.running")}`);
-  console.log(`  ${t(locale, "cli.server.project")} ${workspaceCwd}`);
-  console.log(`  ${t(locale, "cli.server.api")} ${apiBaseUrl}`);
+  const commit = process.env.OCTOGENT_BUILD_COMMIT ?? process.env.GIT_COMMIT;
+  log();
+  log(
+    `  Octogent version=${resolveRootVersion(PACKAGE_ROOT)}${commit ? ` commit=${commit}` : ""} workspace=${workspaceCwd} port=${activePort} pid=${process.pid}`,
+  );
+  log(`  ${t(locale, "cli.server.running")}`);
+  log(`  ${t(locale, "cli.server.project")} ${workspaceCwd}`);
+  log(`  ${t(locale, "cli.server.api")} ${apiBaseUrl}`);
   if (isWildcardHost(host)) {
     for (const address of listLanAddresses(networkInterfaces())) {
       const suffix = accessToken ? `/?token=${accessToken}` : "";
-      console.log(`  ${t(locale, "cli.server.lan")} http://${address}:${activePort}${suffix}`);
+      log(`  ${t(locale, "cli.server.lan")} http://${address}:${activePort}${suffix}`);
     }
     if (accessToken) {
       console.log(`  ${t(locale, "cli.server.token")} ${accessToken}`);
       console.log(`  ${t(locale, "cli.server.tokenHint")}`);
     }
   }
-  console.log();
+  log();
+};
+
+const printServerLogs = () => {
+  const { projectStateDir } = resolveStartupProjectContext(process.cwd());
+  const logPath = resolveServerLogPath(projectStateDir);
+  let options: ReturnType<typeof parseServerLogsArgs>;
+  try {
+    options = parseServerLogsArgs(args.slice(1));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+
+  if (!existsSync(logPath)) {
+    console.error(`Server log not found: ${logPath}`);
+    process.exit(1);
+  }
+  process.stdout.write(readServerLogTail(logPath, options.lines));
+  if (options.follow) {
+    followServerLog(logPath, (chunk) => process.stdout.write(chunk));
+  }
 };
 
 const COLORS = [
@@ -998,6 +1041,10 @@ const main = async () => {
     return;
   }
 
+  if (command === "logs") {
+    return printServerLogs();
+  }
+
   if (command === "tentacle" || command === "tentacles") {
     if (args[1] === "create") {
       return tentacleCreate();
@@ -1056,6 +1103,7 @@ const main = async () => {
   octogent                             Start the dashboard in the current project
   octogent init [project-name]         Initialize the current directory explicitly
   octogent projects                    List registered projects
+  octogent logs [--lines N] [--follow] Tail the current project's server log
 
   octogent tentacle create <name>      Create a tentacle (Octogent must be running)
   octogent tentacle list               List tentacles
