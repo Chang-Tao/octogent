@@ -84,9 +84,6 @@ const SHELF_GAP_Y = 150;
 const SHELF_SPACING_X = 150;
 
 const OCTOBOSS_COLOR = "#d4a017";
-// The runtime uses this reserved tentacle id for agents that truly report to
-// the octoboss; every other terminal-only id gets its own visible tentacle.
-const OCTOBOSS_TENTACLE_ID = "__octoboss__";
 
 const centeredOffset = (index: number, count: number, spacing: number): number =>
   (index - (count - 1) / 2) * spacing;
@@ -199,45 +196,29 @@ export const buildFlowLayout = ({
 
   const tentacleNodes = new Map<string, FlowNode>();
   const providersByTentacle = distinctProvidersByTentacle(terminals);
-  const deckByTentacleId = new Map(tentacles.map((entry) => [entry.tentacleId, entry]));
-  const terminalByTentacleId = new Map(
-    terminals.map((terminal) => [terminal.tentacleId, terminal] as const),
-  );
-  const sortedTentacleIds = [
-    ...new Set([
-      ...tentacles.map((entry) => entry.tentacleId),
-      ...terminals
-        .map((terminal) => terminal.tentacleId)
-        .filter((tentacleId) => tentacleId !== OCTOBOSS_TENTACLE_ID),
-    ]),
-  ].sort((a, b) => a.localeCompare(b));
-  sortedTentacleIds.forEach((tentacleId, index) => {
-    const entry = deckByTentacleId.get(tentacleId);
-    const terminal = terminalByTentacleId.get(tentacleId);
-    const providers = providersByTentacle.get(tentacleId);
-    const visuals = deriveOctopusVisuals({
-      tentacleId,
-      ...(entry?.color ? { color: entry.color } : {}),
-      ...(entry?.octopus ? { octopus: entry.octopus } : {}),
-    });
+  const sortedTentacles = [...tentacles].sort((a, b) => a.tentacleId.localeCompare(b.tentacleId));
+  sortedTentacles.forEach((entry, index) => {
+    const providers = providersByTentacle.get(entry.tentacleId);
+    const visuals = deriveOctopusVisuals(entry);
     const node: FlowNode = {
-      id: `flow:tentacle:${tentacleId}`,
+      id: `flow:tentacle:${entry.tentacleId}`,
       kind: "tentacle",
-      refId: tentacleId,
-      label: entry?.displayName || terminal?.tentacleName || tentacleId,
+      refId: entry.tentacleId,
+      label: entry.displayName || entry.tentacleId,
       color: visuals.color,
       level: 1,
       x: LEVEL_SPACING_X,
-      y: centeredOffset(index, sortedTentacleIds.length, SIBLING_SPACING_Y),
+      y: centeredOffset(index, sortedTentacles.length, SIBLING_SPACING_Y),
       z: LEVEL_DEPTH_Z,
       role: "tentacle",
       visuals,
-      ...(entry ? { todoTotal: entry.todoTotal, todoDone: entry.todoDone } : {}),
-      ...(entry?.description ? { description: entry.description } : {}),
-      ...(entry?.todoItems?.length ? { todoItems: entry.todoItems } : {}),
+      todoTotal: entry.todoTotal,
+      todoDone: entry.todoDone,
+      ...(entry.description ? { description: entry.description } : {}),
+      ...(entry.todoItems?.length ? { todoItems: entry.todoItems } : {}),
       ...(providers ? { agentProviders: providers } : {}),
     };
-    tentacleNodes.set(tentacleId, node);
+    tentacleNodes.set(entry.tentacleId, node);
     nodes.push(node);
     edges.push({ from: boss.id, to: node.id });
   });
@@ -252,8 +233,8 @@ export const buildFlowLayout = ({
   );
 
   // Where the octoboss-direct agents stack, just above the topmost tentacle.
-  const tentacleTopY = sortedTentacleIds.length
-    ? centeredOffset(0, sortedTentacleIds.length, SIBLING_SPACING_Y)
+  const tentacleTopY = sortedTentacles.length
+    ? centeredOffset(0, sortedTentacles.length, SIBLING_SPACING_Y)
     : 0;
   const bossDirectBaseY = tentacleTopY - BOSS_DIRECT_GAP_Y;
   let bossDirectPlaced = 0;

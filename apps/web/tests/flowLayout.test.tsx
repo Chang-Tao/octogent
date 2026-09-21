@@ -188,19 +188,14 @@ describe("buildFlowLayout", () => {
     expect(node?.visuals).toEqual(deriveOctopusVisuals(stored));
   });
 
-  it("materializes a deterministic tentacle look when only a terminal references it", () => {
+  it("keeps a terminal whose tentacle is absent from the deck directly under the octoboss", () => {
     const { nodes, edges } = buildFlowLayout({
       tentacles: [],
       terminals: [terminal("t-1", "terminal-only")],
     });
 
-    const node = nodes.find((entry) => entry.kind === "tentacle");
-    expect(node).toMatchObject({
-      refId: "terminal-only",
-      visuals: deriveOctopusVisuals({ tentacleId: "terminal-only" }),
-    });
-    expect(edges).toContainEqual({ from: nodes[0]?.id, to: node?.id });
-    expect(edges).toContainEqual({ from: node?.id, to: "flow:agent:t-1" });
+    expect(nodes.some((entry) => entry.kind === "tentacle")).toBe(false);
+    expect(edges).toContainEqual({ from: nodes[0]?.id, to: "flow:agent:t-1" });
   });
 
   it("spreads tentacles on level 1, connected to the octoboss", () => {
