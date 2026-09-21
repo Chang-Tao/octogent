@@ -444,6 +444,35 @@ describe("headless worker cleanup", () => {
     expect(runtime.readHealthCounts().ptySessions).toBe(0);
   });
 
+  it("restores the verdict when post-Stop activity flipped it and no new Stop follows", () => {
+    // Seen live: Claude ran two tool calls two seconds after its Stop hook,
+    // Octogent flipped awaiting-review back to running, no further Stop came,
+    // and the finished terminal slid into "stalled" while its coordinator waited.
+    const { terminalId } = startWorker();
+    const lifecycle = () =>
+      runtime.listTerminalSnapshots().find((t) => t.terminalId === terminalId)?.lifecycleState;
+    expect(lifecycle()).toBe("completed");
+
+    runtime.handleHook("user-prompt-submit", { prompt: "background step" }, terminalId);
+    expect(lifecycle()).toBe("running");
+
+    // The tracker falls idle on its own; after the settle period the verdict returns.
+    vi.advanceTimersByTime(30_000);
+    expect(lifecycle()).toBe("completed");
+  });
+
+  it("does not re-evaluate while the agent keeps working", () => {
+    const { terminalId } = startWorker();
+    const lifecycle = () =>
+      runtime.listTerminalSnapshots().find((t) => t.terminalId === terminalId)?.lifecycleState;
+
+    runtime.handleHook("user-prompt-submit", { prompt: "real follow-up" }, terminalId);
+    vi.advanceTimersByTime(5_000);
+    runtime.handleHook("user-prompt-submit", { prompt: "still going" }, terminalId);
+    vi.advanceTimersByTime(15_000);
+    expect(lifecycle()).toBe("running");
+  });
+
   it("keeps a kept-alive idle worker through the next batch's dispatch", () => {
     // The orchestrator may dispatch B while A waits to be continued over the
     // channel; a live PTY means "still in use", idle or not.

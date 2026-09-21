@@ -143,6 +143,8 @@ export type PersistedTerminal = {
   agentEffortTier?: string;
   /** Model the agent actually reported in its transcript (Claude), when none was requested. */
   agentModelObserved?: string;
+  /** In-memory only: activity flipped a completed/awaiting-review verdict back to running. */
+  verdictFlippedBack?: boolean | undefined;
   attentionSince?: string | undefined;
   attentionKind?: "permission" | "user" | undefined;
   attentionToolName?: string | undefined;

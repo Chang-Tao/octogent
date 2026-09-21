@@ -255,6 +255,39 @@ export const createTerminalRuntime = ({
     return null;
   };
 
+  // A verdict that activity flipped back to "running" needs a way home. A real
+  // follow-up turn ends with another Stop hook, but agents also act after Stop
+  // with no turn at all (Claude ran two ToolSearch calls two seconds after its
+  // Stop on 2026-09-21): the terminal then sat in "running", slid to "stalled",
+  // and its coordinator waited on finished work. So once such a terminal has
+  // stayed idle for a settle period, the verdict is re-evaluated from git facts.
+  const VERDICT_RECHECK_IDLE_MS = 20_000;
+  const verdictRecheckTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const cancelVerdictRecheck = (terminalId: string) => {
+    const timer = verdictRecheckTimers.get(terminalId);
+    if (timer) {
+      clearTimeout(timer);
+      verdictRecheckTimers.delete(terminalId);
+    }
+  };
+  const scheduleVerdictRecheck = (terminalId: string) => {
+    cancelVerdictRecheck(terminalId);
+    const timer = setTimeout(() => {
+      verdictRecheckTimers.delete(terminalId);
+      const terminal = terminals.get(terminalId);
+      const session = sessions.get(terminalId);
+      if (!terminal?.verdictFlippedBack || session?.agentState !== "idle") {
+        return;
+      }
+      terminal.verdictFlippedBack = undefined;
+      evaluateSessionCompletion(terminalId);
+    }, VERDICT_RECHECK_IDLE_MS);
+    if (typeof timer.unref === "function") {
+      timer.unref();
+    }
+    verdictRecheckTimers.set(terminalId, timer);
+  };
+
   const broadcastTerminalStateChanged = (
     terminalId: string,
     agentRuntimeState: TerminalSession["agentState"],
@@ -282,11 +315,19 @@ export const createTerminalRuntime = ({
       ) {
         terminal.lifecycleState = "running";
         terminal.lifecycleUpdatedAt = terminal.lastActiveAt;
+        terminal.verdictFlippedBack = true;
         broadcastTerminalEvent({
           type: "terminal-lifecycle-changed",
           terminalId,
           lifecycleState: "running",
         });
+      }
+      if (terminal.verdictFlippedBack) {
+        if (agentRuntimeState === "idle") {
+          scheduleVerdictRecheck(terminalId);
+        } else {
+          cancelVerdictRecheck(terminalId);
+        }
       }
       if (terminal.lifecycleState === "stalled" && !waiting) {
         terminal.lifecycleState = "running";
@@ -665,6 +706,7 @@ export const createTerminalRuntime = ({
     }
 
     const completedAt = new Date().toISOString();
+    terminal.verdictFlippedBack = undefined;
     terminal.lifecycleState = verdict.outcome;
     terminal.lifecycleReason = undefined;
     terminal.lifecycleUpdatedAt = completedAt;
@@ -1464,6 +1506,9 @@ export const createTerminalRuntime = ({
 
     async close() {
       clearInterval(stallDetectorInterval);
+      for (const terminalId of [...verdictRecheckTimers.keys()]) {
+        cancelVerdictRecheck(terminalId);
+      }
       clearInterval(archiveSweepInterval);
       sessionRuntime.close();
       await registryPersistence.close();
