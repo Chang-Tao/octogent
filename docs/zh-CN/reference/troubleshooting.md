@@ -92,4 +92,16 @@ Octogent 的转录（`state/transcripts/<terminal>.jsonl`）记录的是状态**
 
 用 `octogent terminal list` 查找 `waiting=permission:Read 7m` 或 `waiting=user 3m`。`octogent terminal result <id>` 显示等待类型、已知工具和开始等待的时间。需要处理不会立即改变生命周期：到达停滞阈值前仍为 `running`（`OCTOGENT_TERMINAL_STALL_MS`，默认 120000 毫秒，每 30 秒检查一次）。对话框重绘不会刷新活动时间；停滞后原因类似 `waiting for permission: Read (since ...)`。
 
-`octogent terminal wait <id>` 在等待输入达到 60 秒后的轮询中打印相关结果块并退出 `3`。用 `--attention-after <秒>` 调整时长，或设为 `0` 禁用。打开该工人的终端，检查权限请求或问题，作出回答，再运行 `wait`。PTY 仍存活，需要处理时退出不会停止会话。运行时离开等待状态后会清除等待信息。不要为同一任务重复启动工人。
+`octogent terminal wait <id>` 在等待输入达到 60 秒后的轮询中打印相关结果块并退出 `3`。用 `--attention-after <秒>` 调整时长，或设为 `0` 禁用。运行 `octogent terminal screen <id>` 检查权限请求或问题，用 `terminal input` 作出回答，再运行 `wait`。PTY 仍存活，需要处理时退出不会停止会话。运行时离开等待状态后会清除等待信息。不要为同一任务重复启动工人。
+
+
+先查看卡住的工人，再根据实际对话框选择回答（下面的 `1` 仅为示例，不要盲目批准权限）：
+
+```bash
+octogent terminal screen <id> --lines 40
+octogent terminal input <id> "1" --enter
+octogent terminal input <id> --keys esc
+octogent terminal result <id> --screen
+```
+
+`channel send` 等待空闲，无法回答忙碌回合中的对话框；`terminal input` 直接写入存活的 PTY。使用量耗尽、启动失败或退出后的诊断，可用 `result --screen` 或 `screen` 查看；已结束会话的屏幕会标注保存时间。未启动的会话可能没有屏幕；重启不会恢复 PTY，只有正常清理时保存的屏幕可用。

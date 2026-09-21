@@ -150,7 +150,7 @@ octogent worktree gc --dry-run
 
 ```bash
 octogent terminal wait <terminal-id> [<terminal-id>...] [--timeout <秒>] [--interval <秒>] [--attention-after <秒>] [--json]
-octogent terminal result <terminal-id> [--json]
+octogent terminal result <terminal-id> [--json] [--screen]
 ```
 
 `wait` 轮询直到列出的每个终端都已尘埃落定——`awaiting-review`、`completed`、`stopped`、`exited` 或 `stale`——过程中打印每次状态变化，最后打印每个终端的结果块。全部以 `awaiting-review` 或 `completed` 结束时退出码为 `0`，任一以其他方式结束为 `1`，超时为 `2`，工人需要处理时为 `3`（`--timeout 0` 即默认值表示一直等；`--interval` 默认 5 秒、最小 1 秒）。`result` 不等待，立即打印同样的结果块。
@@ -176,3 +176,17 @@ octogent channel list <terminal-id>
 ```
 
 > 本文件是 [../../reference/cli.md](../../reference/cli.md) 的中文翻译版本。如有歧义，以英文原文为准。
+
+## 查看屏幕并直接输入
+
+```bash
+octogent terminal screen <id> [--lines N] [--raw]
+octogent terminal input <id> [<text>] [--enter] [--keys <name,...>]
+octogent terminal result <id> --screen [--json]
+```
+
+`screen` 默认打印最后 40 行（`--lines` 为 1–200）：移除 ANSI/OSC，应用回车覆盖，合并连续重复行。它是有界滚动历史的文本视图，不是完整终端模拟器。`--raw` 返回未经处理的实时尾部。会话结束时，最后 200 行处理后的屏幕尽力保存到 `<stateDir>/state/transcripts/<terminalId>.screen.txt`；没有实时会话时读取该文件并标注“保存于 <时间>”。保存内容不含原始转义序列，即使带 `--raw` 也如此。没有实时或已保存屏幕时退出码为 1；未启动的会话或服务被强制终止时可能没有屏幕。
+
+`input` 不受代理忙碌或等待权限的状态限制，文本按字符输入，不使用括号粘贴。先发送文本，再按顺序发送 `--keys`，最后 `--enter` 延迟 150 毫秒发送回车。允许的按键为 `enter`、`esc`、`up`、`down`、`tab`、`ctrl-c` 和 `1`–`9`；其他名称被拒绝。纯按键输入可省略文本；以 `--` 开头的文本放在 `--` 分隔符之后。JSON 请求体及解码后的输入都最多 4096 字节（JSON 包装占用请求体额度）。需要存活的 PTY，不会启动会话；每次接受的请求记录 `input_submit` 审计事件。延迟回车前结束会话会取消该回车。
+
+`result --screen` 附加最后 20 行；配合 `--json` 时增加 `screen: { text, savedAt, raw }`（没有屏幕时为 `null`）。实时屏幕的 `savedAt` 为 `null`，保存屏幕的时间为 ISO 格式。

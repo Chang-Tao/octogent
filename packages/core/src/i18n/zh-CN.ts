@@ -1,6 +1,17 @@
 import type { TranslationMap } from "./types";
 
 export const zhCN: TranslationMap = {
+  "cli.screen.unavailable": "没有可用的实时或已保存终端屏幕。",
+  "cli.screen.savedAt": "保存于 {time}",
+  "cli.screen.heading": "终端屏幕",
+  "cli.input.sent": "已向终端 {id} 发送输入",
+  "cli.error.screenArgs": "用法：terminal screen <id> [--lines 1–200] [--raw]",
+  "cli.error.inputArgs":
+    "用法：terminal input <id> [<text>] [--enter] [--keys enter,esc,up,down,tab,ctrl-c,1–9]（最多 4096 字节）",
+  "cli.error.inputFailed": "终端输入失败（HTTP {status}），需要存活的会话。",
+  "cli.help.resultScreen": "附加最后 20 行屏幕内容",
+  "cli.help.screenInput":
+    "octogent terminal screen <id> [--lines N] [--raw]  查看屏幕（默认 40 行）\n  octogent terminal input <id> [<text>] [--enter] [--keys name,...]  直接向 PTY 输入",
   // ── CLI ──────────────────────────────────────────────
   "cli.init.initialized": "已初始化 Octogent 项目 {displayName}，路径：{path}",
   "cli.init.ready": "运行 `octogent` 启动仪表盘。",
