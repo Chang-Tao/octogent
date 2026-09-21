@@ -9,6 +9,7 @@ import type {
   TerminalAgentProvider,
   TerminalCompletionSummary,
   TerminalLifecycleState,
+  TerminalProviderError,
 } from "@octogent/core";
 import { isTerminalAgentProvider, isTerminalCompletionSoundId } from "@octogent/core";
 import type { IPty } from "node-pty";
@@ -148,6 +149,7 @@ export type PersistedTerminal = {
   attentionSince?: string | undefined;
   attentionKind?: "permission" | "user" | undefined;
   attentionToolName?: string | undefined;
+  providerError?: TerminalProviderError | undefined;
   initialPrompt?: string;
   initialInputDraft?: string;
   lastActiveAt?: string;

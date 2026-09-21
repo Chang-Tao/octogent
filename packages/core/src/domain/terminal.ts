@@ -39,6 +39,26 @@ export type TerminalCompletionSummary = {
   workspaceMode: TentacleWorkspaceMode;
 };
 
+export type TerminalProviderErrorKind = "usage-limit" | "rate-limit" | "api-error" | "auth";
+
+export const TERMINAL_PROVIDER_ERROR_KINDS: TerminalProviderErrorKind[] = [
+  "usage-limit",
+  "rate-limit",
+  "api-error",
+  "auth",
+];
+
+export const isTerminalProviderErrorKind = (value: unknown): value is TerminalProviderErrorKind =>
+  typeof value === "string" &&
+  TERMINAL_PROVIDER_ERROR_KINDS.includes(value as TerminalProviderErrorKind);
+
+/** A fatal or limit banner the agent CLI printed; the agent itself reports nothing. */
+export type TerminalProviderError = {
+  kind: TerminalProviderErrorKind;
+  message: string;
+  at: string;
+};
+
 export type TerminalSnapshot = {
   terminalId: string;
   label: string;
@@ -60,6 +80,8 @@ export type TerminalSnapshot = {
   attentionSince?: string;
   attentionKind?: "permission" | "user";
   attentionToolName?: string;
+  /** Cleared when the agent next makes real progress (a tool call or a Stop verdict). */
+  providerError?: TerminalProviderError;
   agentRuntimeState?: AgentRuntimeState;
   lifecycleState?: TerminalLifecycleState;
   lifecycleReason?: string;
