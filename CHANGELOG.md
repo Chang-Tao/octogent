@@ -105,6 +105,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Flow view octopuses now look the way they do on the canvas: one shared
+  derivation (`apps/web/src/app/octopusVisuals.ts`) gives each tentacle its
+  animation, expression, accessory, hair color and color from its id and the
+  deck's stored appearance, and the canvas node, canvas panel, deck and flow
+  view all use it — the flow view used to draw the same octopus in different
+  colors. Octoboss-direct agents keep their place in front of the fan.
 - Claude worktree terminals are launched with `--add-dir
   <workspace>/.octogent/tentacles`. Claude Code raises a blocking one-time
   dialog ("Read outside the working directories…") on the first read outside
