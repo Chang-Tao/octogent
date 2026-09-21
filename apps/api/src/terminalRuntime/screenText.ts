@@ -6,6 +6,8 @@ const ERASE_LINE = new RegExp(`^${ESC}\\[[012]?K$`);
 const WIDE_CHARACTER =
   /[\u1100-\u115f\u2329\u232a\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff01-\uff60\uffe0-\uffe6\u{1f300}-\u{1faff}\u{20000}-\u{3ffff}]/u;
 
+// Raw mode serves `--raw` and reads of saved screens. Stripped mode is the teardown
+// fallback that stays on disk when the emulator render (screenRender.ts) cannot finish.
 export const screenTail = (text: string, lines = 40, raw = false): string => {
   if (raw) {
     const rows = text.split("\n");

@@ -477,7 +477,11 @@ export const handleTerminalScreenInputRoute: ApiRouteHandler = async (
       writeJson(response, 400, { error: "lines must be an integer from 1 to 200." }, corsOrigin);
       return true;
     }
-    const result = runtime.getScreen(terminalId, lines, requestUrl.searchParams.get("raw") === "1");
+    const result = await runtime.getScreen(
+      terminalId,
+      lines,
+      requestUrl.searchParams.get("raw") === "1",
+    );
     writeJson(
       response,
       result ? 200 : 404,
