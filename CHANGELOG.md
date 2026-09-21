@@ -105,6 +105,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- A worker waiting on a dialog is no longer invisible. The runtime records
+  since when and on what it waits (`attentionSince` / `attentionKind` /
+  `attentionToolName` on the snapshot), dialog repaints stop counting as
+  activity so the stall detector fires with a specific reason
+  (`waiting for permission: Read (since …)`), `terminal list` appends
+  `waiting=permission:Read 7m`, `terminal result` prints a "needs attention"
+  line, and `terminal wait` exits with code 3 once a terminal has waited
+  longer than `--attention-after` (default 60 s). Verified against a real
+  Claude permission dialog.
 - Flow view octopuses now look the way they do on the canvas: one shared
   derivation (`apps/web/src/app/octopusVisuals.ts`) gives each tentacle its
   animation, expression, accessory, hair color and color from its id and the
