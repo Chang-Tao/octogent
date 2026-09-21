@@ -210,7 +210,7 @@ describe("terminal attention", () => {
 describe("provider errors", () => {
   const at = "2026-09-21T12:03:04.000Z";
   const providerError = {
-    kind: "usage-limit",
+    kind: "usage-limit" as const,
     message: "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage.",
     at,
   };
