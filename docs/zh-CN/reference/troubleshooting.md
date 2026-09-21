@@ -128,3 +128,17 @@ octogent terminal result <id> --screen
 ```
 
 `channel send` 等待空闲，无法回答忙碌回合中的对话框；`terminal input` 直接写入存活的 PTY。使用量耗尽、启动失败或退出后的诊断，可用 `result --screen` 或 `screen` 查看；已结束会话的屏幕会标注保存时间。屏幕是保留的滚动历史在终端模拟器中的回放，对话框按绘制结果显示，但超出滚动缓冲区的更早输出不包含在内。未启动的会话可能没有屏幕；重启不会恢复 PTY，只有正常清理时保存的屏幕可用。
+
+## 工作代理撞上用量上限或 API 错误
+
+代理 CLI 只在屏幕上报告服务商那边的失败：Codex 因用量上限结束一轮时不触发 Stop 钩子，Claude 打印 API 错误后就停在那里。Octogent 会在每个终端的 PTY 输出里识别这类横幅——用量上限、速率限制、API 错误（如连接中断、服务过载）以及登录失效——并把第一条匹配的行记录到终端的 `providerError`（`kind`、`message`、`at`）上。只有位于行首的横幅才算数，所以工作代理在自己的正文里讨论“上限”不会被误判；CLI 自己还在重试的提示也会被忽略。同一条横幅反复重绘不会重新计时。
+
+错误存在期间，生命周期仍为 `running`，原因为 `provider error: <横幅内容>`；之后若进入停滞，原因也保持这一条，而不是 `no transcript activity`。`octogent terminal list` 在行尾追加 `error=usage-limit`（或 `rate-limit`、`api-error`、`auth`），`octogent terminal result <id>` 在“需要处理”行之后打印一行服务商错误。服务商错误持续 30 秒后，`octogent terminal wait` 就退出 `3`——比对话框的阈值更早，因为干等解除不了上限；`--attention-after 0` 同样会禁用这一项。代理重新取得真实进展时错误自动清除：下一次工具调用，或给出完成判定的 Stop 钩子；重新启动的会话也从无错误开始。单纯发一条新提示词不会清除它，因为代理可能再次撞上同一堵墙。
+
+按类型处理：
+
+- `usage-limit`：不要再派给同一个服务商。横幅通常写明重置时间；等到那时，或用别的 `--agent-provider` / `--model` 重新创建工作代理。
+- `rate-limit` 或 `api-error`：多半是暂时的。稍等片刻后用 `octogent channel send <id> "continue"` 让它继续，再确认下一次工具调用清除了错误。
+- `auth`：在主机上重新登录 CLI（在 `claude` 里执行 `/login`，或 `codex login`）；工作代理无法自行恢复。
+
+识别依据是屏幕文字，所以如果某个工具结果的第一行本身就是这样的横幅（比如工作代理打印了一段错误日志），也会触发；下一次工具调用会清除它。另外，当服务端最近一次获取的用量已经显示所选服务商额度耗尽时，`octogent terminal create` 也会给出警告，见 [CLI 参考](cli.md) 的“创建终端”一节。

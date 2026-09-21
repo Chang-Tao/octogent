@@ -7,6 +7,7 @@ import type { CodexUsageSnapshot } from "../codexUsage";
 import type { GitHubRepoSummarySnapshot } from "../githubRepoSummary";
 import type { HealthSnapshot } from "../healthSnapshot";
 import type { MonitorService } from "../monitor";
+import type { CachedUsageSnapshots } from "../usageExhaustion";
 import { RequestBodyTooLargeError, readJsonBody } from "./requestParsers";
 import { withCors } from "./security";
 
@@ -24,6 +25,8 @@ export type RouteHandlerDependencies = {
   readClaudeOauthUsageSnapshot: () => Promise<ClaudeUsageSnapshot>;
   readClaudeCliUsageSnapshot: () => Promise<ClaudeUsageSnapshot>;
   readCodexUsageSnapshot: () => Promise<CodexUsageSnapshot>;
+  /** Last good usage readings, for checks that must not fetch. */
+  readCachedUsage: () => CachedUsageSnapshots;
   readGithubRepoSummary: () => Promise<GitHubRepoSummarySnapshot>;
   scanUsageHeatmap: (scope: "all" | "project") => Promise<UsageChartResponse>;
   monitorService: MonitorService;

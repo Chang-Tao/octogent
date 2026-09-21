@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseTerminalCreateArgs } from "../src/cliTerminalCreate";
+import { formatUsageWarning, parseTerminalCreateArgs } from "../src/cliTerminalCreate";
 
 const createArgs = (...rest: string[]) => ["terminal", "create", ...rest];
 
@@ -132,5 +132,28 @@ describe("parseTerminalCreateArgs", () => {
       errorKey: "cli.error.validJsonFlag",
       params: { flag: "--prompt-variables" },
     });
+  });
+});
+
+describe("formatUsageWarning", () => {
+  it("warns when the create response carries an exhausted bucket", () => {
+    const usageWarning = {
+      provider: "codex",
+      bucket: "5-hour",
+      usedPercent: 100,
+      resetAt: "2026-09-21T15:00:00.000Z",
+    };
+    expect(formatUsageWarning({ terminalId: "t-1", usageWarning }, "en")).toBe(
+      "Warning: codex's cached usage shows its 5-hour limit reached (resets 2026-09-21T15:00:00.000Z) — this worker will likely stop at its first request.",
+    );
+    expect(formatUsageWarning({ usageWarning: { ...usageWarning, resetAt: null } }, "zh-CN")).toBe(
+      "警告：codex 的缓存用量显示 5-hour 额度已用尽——该 worker 很可能在第一次请求时就停下。",
+    );
+  });
+
+  it("stays silent without a well-formed warning", () => {
+    expect(formatUsageWarning({ terminalId: "t-1" }, "en")).toBeNull();
+    expect(formatUsageWarning({ usageWarning: { provider: "codex" } }, "en")).toBeNull();
+    expect(formatUsageWarning({ usageWarning: "exhausted" }, "en")).toBeNull();
   });
 });

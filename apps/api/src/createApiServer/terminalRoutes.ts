@@ -7,8 +7,10 @@ import {
   type TerminalAgentProvider,
   type TerminalNameOrigin,
 } from "../terminalRuntime";
+import { DEFAULT_AGENT_PROVIDER } from "../terminalRuntime/constants";
 import type { EffortTier } from "../terminalRuntime/modelSelection";
 import { MAX_TERMINAL_INPUT_BYTES } from "../terminalRuntime/terminalInput";
+import { findExhaustedUsage } from "../usageExhaustion";
 import type { ApiRouteHandler } from "./routeHelpers";
 import {
   readJsonBodyOrWriteError,
@@ -66,7 +68,15 @@ export const handleTerminalSnapshotsRoute: ApiRouteHandler = async (
 
 export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
   { request, response, requestUrl, corsOrigin },
-  { runtime, workspaceCwd, projectStateDir, promptsDir, userPromptsDir, getApiPort },
+  {
+    runtime,
+    workspaceCwd,
+    projectStateDir,
+    promptsDir,
+    userPromptsDir,
+    getApiPort,
+    readCachedUsage,
+  },
 ) => {
   if (requestUrl.pathname !== "/api/terminals") {
     return false;
@@ -262,6 +272,15 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     const payload: Record<string, unknown> = { ...snapshot };
     if (createTerminalInput.initialPrompt) {
       payload.initialPrompt = createTerminalInput.initialPrompt;
+    }
+    const usageWarning = findExhaustedUsage(
+      snapshot.agentProvider ?? DEFAULT_AGENT_PROVIDER,
+      snapshot.agentModel ?? null,
+      readCachedUsage(),
+      Date.now(),
+    );
+    if (usageWarning) {
+      payload.usageWarning = usageWarning;
     }
     writeJson(response, 201, payload, corsOrigin);
     return true;

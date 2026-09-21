@@ -25,6 +25,9 @@ export const zhCN: TranslationMap = {
   "cli.created.terminal": "已在触手 {tentacleId} 上创建终端 {id}",
   "cli.created.terminalOctobossHint":
     "未指定 --tentacle-id，该终端直属 octoboss；要挂到某个触手（小章鱼）下，请加 --tentacle-id <触手ID>。",
+  "cli.created.usageExhausted":
+    "警告：{provider} 的缓存用量显示 {bucket} 额度已用尽{reset}——该 worker 很可能在第一次请求时就停下。",
+  "cli.created.usageExhaustedReset": "（{time} 重置）",
   "cli.killed.terminal": "已终止终端 {id}",
   "cli.stopped.terminal": "已停止终端 {id}",
   "cli.archived.terminal": "已归档终端 {id}",
@@ -62,6 +65,7 @@ export const zhCN: TranslationMap = {
   "cli.result.attentionPermission": "等待权限确认",
   "cli.result.attentionUser": "等待用户回答",
   "cli.result.attentionSince": "自 {since} 起",
+  "cli.result.providerError": "服务商错误",
   "cli.result.state": "状态",
   "cli.result.summary": "摘要",
   "cli.result.summaryLine":
