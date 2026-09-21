@@ -105,6 +105,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Trial-run fixes (this fork's evolution, phase 7)
 
+- Claude worktree terminals are launched with `--add-dir
+  <workspace>/.octogent/tentacles`. Claude Code raises a blocking one-time
+  dialog ("Read outside the working directories…") on the first read outside
+  a session's working directories, and Octogent's own convention keeps task
+  briefs in the main checkout — four workers in a real project froze on that
+  read for 41–464 minutes while Octogent reported them as running
+  (cross-project log analysis, 2026-09-21). Verified with a live sonnet
+  worktree worker: no dialog, task read in seconds.
 - `octogent terminal wait <id>...` blocks until the listed terminals settle
   and prints each one's final answer (exit 0 when all reached
   awaiting-review/completed, 1 otherwise, 2 on `--timeout`);
