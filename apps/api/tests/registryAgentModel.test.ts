@@ -53,3 +53,43 @@ describe("terminal registry model fields", () => {
     });
   });
 });
+
+describe("terminal registry attention fields", () => {
+  it.each([
+    {
+      attentionKind: "permission",
+      attentionSince: "2026-09-21T12:03:04.000Z",
+      attentionToolName: "Read",
+    },
+    { attentionKind: "user", attentionSince: "2026-09-21T12:03:04.000Z" },
+    { attentionKind: "invalid", attentionSince: "bad" },
+    {},
+  ])("loads valid optional attention metadata: %j", (attention) => {
+    const dir = mkdtempSync(join(tmpdir(), "octogent-registry-attention-"));
+    tempDirs.push(dir);
+    const path = join(dir, "tentacles.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: TERMINAL_REGISTRY_VERSION,
+        terminals: [
+          {
+            terminalId: "t",
+            tentacleId: "t",
+            tentacleName: "t",
+            createdAt: "2026-09-21T12:00:00.000Z",
+            workspaceMode: "shared",
+            ...attention,
+          },
+        ],
+      }),
+    );
+    const terminal = loadTerminalRegistry(path).terminals.get("t");
+    if (attention.attentionKind === "permission" || attention.attentionKind === "user") {
+      expect(terminal).toMatchObject(attention);
+    } else {
+      expect(terminal?.attentionSince).toBeUndefined();
+      expect(terminal?.attentionKind).toBeUndefined();
+    }
+  });
+});
