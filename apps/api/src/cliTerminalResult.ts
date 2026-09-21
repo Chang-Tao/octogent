@@ -78,9 +78,7 @@ const asString = (value: unknown): string | null => (typeof value === "string" ?
 const asNumber = (value: unknown): number => (typeof value === "number" ? value : 0);
 
 /** The snapshot's provider error, or null when absent or malformed. */
-export const readProviderError = (
-  snapshot: Record<string, unknown>,
-): TerminalProviderError | null => {
+const readProviderError = (snapshot: Record<string, unknown>): TerminalProviderError | null => {
   const value = snapshot.providerError as Record<string, unknown> | undefined;
   if (
     !value ||

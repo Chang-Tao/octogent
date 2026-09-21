@@ -68,15 +68,24 @@ const OSC_RE = new RegExp(`${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`, "g")
 // Cursor moves to another row (or column 1) start a new visual line; TUIs that
 // paint by cursor address never print a newline between rows.
 const LINE_BREAK_SOURCE = `\\r\\n?|\\n|${ESC}\\[[0-9;?]*[ABEFGHdf]|${ESC}[DEM]`;
+const LINE_BREAK_RE = new RegExp(LINE_BREAK_SOURCE, "g");
+const FIRST_LINE_BREAK_RE = new RegExp(LINE_BREAK_SOURCE);
 const CURSOR_FORWARD_RE = new RegExp(`${ESC}\\[\\d*C`, "g");
+// Controls left once sequences are stripped (a bell, a backspace) would sit
+// in front of a banner and hide its line start.
+const charRange = (from: number, to: number) =>
+  `${String.fromCharCode(from)}-${String.fromCharCode(to)}`;
+const STRAY_CONTROL_RE = new RegExp(
+  `[${charRange(0x00, 0x08)}${charRange(0x0b, 0x1f)}${String.fromCharCode(0x7f)}]`,
+  "g",
+);
 
 const toPlainLines = (raw: string): string[] =>
   stripVTControlCharacters(
-    raw
-      .replace(OSC_RE, "")
-      .replace(CURSOR_FORWARD_RE, " ")
-      .replace(new RegExp(LINE_BREAK_SOURCE, "g"), "\n"),
-  ).split("\n");
+    raw.replace(OSC_RE, "").replace(CURSOR_FORWARD_RE, " ").replace(LINE_BREAK_RE, "\n"),
+  )
+    .replace(STRAY_CONTROL_RE, "")
+    .split("\n");
 
 const matchBannerLine = (line: string): ProviderErrorMatch | null => {
   const text = line.replace(LEADING_DECORATION_RE, "").replace(/\s+/g, " ").trim();
@@ -98,14 +107,14 @@ const matchFirstLine = (lines: string[]): ProviderErrorMatch | null => {
 /** End offset of the last line break in raw PTY text, or -1 when there is none. */
 const lastLineBreakEnd = (raw: string): number => {
   let end = -1;
-  for (const match of raw.matchAll(new RegExp(LINE_BREAK_SOURCE, "g"))) {
+  for (const match of raw.matchAll(LINE_BREAK_RE)) {
     end = match.index + match[0].length;
   }
   return end;
 };
 
 const firstLineBreakEnd = (raw: string): number => {
-  const match = new RegExp(LINE_BREAK_SOURCE).exec(raw);
+  const match = FIRST_LINE_BREAK_RE.exec(raw);
   return match ? match.index + match[0].length : -1;
 };
 

@@ -58,6 +58,10 @@ describe("detectProviderError", () => {
         `\x1b]0;✳ Worker\x07\x1b[12;1H\x1b[2K\x1b[31m■\x1b[39m \x1b[1mYou've hit your usage limit.\x1b[22m`,
       ),
     ).toEqual({ kind: "usage-limit", message: "You've hit your usage limit." });
+    // A terminal bell rung just before the banner is not part of the line.
+    expect(detectProviderError("\x07\x1b[2K  ⎿  API Error: Connection lost\r\n")?.kind).toBe(
+      "api-error",
+    );
     // Rows painted by cursor moves are separate lines, not one run-on string.
     expect(detectProviderError("previous row\x1b[5;3HAPI Error: Connection lost")?.kind).toBe(
       "api-error",
