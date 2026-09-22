@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -10,7 +9,6 @@ import { formatChannelMessageLine } from "./cliChannel";
 import { renderGuide, resolveAgentSkillTargets, setupAgentSkills } from "./cliGuide";
 import {
   type HubCliContext,
-  announceHubForCurrentProject,
   exitOnHubCliError,
   runHubForeground,
   runHubRestart,
@@ -18,6 +16,7 @@ import {
   runHubStatus,
   runHubStop,
 } from "./cliHub";
+import { runBareStart } from "./cliStart";
 import { formatUsageWarning, parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
@@ -46,6 +45,7 @@ import {
   toConnectableHost,
 } from "./listenHost";
 import { configureServerLogging, installUncaughtErrorLogging, log } from "./logging";
+import { maybeOpenBrowser } from "./openBrowser";
 import {
   ensureOctogentGitignoreEntry,
   ensureProjectScaffold,
@@ -71,7 +71,7 @@ const locale: Locale = (process.env.OCTOGENT_LOCALE as Locale) ?? DEFAULT_LOCALE
 
 // --project and --standalone apply to every command, so no per-command parser
 // (or a channel message's free text) ever sees them.
-const { args, projectFlag, standalone } = extractGlobalFlags(process.argv.slice(2));
+const { args, projectFlag } = extractGlobalFlags(process.argv.slice(2));
 const command = args[0];
 
 const resolvePackageRoot = () => {
@@ -218,29 +218,6 @@ const apiError = () => {
     t(locale, "cli.error.apiUnreachable", { url: apiBaseResolver.lastApiBase() ?? "?" }),
   );
   process.exit(1);
-};
-
-const maybeOpenBrowser = (url: string) => {
-  if (process.env.OCTOGENT_NO_OPEN === "1" || process.env.CI === "1") {
-    return;
-  }
-
-  const command =
-    process.platform === "darwin"
-      ? { file: "open", args: [url] }
-      : process.platform === "win32"
-        ? { file: "cmd", args: ["/c", "start", "", url] }
-        : { file: "xdg-open", args: [url] };
-
-  try {
-    const child = spawn(command.file, command.args, {
-      stdio: "ignore",
-      detached: true,
-    });
-    child.unref();
-  } catch {
-    // Best-effort browser open.
-  }
 };
 
 const startServer = async () => {
@@ -1054,12 +1031,15 @@ const listProjects = () => {
 
 const main = async () => {
   if (!command || command === "start") {
-    // A second server over a project the hub already serves would share its
-    // state files with it; point at the hub unless asked for a lone server.
-    if (!standalone && (await announceHubForCurrentProject(hubContext))) {
-      return;
+    const handled = await runBareStart(hubContext, {
+      argv: process.argv.slice(2),
+      projectFlag,
+      openBrowser: maybeOpenBrowser,
+    }).catch(exitOnHubCliError);
+    if (!handled) {
+      return startServer();
     }
-    return startServer();
+    return;
   }
 
   if (command === "hub" && (await runHubCommand(args[1]))) {
@@ -1172,7 +1152,7 @@ const main = async () => {
   }
 
   console.log(`Usage:
-  octogent                             Start the dashboard in the current project
+  ${t(locale, "cli.help.start")}
   ${t(locale, "cli.help.standalone")}
   octogent init [project-name]         Initialize the current directory explicitly
   octogent projects                    List registered projects (* marks the current one)

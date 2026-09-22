@@ -157,18 +157,24 @@ export const en: TranslationMap = {
   "cli.hub.notAProject":
     "Error: {path} is not inside a registered project or a git repository. Run the command in a project, pass --project <slug>, or run `octogent init` here first.",
   "cli.hub.autostartDisabled":
-    "Error: no hub is running and OCTOGENT_NO_AUTOSTART=1 keeps it from starting. Start it with `octogent hub start`, or run `octogent` in the project for a single-project server.",
+    "Error: no hub is running and OCTOGENT_NO_AUTOSTART=1 keeps it from starting. Start it with `octogent hub start`, or run `octogent --standalone` in the project for a single-project server.",
   "cli.hub.registered": "Registered {path} with the hub as {slug}.",
   "cli.hub.registerFailed": "Error: could not register {path} with the hub: {reason}",
-  "cli.hub.bareServing": "The hub already serves this project: {url}",
-  "cli.hub.bareUseHub":
-    "- Use the hub: open that address; octogent commands here already reach it.",
-  "cli.hub.bareStandalone":
-    "- Or run `octogent --standalone` to start a separate single-project server as before.",
+  "cli.start.project": "Octogent dashboard for {slug}: {url}",
+  "cli.start.overview": "Not inside a project; the hub's project overview: {url}",
+  "cli.start.hubStarted":
+    "The hub keeps running in the background: `octogent hub status` shows it, `octogent hub stop` stops it.",
+  "cli.start.ownServer": "A single-project server already serves this project: {url}",
+  "cli.start.ownServerHint":
+    "To move the project to the hub, stop that server and run `octogent` again.",
+  "cli.start.blockedStandalone":
+    "Or run `octogent --standalone` for a single-project server on the next free port.",
   "cli.help.hub":
     "octogent hub start [--foreground]    Start the hub: one server for every registered project\n  octogent hub status                  Show the hub's address, build, and projects (exit 1 if none answers)\n  octogent hub stop                    Stop the hub\n  octogent hub restart [--force]       Restart the hub; refuses while terminals run unless --force",
+  "cli.help.start":
+    "octogent                             Open the current project on the hub (starts the hub and registers the project if needed)",
   "cli.help.standalone":
-    "octogent --standalone                Start a single-project server even when a hub serves the project",
+    "octogent --standalone                Start a single-project server for the current project instead",
   "cli.help.project":
     "--project <slug|id>                  For the commands below: target a registered project, not the current directory",
   "cli.hub.driftOlder":
@@ -176,7 +182,7 @@ export const en: TranslationMap = {
   "cli.hub.driftDifferent":
     "Warning: the hub is running a different build (hub {hub}, CLI {cli}); `octogent hub restart` when workers are idle.",
   "cli.usage": `Usage:
-  octogent                             Start the dashboard in the current project
+  octogent                             Open the current project on the hub
   octogent init [project-name]         Initialize the current directory explicitly
   octogent projects                    List registered projects
 

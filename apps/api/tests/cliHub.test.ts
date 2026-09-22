@@ -280,7 +280,47 @@ describe("octogent hub (end to end)", () => {
     expect(start.stderr).toContain(String(port));
     expect(start.stderr).toContain("/work/old-project");
     expect(existsSync(join(home, "hub.json"))).toBe(false);
+
+    // Bare `octogent` says the same and offers the single-project server.
+    const bare = await runCli([], env, makeDirectory("octogent-no-repo-"));
+    expect(bare.code).toBe(1);
+    expect(bare.stderr).toContain(`pid ${process.pid}`);
+    expect(bare.stderr).toContain("--standalone");
+    expect(existsSync(join(home, "hub.json"))).toBe(false);
   }, 60_000);
+
+  it("bare octogent starts the hub, registers the repository, and prints its page", async () => {
+    const { home, env, apiBaseUrl } = await makeEnvironment();
+    const repo = join(makeDirectory("octogent-hub-repo-"), "Bare Repo");
+    mkdirSync(repo);
+    spawnSync("git", ["init", "-q"], { cwd: repo });
+
+    const first = await runCli([], env, repo);
+    const metadata = readHubMetadata(home);
+    if (metadata) {
+      hubPids.push(metadata.pid);
+    }
+    expect(first.code, first.stderr).toBe(0);
+    expect(metadata?.apiBaseUrl).toBe(apiBaseUrl);
+    expect(first.stdout).toContain(`${apiBaseUrl}/p/bare-repo/`);
+    expect(first.stdout).toContain("octogent hub stop");
+    expect(existsSync(join(repo, ".octogent", "project.json"))).toBe(true);
+
+    // Outside any project it opens the overview of the hub already running.
+    const outside = await runCli([], env, makeDirectory("octogent-no-repo-"));
+    expect(outside.code, outside.stderr).toBe(0);
+    expect(outside.stdout).toContain(`${apiBaseUrl}/`);
+    expect(outside.stdout).not.toContain("/p/");
+    expect(outside.stdout).not.toContain("octogent hub stop");
+
+    const byFlag = await runCli(["--project", "bare-repo"], env, home);
+    expect(byFlag.code, byFlag.stderr).toBe(0);
+    expect(byFlag.stdout).toContain(`${apiBaseUrl}/p/bare-repo/`);
+    expect((await runCli(["--project", "nope"], env, home)).code).toBe(1);
+
+    expect(readHubMetadata(home)?.pid).toBe(metadata?.pid);
+    expect((await runCli(["hub", "stop"], env)).code).toBe(0);
+  }, 90_000);
 
   it("auto-starts the hub and registers a git repository on first use", async () => {
     const { home, env, apiBaseUrl } = await makeEnvironment();
@@ -315,11 +355,11 @@ describe("octogent hub (end to end)", () => {
     const projects = await runCli(["projects"], env, repo);
     expect(projects.stdout).toMatch(/^\* +sample-repo +Sample Repo/m);
 
-    // Bare `octogent` points at the hub instead of starting a second server.
+    // Bare `octogent` opens the project on the running hub.
     const bare = await runCli([], env, repo);
-    expect(bare.code).toBe(0);
+    expect(bare.code, bare.stderr).toBe(0);
     expect(bare.stdout).toContain(`${apiBaseUrl}/p/sample-repo/`);
-    expect(bare.stdout).toContain("--standalone");
+    expect(readHubMetadata(home)?.pid).toBe(metadata?.pid);
 
     const outside = await runCli(["terminal", "list"], env, makeDirectory("octogent-no-repo-"));
     expect(outside.code).toBe(1);

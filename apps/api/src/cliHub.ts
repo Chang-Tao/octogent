@@ -32,7 +32,6 @@ import {
   resolveGlobalOctogentDir,
   resolveHubStateDir,
 } from "./projectPersistence";
-import { toProjectSlug } from "./projectSlug";
 import { readRuntimeMetadata } from "./runtimeMetadata";
 import { logStartupPrerequisites } from "./startupPrerequisites";
 
@@ -72,7 +71,7 @@ const resolveHubLogPath = () => join(resolveHubStateDir(), "logs", "server.log")
 // to server.log, such as a crash while loading.
 const resolveDaemonStderrPath = () => join(resolveHubStateDir(), "logs", "daemon-stderr.log");
 
-type PortOccupant =
+export type PortOccupant =
   | { kind: "free" }
   | { kind: "hub"; pid: number | null }
   | { kind: "other"; pid: number | null; workspaceCwd: string | null };
@@ -95,7 +94,7 @@ const findRuntimeOnPort = (port: number): { pid: number; workspaceCwd: string } 
   return null;
 };
 
-const inspectHubPort = async (port: number, host: string): Promise<PortOccupant> => {
+export const inspectHubPort = async (port: number, host: string): Promise<PortOccupant> => {
   if (await canListenOnPort(port, host)) {
     return { kind: "free" };
   }
@@ -105,6 +104,27 @@ const inspectHubPort = async (port: number, host: string): Promise<PortOccupant>
   }
   const runtime = findRuntimeOnPort(port);
   return { kind: "other", pid: runtime?.pid ?? null, workspaceCwd: runtime?.workspaceCwd ?? null };
+};
+
+/** Why the hub cannot take its port from this occupant; null when the port is free. */
+export const describePortOccupant = (
+  locale: Locale,
+  port: number,
+  occupant: PortOccupant,
+): string | null => {
+  if (occupant.kind === "hub") {
+    return t(locale, "cli.hub.portHeldByOrphanHub", { port, pid: occupant.pid ?? "?" });
+  }
+  if (occupant.kind === "other") {
+    return occupant.pid === null
+      ? t(locale, "cli.hub.portTakenUnknown", { port })
+      : t(locale, "cli.hub.portTaken", {
+          port,
+          pid: occupant.pid,
+          workspace: occupant.workspaceCwd ?? "?",
+        });
+  }
+  return null;
 };
 
 /** Throws a worded error unless the hub may bind here. */
@@ -124,21 +144,9 @@ const assertHubCanStart = async (
   }
 
   const occupant = await inspectHubPort(port, host);
-  if (occupant.kind === "hub") {
-    throw new HubCliError(
-      t(locale, "cli.hub.portHeldByOrphanHub", { port, pid: occupant.pid ?? "?" }),
-    );
-  }
-  if (occupant.kind === "other") {
-    throw new HubCliError(
-      occupant.pid === null
-        ? t(locale, "cli.hub.portTakenUnknown", { port })
-        : t(locale, "cli.hub.portTaken", {
-            port,
-            pid: occupant.pid,
-            workspace: occupant.workspaceCwd ?? "?",
-          }),
-    );
+  const blocked = describePortOccupant(locale, port, occupant);
+  if (blocked) {
+    throw new HubCliError(blocked);
   }
   return { port, host, accessToken };
 };
@@ -575,28 +583,6 @@ export const runHubStatus = async (context: HubCliContext): Promise<number> => {
     console.log(`${marker} ${project.slug.padEnd(slugWidth)}  ${state}  ${project.path}`);
   }
   return 0;
-};
-
-/**
- * Bare `octogent` while a hub already serves this project: point at it
- * rather than start a second server over the same state. True when it did.
- */
-export const announceHubForCurrentProject = async (context: HubCliContext): Promise<boolean> => {
-  const hub = await readLiveHubMetadata();
-  if (!hub) {
-    return false;
-  }
-  const cwd = process.cwd();
-  const project = findCurrentProject(loadProjectsRegistry(), cwd, findProjectConfigRoot(cwd));
-  if (!project) {
-    return false;
-  }
-  const slug = project.slug ?? toProjectSlug(project.name);
-  const url = `${hub.apiBaseUrl.replace(/\/+$/, "")}/p/${encodeURIComponent(slug)}/`;
-  console.log(t(context.locale, "cli.hub.bareServing", { url }));
-  console.log(`  ${t(context.locale, "cli.hub.bareUseHub")}`);
-  console.log(`  ${t(context.locale, "cli.hub.bareStandalone")}`);
-  return true;
 };
 
 /** Reports a worded hub failure and exits; anything else is a real bug and rethrows. */

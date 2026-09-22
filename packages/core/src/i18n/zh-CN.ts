@@ -146,16 +146,22 @@ export const zhCN: TranslationMap = {
   "cli.hub.notAProject":
     "错误：{path} 不在任何已注册项目或 git 仓库内。请在项目中运行命令、传入 --project <slug>，或先在此运行 `octogent init`。",
   "cli.hub.autostartDisabled":
-    "错误：没有运行中的 hub，且 OCTOGENT_NO_AUTOSTART=1 阻止了自动启动。用 `octogent hub start` 启动它，或在项目中运行 `octogent` 使用单项目服务器。",
+    "错误：没有运行中的 hub，且 OCTOGENT_NO_AUTOSTART=1 阻止了自动启动。用 `octogent hub start` 启动它，或在项目中运行 `octogent --standalone` 使用单项目服务器。",
   "cli.hub.registered": "已将 {path} 注册到 hub，slug 为 {slug}。",
   "cli.hub.registerFailed": "错误：无法将 {path} 注册到 hub：{reason}",
-  "cli.hub.bareServing": "hub 已在服务这个项目：{url}",
-  "cli.hub.bareUseHub": "- 使用 hub：打开该地址；在这里运行的 octogent 命令已经会连到它。",
-  "cli.hub.bareStandalone": "- 或运行 `octogent --standalone`，像以前一样启动独立的单项目服务器。",
+  "cli.start.project": "{slug} 的 Octogent 仪表盘：{url}",
+  "cli.start.overview": "当前不在任何项目内；hub 的项目总览：{url}",
+  "cli.start.hubStarted":
+    "hub 会在后台持续运行：`octogent hub status` 查看状态，`octogent hub stop` 停止它。",
+  "cli.start.ownServer": "已有单项目服务器在服务这个项目：{url}",
+  "cli.start.ownServerHint": "要把项目迁到 hub 上，先停止该服务器，再运行一次 `octogent`。",
+  "cli.start.blockedStandalone":
+    "或运行 `octogent --standalone`，在下一个空闲端口启动单项目服务器。",
   "cli.help.hub":
     "octogent hub start [--foreground]    启动 hub：一个服务器服务所有已注册项目\n  octogent hub status                  显示 hub 的地址、构建和项目（无 hub 响应时退出码 1）\n  octogent hub stop                    停止 hub\n  octogent hub restart [--force]       重启 hub；有终端在运行时拒绝，除非加 --force",
-  "cli.help.standalone":
-    "octogent --standalone                即使 hub 在服务该项目，也启动单项目服务器",
+  "cli.help.start":
+    "octogent                             在 hub 上打开当前项目（需要时启动 hub 并注册项目）",
+  "cli.help.standalone": "octogent --standalone                改为给当前项目启动单项目服务器",
   "cli.help.project":
     "--project <slug|id>                  用于以下命令：指定已注册的项目，而不是当前目录",
   "cli.hub.driftOlder":
@@ -163,7 +169,7 @@ export const zhCN: TranslationMap = {
   "cli.hub.driftDifferent":
     "警告：hub 运行的构建与 CLI 不同（hub {hub}，CLI {cli}）；等 worker 空闲时执行 `octogent hub restart`。",
   "cli.usage": `用法：
-  octogent                             在当前项目中启动仪表盘
+  octogent                             在 hub 上打开当前项目
   octogent init [项目名称]              显式初始化当前目录
   octogent projects                    列出已注册的项目
 
