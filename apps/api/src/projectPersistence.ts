@@ -314,6 +314,9 @@ export const registerProject = (
 export const resolveGlobalProjectDir = (projectId: string) =>
   join(GLOBAL_OCTOGENT_DIR, "projects", projectId);
 
+/** Hub-wide state (its server log) that belongs to no single project. */
+export const resolveHubStateDir = () => join(GLOBAL_OCTOGENT_DIR, "hub");
+
 export const resolveEphemeralProjectStateDir = (workspaceCwd: string) =>
   resolveGlobalProjectDir(deriveProjectIdFromWorkspace(workspaceCwd));
 
