@@ -160,6 +160,8 @@ describe("octogent hub install-service", () => {
         username: "ada",
         platform: "linux" as const,
         print: (line: string) => lines.push(line),
+        // The fake systemctl starts no hub; the wait is covered by its own test.
+        waitForHubMs: 0,
       },
     };
   };
@@ -189,6 +191,50 @@ describe("octogent hub install-service", () => {
     // What a CLI checks before starting the hub through this unit.
     expect(isHubServiceInstalled(options.env, options.home, resolveGlobalOctogentDir())).toBe(true);
     expect(isHubServiceInstalled(options.env, options.home, "/elsewhere/.octogent")).toBe(false);
+  });
+
+  it("waits for the unit's hub and prints its address", async () => {
+    const { lines, options } = makeSetup();
+    // Stands in for the hub systemd starts: it answers health as this process.
+    const fakeHub = createServer((_request, response) => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ status: "ok", pid: process.pid, version: "0.0.0" }));
+    });
+    const fakeHubPort = await new Promise<number>((resolvePort) => {
+      fakeHub.listen(0, "127.0.0.1", () => {
+        const address = fakeHub.address();
+        resolvePort(typeof address === "object" && address ? address.port : 0);
+      });
+    });
+    try {
+      const { runner } = fakeRunner(({ args }) => {
+        if (args.join(" ") === `--user enable --now ${"octogent-hub.service"}`) {
+          writeHubMetadata({
+            apiBaseUrl: `http://127.0.0.1:${fakeHubPort}`,
+            host: "127.0.0.1",
+            port: fakeHubPort,
+            pid: process.pid,
+            startedAt: new Date().toISOString(),
+            version: "0.0.0",
+          });
+        }
+        return undefined;
+      });
+
+      expect(await runHubInstallService({ ...options, runner, waitForHubMs: 5_000 })).toBe(0);
+      expect(lines.join("\n")).toContain(`Hub running at http://127.0.0.1:${fakeHubPort}`);
+    } finally {
+      clearHubMetadata();
+      await new Promise<void>((resolveClose) => fakeHub.close(() => resolveClose()));
+    }
+  });
+
+  it("says when the unit's hub has not answered in time", async () => {
+    const { lines, options } = makeSetup();
+    const { runner } = fakeRunner();
+
+    expect(await runHubInstallService({ ...options, runner, waitForHubMs: 200 })).toBe(0);
+    expect(lines.join("\n")).toContain("The hub has not answered yet");
   });
 
   it("advises lingering when it is off", async () => {

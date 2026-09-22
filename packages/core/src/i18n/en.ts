@@ -191,6 +191,8 @@ export const en: TranslationMap = {
     "For more variables (OCTOGENT_HUB_PORT, OCTOGENT_ACCESS_TOKEN, …), write KEY=value lines to {path} and restart the hub.",
   "cli.service.hubAlreadyRunning":
     "A hub was already running (pid {pid}), so the service did not start another; `octogent hub restart` restarts it under systemd once its workers are idle.",
+  "cli.service.startPending":
+    "The hub has not answered yet; `systemctl --user status octogent-hub` and `journalctl --user -u octogent-hub` show why.",
   "cli.service.lingerOff":
     "Lingering is off, so the hub starts at your first login and stops at your last logout. To run it from boot: loginctl enable-linger {user}",
   "cli.service.notInstalled": "The hub service is not installed ({path} does not exist).",

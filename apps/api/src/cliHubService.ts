@@ -33,6 +33,25 @@ export type HubServiceOptions = {
   platform?: NodeJS.Platform;
   runner?: CommandRunner;
   print?: (line: string) => void;
+  /** How long to wait for the unit's hub to answer before returning; 0 skips the wait. */
+  waitForHubMs?: number;
+};
+
+// Matches `hub start`: systemd returns from `enable --now` before the hub
+// listens, and a `hub status` typed right after would otherwise say "no hub".
+const SERVICE_START_TIMEOUT_MS = 15_000;
+const POLL_INTERVAL_MS = 150;
+
+const waitForHub = async (timeoutMs: number) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const metadata = await readLiveHubMetadata();
+    if (metadata) {
+      return metadata;
+    }
+    await new Promise<void>((resolveSleep) => setTimeout(resolveSleep, POLL_INTERVAL_MS));
+  }
+  return null;
 };
 
 const resolveOptions = (options: HubServiceOptions) => ({
@@ -113,6 +132,14 @@ export const runHubInstallService = async (options: HubServiceOptions): Promise<
   // An already running hub keeps the port, so the unit's own hub stepped aside.
   if (runningBefore) {
     print(`  ${t(locale, "cli.service.hubAlreadyRunning", { pid: runningBefore.pid })}`);
+  } else {
+    const waitMs = options.waitForHubMs ?? SERVICE_START_TIMEOUT_MS;
+    const started = waitMs > 0 ? await waitForHub(waitMs) : undefined;
+    if (started) {
+      print(`  ${t(locale, "cli.hub.started", { url: started.apiBaseUrl, pid: started.pid })}`);
+    } else if (started === null) {
+      print(`  ${t(locale, "cli.service.startPending")}`);
+    }
   }
 
   const username = options.username ?? userInfo().username;

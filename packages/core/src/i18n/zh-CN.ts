@@ -179,6 +179,8 @@ export const zhCN: TranslationMap = {
     "如需更多变量（OCTOGENT_HUB_PORT、OCTOGENT_ACCESS_TOKEN 等），把 KEY=value 行写入 {path}，再重启 hub 即可。",
   "cli.service.hubAlreadyRunning":
     "已有 hub 在运行（pid {pid}），所以服务没有再启动一个；等它的 worker 空闲后，`octogent hub restart` 会在 systemd 下重启它。",
+  "cli.service.startPending":
+    "hub 还没有响应；`systemctl --user status octogent-hub` 与 `journalctl --user -u octogent-hub` 可查看原因。",
   "cli.service.lingerOff":
     "未开启 lingering：hub 会在你首次登录时启动、最后一次登出时停止。要开机即运行：loginctl enable-linger {user}",
   "cli.service.notInstalled": "hub 服务未安装（{path} 不存在）。",
