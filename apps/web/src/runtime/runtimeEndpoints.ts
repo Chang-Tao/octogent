@@ -68,6 +68,10 @@ const buildRuntimeSocketUrl = (
     : localRuntimeWebSocketUrl(location, prefixedPath);
 };
 
+// The hub's own route: it lists every project, so it never sits behind one project's mount.
+export const buildHubProjectsUrl = (runtimeBaseUrl = readRuntimeBaseUrl()) =>
+  runtimeBaseUrl ? buildAbsoluteUrl(runtimeBaseUrl, "/api/projects") : "/api/projects";
+
 export const buildTerminalSnapshotsUrl = (runtimeBaseUrl = readRuntimeBaseUrl()) =>
   buildRuntimeUrl("/api/terminal-snapshots", runtimeBaseUrl);
 

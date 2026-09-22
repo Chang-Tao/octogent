@@ -32,6 +32,7 @@ import { ActiveAgentsSidebar } from "./components/ActiveAgentsSidebar";
 import { ConsolePrimaryNav } from "./components/ConsolePrimaryNav";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PrimaryViewRouter } from "./components/PrimaryViewRouter";
+import { ProjectSwitcher } from "./components/ProjectSwitcher";
 import { RuntimeStatusStrip } from "./components/RuntimeStatusStrip";
 import { SidebarActionPanel } from "./components/SidebarActionPanel";
 import { TelemetryTape } from "./components/TelemetryTape";
@@ -54,7 +55,12 @@ const SIDEBARLESS_NAV: ReadonlySet<number> = new Set([
   NAV_INDEX.settings,
 ]);
 
-export const App = () => {
+type AppProps = {
+  /** Set on a hub project page (`/p/<key>/`); absent when a single-project server serves the root. */
+  projectKey?: string;
+};
+
+export const App = ({ projectKey }: AppProps = {}) => {
   const [terminals, setTerminals] = useState<TerminalView>([]);
   // Bumped when the server says deck content changed, so a page that never
   // made the change (a tentacle created from the CLI) still refetches.
@@ -475,6 +481,7 @@ export const App = () => {
         <ConsolePrimaryNav
           activePrimaryNav={activePrimaryNav}
           onPrimaryNavChange={setActivePrimaryNav}
+          projectSwitcher={projectKey ? <ProjectSwitcher projectKey={projectKey} /> : undefined}
         />
 
         <section

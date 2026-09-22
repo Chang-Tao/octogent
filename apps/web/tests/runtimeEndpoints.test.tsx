@@ -9,6 +9,7 @@ import {
   buildConversationsUrl,
   buildDeckTentacleSwarmUrl,
   buildGithubSummaryUrl,
+  buildHubProjectsUrl,
   buildMonitorConfigUrl,
   buildMonitorFeedUrl,
   buildMonitorRefreshUrl,
@@ -252,6 +253,10 @@ describe("runtimeEndpoints", () => {
     );
     expect(buildCodeIntelEventsUrl()).toBe("/api/code-intel/events");
   });
+
+  it("builds the hub project listing URL", () => {
+    expect(buildHubProjectsUrl()).toBe("/api/projects");
+  });
 });
 
 describe("resolveApiPrefix", () => {
@@ -311,6 +316,14 @@ describe("runtimeEndpoints on a hub project page", () => {
     );
     expect(endpoints.buildTerminalEventsSocketUrl(undefined, socketLocation)).toBe(
       "wss://hub.example.com/api/p/keycluster/api/terminal-events/ws",
+    );
+  });
+
+  it("keeps hub-level URLs off the project mount", async () => {
+    const endpoints = await loadEndpointsAt("/p/keycluster/");
+    expect(endpoints.buildHubProjectsUrl()).toBe("/api/projects");
+    expect(endpoints.buildHubProjectsUrl("http://127.0.0.1:8787")).toBe(
+      "http://127.0.0.1:8787/api/projects",
     );
   });
 
