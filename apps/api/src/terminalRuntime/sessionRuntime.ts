@@ -73,6 +73,8 @@ type CreateSessionRuntimeOptions = {
     tentacleId: string;
   } | null;
   getTentacleWorkspaceCwd: (tentacleId: string) => string;
+  /** Values for the terminal's `inheritEnv` names; memory only, so empty after a restart. */
+  getInheritedEnv?: (terminalId: string) => Record<string, string> | undefined;
   getApiBaseUrl?: () => string;
   isDebugPtyLogsEnabled: boolean;
   ptyLogDir: string;
@@ -103,6 +105,7 @@ export const createSessionRuntime = ({
   workspaceCwd,
   resolveTerminalSession,
   getTentacleWorkspaceCwd,
+  getInheritedEnv,
   getApiBaseUrl,
   isDebugPtyLogsEnabled,
   ptyLogDir,
@@ -775,6 +778,12 @@ export const createSessionRuntime = ({
 
     ensureNodePtySpawnHelperExecutable();
     const shellLaunch = getShellLaunch();
+    const inheritedEnv = getInheritedEnv?.(sessionId);
+    if (!inheritedEnv && terminalRecord?.inheritedEnv?.length) {
+      logVerbose(
+        `[Session] inherited env ${terminalRecord.inheritedEnv.join(", ")} not available after a server restart session=${sessionId}; use .octogent/env for variables that must persist`,
+      );
+    }
 
     let pty: IPty;
     try {
@@ -785,6 +794,8 @@ export const createSessionRuntime = ({
         env: createShellEnvironment({
           octogentSessionId: sessionId,
           ...(getApiBaseUrl ? { apiBaseUrl: getApiBaseUrl() } : {}),
+          ...(workspaceCwd ? { workspaceCwd } : {}),
+          ...(inheritedEnv ? { inheritedEnv } : {}),
         }),
         name: "xterm-256color",
       });

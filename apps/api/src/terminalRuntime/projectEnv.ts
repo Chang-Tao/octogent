@@ -26,6 +26,8 @@ export const MAX_INHERITED_ENV_NAMES = 64;
 export const isInheritableEnvName = (value: unknown): value is string =>
   typeof value === "string" && INHERITABLE_ENV_NAME_PATTERN.test(value);
 
+export const isValidEnvValue = (value: string) => !FORBIDDEN_VALUE_CHARACTERS.test(value);
+
 type ParsedValue = { value: string; expand: boolean } | { error: string };
 
 const parseValue = (raw: string): ParsedValue => {
@@ -97,7 +99,7 @@ export const parseEnvFile = (text: string, base: Record<string, string>): Parsed
     }
 
     const value = parsed.expand ? expand(parsed.value, scope) : parsed.value;
-    if (FORBIDDEN_VALUE_CHARACTERS.test(value)) {
+    if (!isValidEnvValue(value)) {
       issues.push({ line: lineNumber, reason: `value of ${key} contains NUL or a newline` });
       return;
     }

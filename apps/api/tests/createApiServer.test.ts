@@ -2103,6 +2103,127 @@ describe("createApiServer", () => {
     );
   });
 
+  it("spawns workers with the project's .octogent/env and the caller's inherited variables", async () => {
+    spawnMock.mockReset();
+    spawnMock.mockReturnValue({
+      pid: 4242,
+      write: vi.fn(),
+      kill: vi.fn(),
+      resize: vi.fn(),
+      onData: () => ({ dispose: vi.fn() }),
+      onExit: () => ({ dispose: vi.fn() }),
+    });
+    const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
+    temporaryDirectories.push(workspaceCwd);
+    mkdirSync(join(workspaceCwd, ".octogent"), { recursive: true });
+    writeFileSync(
+      join(workspaceCwd, ".octogent", "env"),
+      "PATH=$PWD/.venv/bin:$PATH\nPROJECT_FLAG=on\nOCTOGENT_API_BASE=http://elsewhere\n",
+      "utf8",
+    );
+    const baseUrl = await startServer({ workspaceCwd });
+
+    const createResponse = await fetch(`${baseUrl}/api/terminals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "venv-worker",
+        initialPrompt: "Run the tests.",
+        inheritEnv: ["VIRTUAL_ENV", "CALLER_TOKEN"],
+        env: { VIRTUAL_ENV: "/caller/.venv", CALLER_TOKEN: "caller-secret-value" },
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const createdText = await createResponse.text();
+    expect(createdText).not.toContain("caller-secret-value");
+    const created = JSON.parse(createdText) as { terminalId: string; inheritedEnv?: string[] };
+    expect(created.inheritedEnv).toEqual(["VIRTUAL_ENV", "CALLER_TOKEN"]);
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const spawnEnv = (spawnMock.mock.calls[0]?.[2] as { env: Record<string, string> }).env;
+    expect(spawnEnv.PATH).toBe(`${workspaceCwd}/.venv/bin:${process.env.PATH}`);
+    expect(spawnEnv.PROJECT_FLAG).toBe("on");
+    expect(spawnEnv.VIRTUAL_ENV).toBe("/caller/.venv");
+    expect(spawnEnv.CALLER_TOKEN).toBe("caller-secret-value");
+    expect(spawnEnv.OCTOGENT_SESSION_ID).toBe(created.terminalId);
+    expect(spawnEnv.OCTOGENT_API_BASE).not.toBe("http://elsewhere");
+
+    const snapshots = (await (await fetch(`${baseUrl}/api/terminal-snapshots`)).json()) as Array<{
+      terminalId: string;
+      inheritedEnv?: string[];
+    }>;
+    expect(snapshots.find((entry) => entry.terminalId === created.terminalId)).toMatchObject({
+      inheritedEnv: ["VIRTUAL_ENV", "CALLER_TOKEN"],
+    });
+
+    const registry = await waitForRegistryDocument<{
+      terminals: Array<{ terminalId: string; inheritedEnv?: string[] }>;
+    }>(workspaceCwd, (document) =>
+      document.terminals.some((terminal) => terminal.inheritedEnv !== undefined),
+    );
+    expect(registry.terminals[0]?.inheritedEnv).toEqual(["VIRTUAL_ENV", "CALLER_TOKEN"]);
+    const registryText = readFileSync(
+      join(workspaceCwd, ".octogent", "state", "tentacles.json"),
+      "utf8",
+    );
+    expect(registryText).not.toContain("caller-secret-value");
+    expect(registryText).not.toContain("/caller/.venv");
+
+    await stopServer?.();
+    stopServer = null;
+    const restartedUrl = await startServer({ workspaceCwd });
+    const restartedSnapshots = (await (
+      await fetch(`${restartedUrl}/api/terminal-snapshots`)
+    ).json()) as Array<{ terminalId: string; inheritedEnv?: string[] }>;
+    expect(
+      restartedSnapshots.find((entry) => entry.terminalId === created.terminalId)?.inheritedEnv,
+    ).toEqual(["VIRTUAL_ENV", "CALLER_TOKEN"]);
+    spawnMock.mockReset();
+  });
+
+  it("rejects malformed inheritEnv requests with 400", async () => {
+    const baseUrl = await startServer();
+    const create = (body: Record<string, unknown>) =>
+      fetch(`${baseUrl}/api/terminals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceMode: "shared", ...body }),
+      });
+
+    const invalidBodies: Array<Record<string, unknown>> = [
+      { inheritEnv: "PATH", env: { PATH: "/bin" } },
+      { inheritEnv: ["lower_case"], env: { lower_case: "x" } },
+      { inheritEnv: ["BAD-NAME"], env: { "BAD-NAME": "x" } },
+      { inheritEnv: [42], env: {} },
+      { inheritEnv: ["PATH"] },
+      { inheritEnv: ["PATH"], env: {} },
+      { inheritEnv: ["PATH"], env: { PATH: "/bin", EXTRA: "not listed" } },
+      { inheritEnv: ["PATH"], env: { PATH: 7 } },
+      { inheritEnv: ["PATH"], env: { PATH: "/bin\n/evil" } },
+      { inheritEnv: ["PATH"], env: { PATH: "/bin\u0000" } },
+      { inheritEnv: ["PATH"], env: ["/bin"] },
+      { env: { PATH: "/bin" } },
+      {
+        inheritEnv: Array.from({ length: 65 }, (_, index) => `VAR_${index}`),
+        env: Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`VAR_${index}`, "x"])),
+      },
+    ];
+    for (const body of invalidBodies) {
+      const response = await create(body);
+      expect(response.status, JSON.stringify(body)).toBe(400);
+      expect(((await response.json()) as { error?: string }).error).toEqual(expect.any(String));
+    }
+
+    const snapshots = (await (
+      await fetch(`${baseUrl}/api/terminal-snapshots`)
+    ).json()) as unknown[];
+    expect(snapshots).toEqual([]);
+
+    const accepted = await create({ inheritEnv: [], env: {} });
+    expect(accepted.status).toBe(201);
+    expect(await accepted.json()).not.toHaveProperty("inheritedEnv");
+  });
+
   it("injects a default tentacle context prompt for tentacle terminals", async () => {
     const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
     temporaryDirectories.push(workspaceCwd);

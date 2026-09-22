@@ -9,6 +9,11 @@ import {
   isEffortTier,
   isValidModelToken,
 } from "../terminalRuntime/modelSelection";
+import {
+  MAX_INHERITED_ENV_NAMES,
+  isInheritableEnvName,
+  isValidEnvValue,
+} from "../terminalRuntime/projectEnv";
 
 const isTerminalNameOrigin = (value: unknown): value is TerminalNameOrigin =>
   value === "generated" || value === "user" || value === "prompt";
@@ -205,4 +210,63 @@ export const parseTerminalNameOrigin = (payload: unknown) => {
     nameOrigin: rawNameOrigin,
     error: null as string | null,
   };
+};
+
+/**
+ * `inheritEnv` names the variables a caller passes along from its own shell and
+ * `env` carries exactly their values — the CLI reads nothing else. Both sides
+ * must match so a request can never slip in variables it did not name.
+ */
+export const parseTerminalInheritedEnv = (payload: unknown) => {
+  const none = {
+    inheritedEnv: undefined as Record<string, string> | undefined,
+    error: null as string | null,
+  };
+  const fail = (error: string) => ({ ...none, error });
+  if (payload === null || payload === undefined || typeof payload !== "object") {
+    return none;
+  }
+  const { inheritEnv, env } = payload as Record<string, unknown>;
+
+  if (inheritEnv === undefined) {
+    return env === undefined ? none : fail("env is only accepted together with inheritEnv.");
+  }
+  if (!Array.isArray(inheritEnv)) {
+    return fail("inheritEnv must be an array of variable names.");
+  }
+  if (inheritEnv.length > MAX_INHERITED_ENV_NAMES) {
+    return fail(`inheritEnv accepts at most ${MAX_INHERITED_ENV_NAMES} names.`);
+  }
+  const invalidName = inheritEnv.find((name) => !isInheritableEnvName(name));
+  if (invalidName !== undefined) {
+    return fail(
+      `inheritEnv name ${JSON.stringify(invalidName)} is invalid; use upper-case letters, digits, and _.`,
+    );
+  }
+  const names = [...new Set(inheritEnv as string[])];
+
+  if (env === undefined && names.length === 0) {
+    return none;
+  }
+  if (env === null || typeof env !== "object" || Array.isArray(env)) {
+    return fail("env must be an object with a value for each inheritEnv name.");
+  }
+  const values = env as Record<string, unknown>;
+  const unlisted = Object.keys(values).find((key) => !names.includes(key));
+  if (unlisted !== undefined) {
+    return fail(`env.${unlisted} is not listed in inheritEnv.`);
+  }
+
+  const inheritedEnv: Record<string, string> = {};
+  for (const name of names) {
+    const value = values[name];
+    if (typeof value !== "string") {
+      return fail(`env.${name} must be a string: the value to pass on for inheritEnv ${name}.`);
+    }
+    if (!isValidEnvValue(value)) {
+      return fail(`env.${name} must not contain NUL or newline characters.`);
+    }
+    inheritedEnv[name] = value;
+  }
+  return names.length === 0 ? none : { inheritedEnv, error: null as string | null };
 };
