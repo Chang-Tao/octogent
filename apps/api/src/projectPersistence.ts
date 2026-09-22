@@ -11,6 +11,8 @@ import {
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
+import { assignUniqueSlug, toProjectSlug } from "./projectSlug";
+
 // OCTOGENT_HOME relocates the global state root. Tests point it at a temp
 // directory so a run cannot register throwaway projects into the operator's
 // real ~/.octogent registry; operators can use it to keep isolated roots.
@@ -34,6 +36,10 @@ export type ProjectRegistryEntry = {
   path: string;
   createdAt: string;
   lastOpenedAt?: string;
+  /** URL key for the hub (`/p/<slug>/`); backfilled on load for older registries. */
+  slug?: string;
+  /** Slugs this project answered to before a rename, so old links keep resolving. */
+  aliases?: string[];
 };
 
 type LegacyProjectRegistryEntry = {
@@ -46,6 +52,19 @@ export type ProjectsRegistry = { projects: ProjectRegistryEntry[] };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
+
+const isWellFormedSlug = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && toProjectSlug(value) === value;
+
+const readSlugFields = (
+  value: Record<string, unknown>,
+): Pick<ProjectRegistryEntry, "slug" | "aliases"> => {
+  const aliases = Array.isArray(value.aliases) ? value.aliases.filter(isWellFormedSlug) : [];
+  return {
+    ...(isWellFormedSlug(value.slug) ? { slug: value.slug } : {}),
+    ...(aliases.length > 0 ? { aliases } : {}),
+  };
+};
 
 const toProjectRegistryEntry = (
   value: unknown,
@@ -73,6 +92,7 @@ const toProjectRegistryEntry = (
       ...(typeof value.lastOpenedAt === "string" && value.lastOpenedAt.trim().length > 0
         ? { lastOpenedAt: value.lastOpenedAt }
         : {}),
+      ...readSlugFields(value),
     };
   }
 
@@ -145,11 +165,43 @@ export const loadProjectsRegistry = (): ProjectsRegistry => {
     return { projects: [] };
   }
 
-  return {
+  const registry = {
     projects: parsed.projects
       .map((entry) => toProjectRegistryEntry(entry))
       .filter((entry): entry is ProjectRegistryEntry => entry !== null),
   };
+  if (backfillProjectSlugs(registry)) {
+    try {
+      saveProjectsRegistry(registry);
+    } catch {
+      // A read-only registry still resolves: the slugs just are not persisted.
+    }
+  }
+  return registry;
+};
+
+/**
+ * Gives every entry a unique slug. Existing slugs are kept (first one wins on
+ * a duplicate) so URLs stay stable; only missing or clashing ones are
+ * assigned, after all kept slugs are known. Returns whether anything changed.
+ */
+const backfillProjectSlugs = (registry: ProjectsRegistry): boolean => {
+  const kept = new Set<string>();
+  const needsSlug: ProjectRegistryEntry[] = [];
+  for (const project of registry.projects) {
+    if (project.slug && !kept.has(project.slug)) {
+      kept.add(project.slug);
+      continue;
+    }
+    needsSlug.push(project);
+  }
+
+  // Excluding the entry's own id means a clashing slug it still carries does
+  // not count against it.
+  for (const project of needsSlug) {
+    project.slug = assignUniqueSlug(registry, project.name, project.id);
+  }
+  return needsSlug.length > 0;
 };
 
 export const saveProjectsRegistry = (registry: ProjectsRegistry) => {
@@ -225,6 +277,17 @@ export const registerProject = (
   const existing = registry.projects.find((entry) => entry.id === projectConfig.projectId);
 
   if (existing) {
+    if (existing.name !== projectConfig.displayName || !existing.slug) {
+      const nextSlug = assignUniqueSlug(registry, projectConfig.displayName, existing.id);
+      const aliases = (existing.aliases ?? []).filter((alias) => alias !== nextSlug);
+      if (existing.slug && existing.slug !== nextSlug && !aliases.includes(existing.slug)) {
+        aliases.push(existing.slug);
+      }
+      existing.slug = nextSlug;
+      if (aliases.length > 0 || existing.aliases) {
+        existing.aliases = aliases;
+      }
+    }
     existing.name = projectConfig.displayName;
     existing.path = workspaceCwd;
     existing.lastOpenedAt = lastOpenedAt;
@@ -232,17 +295,17 @@ export const registerProject = (
     return existing;
   }
 
+  const filteredProjects = registry.projects.filter(
+    (entry) => entry.path !== workspaceCwd && entry.id !== projectConfig.projectId,
+  );
   const nextEntry: ProjectRegistryEntry = {
     id: projectConfig.projectId,
     name: projectConfig.displayName,
     path: workspaceCwd,
     createdAt: projectConfig.createdAt,
     lastOpenedAt,
+    slug: assignUniqueSlug({ projects: filteredProjects }, projectConfig.displayName),
   };
-
-  const filteredProjects = registry.projects.filter(
-    (entry) => entry.path !== workspaceCwd && entry.id !== projectConfig.projectId,
-  );
   filteredProjects.push(nextEntry);
   saveProjectsRegistry({ projects: filteredProjects });
   return nextEntry;
