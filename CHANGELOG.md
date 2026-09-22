@@ -103,6 +103,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Hub, phase 0: agents learn Octogent (2026-09-22)
+
+- `octogent setup-agents` installs a user-level skill for Claude Code and
+  Codex (`~/.claude/skills/octogent/`, `~/.codex/skills/octogent/`; nothing
+  else in those homes is touched; `--remove` uninstalls). Every session on the
+  machine then loads the coordinator's routine on demand. Three real
+  coordinators had learned the CLI from `--help` and made the same mistakes.
+- `octogent guide` prints the routine and the exact current command surface
+  (both locales); the skill defers to it, so it never goes stale.
+
 ### Trial-run fixes (this fork's evolution, phase 7)
 
 - Provider-side failures are visible. Banners the agent CLIs print when their

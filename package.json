@@ -11,7 +11,7 @@
   "bin": {
     "octogent": "./bin/octogent"
   },
-  "files": ["bin", "dist", "README.md"],
+  "files": ["bin", "dist", "agents", "README.md"],
   "pnpm": {
     "onlyBuiltDependencies": ["node-pty", "esbuild", "@biomejs/biome"]
   },

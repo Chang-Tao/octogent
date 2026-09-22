@@ -44,6 +44,16 @@ OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
 HOST=192.168.1.100 octogent
 ```
 
+## 让代理学会 Octogent
+
+```bash
+octogent setup-agents            # 为 Claude Code 与 Codex 安装 Octogent skill（用户层）
+octogent setup-agents --remove
+octogent guide                   # 打印协调者工作法与当前命令一览
+```
+
+`setup-agents` 把一个 skill 目录复制到 `~/.claude/skills/octogent/` 与 `~/.codex/skills/octogent/`（尊重 `CLAUDE_CONFIG_DIR` / `CODEX_HOME`），不动那里的其他任何文件。此后这台机器上的每个 Claude Code / Codex 会话都会按需加载这套工作法——派发、`terminal wait`、`terminal result`、追问、审阅、收尾——不用再把文档贴进提示词。skill 把确切参数交给 `octogent guide`，所以已安装版本打印的总是当前真相；升级 Octogent 后再跑一次 `setup-agents` 刷新副本。
+
 ## 初始化项目
 
 ```bash

@@ -255,6 +255,8 @@ octogent terminal delete first-worker --with-worktree
 
 ### The coordinator's routine: dispatch → wait → read → follow up → review → finish
 
+Run `octogent setup-agents` once: every Claude Code or Codex session then carries this routine, and `octogent guide` prints the current command surface from inside a session.
+
 This section is for whoever hands out the work — you, or an AI coordinator (a Claude Code or Codex session) calling commands from a shell. The coordinator does not have to be an Octogent terminal; every step below uses only the CLI, with no browser and no hand-written API or WebSocket code.
 
 1. **Dispatch**: `octogent tentacle create` first, then `octogent terminal create` per worker — **always with `--tentacle-id`** — and give each worker a `--terminal-id` you can refer to later. Say in the brief where the deliverable goes: have the worker write its conclusions to `.octogent/tentacles/<tentacle-id>/RESULT.md` and name the path in its final message.

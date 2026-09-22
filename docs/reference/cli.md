@@ -44,6 +44,16 @@ OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
 HOST=192.168.1.100 octogent
 ```
 
+## Teach the agents Octogent
+
+```bash
+octogent setup-agents            # install the Octogent skill for Claude Code and Codex (user level)
+octogent setup-agents --remove
+octogent guide                   # print the coordinator's routine and the current command surface
+```
+
+`setup-agents` copies one skill directory to `~/.claude/skills/octogent/` and `~/.codex/skills/octogent/` (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` respected) and touches nothing else there. From then on every Claude Code or Codex session on the machine loads the routine on demand — dispatch, `terminal wait`, `terminal result`, follow up, review, finish — without anyone pasting docs into a prompt. The skill defers to `octogent guide` for exact flags, so the installed version always prints the truth; run `setup-agents` again after upgrading Octogent to refresh the copy.
+
 ## Initialize a project
 
 ```bash

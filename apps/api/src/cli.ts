@@ -6,6 +6,7 @@ import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
 import { formatChannelMessageLine } from "./cliChannel";
+import { renderGuide, resolveAgentSkillTargets, setupAgentSkills } from "./cliGuide";
 import { formatUsageWarning, parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
@@ -1027,6 +1028,32 @@ const main = async () => {
     return initProject(args[1]);
   }
 
+  if (command === "guide") {
+    process.stdout.write(renderGuide(locale));
+    return;
+  }
+
+  if (command === "setup-agents") {
+    const remove = args.includes("--remove");
+    const sourceDir = resolveRuntimeAssetPath(
+      ["dist", "agents", "octogent"],
+      ["agents", "octogent"],
+    );
+    if (!remove && !existsSync(join(sourceDir, "SKILL.md"))) {
+      console.error(t(locale, "cli.setupAgents.missingSource", { path: sourceDir }));
+      process.exit(1);
+    }
+    for (const result of setupAgentSkills(sourceDir, resolveAgentSkillTargets(), { remove })) {
+      console.log(
+        `  ${result.target.name.padEnd(12)} ${t(locale, `cli.setupAgents.${result.action}`)}  ${result.target.directory}`,
+      );
+    }
+    if (!remove) {
+      console.log(t(locale, "cli.setupAgents.done"));
+    }
+    return;
+  }
+
   if (command === "projects" || command === "project") {
     const projects = loadProjectsRegistry().projects;
     if (projects.length === 0) {
@@ -1116,6 +1143,8 @@ const main = async () => {
   octogent init [project-name]         Initialize the current directory explicitly
   octogent projects                    List registered projects
   octogent logs [--lines N] [--follow] Tail the current project's server log
+  octogent guide                       Print the coordinator's routine and the current command surface
+  octogent setup-agents [--remove]     Install the Octogent skill for Claude Code and Codex (user level)
 
   octogent tentacle create <name>      Create a tentacle (Octogent must be running)
   octogent tentacle list               List tentacles

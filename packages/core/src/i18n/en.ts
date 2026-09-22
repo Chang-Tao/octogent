@@ -86,6 +86,14 @@ export const en: TranslationMap = {
   "cli.worktreeGc.dryRun": "Would reclaim {count} worktrees:",
   "cli.worktreeGc.reclaimed": "Reclaimed {count} merged worktrees.",
   "cli.worktreeGc.failed": "Failed to reclaim {count} worktrees; check the server logs.",
+  "cli.setupAgents.installed": "installed",
+  "cli.setupAgents.updated": "updated",
+  "cli.setupAgents.removed": "removed",
+  "cli.setupAgents.absent": "not installed",
+  "cli.setupAgents.done":
+    "Done. New Claude Code and Codex sessions load the skill on demand; run `octogent guide` for the current command surface.",
+  "cli.setupAgents.missingSource":
+    "Error: skill source not found at {path}. Run `pnpm build` in the Octogent checkout.",
   "cli.empty.projects":
     "No projects registered yet. Run `octogent` or `octogent init` in a project directory.",
   "cli.usage": `Usage:

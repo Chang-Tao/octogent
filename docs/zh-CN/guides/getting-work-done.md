@@ -255,6 +255,8 @@ octogent terminal delete first-worker --with-worktree
 
 ### 协调者工作法：派发 → 等待 → 读回答 → 追问 → 审阅 → 收尾
 
+先跑一次 `octogent setup-agents`：之后每个 Claude Code / Codex 会话都自带这套工作法，会话里随时可用 `octogent guide` 看当前命令一览。
+
 这一节写给“派活的人”——既可以是你自己，也可以是一个通过 shell 调用命令的 AI 协调者（Claude Code 或 Codex 会话）。协调者本身不必是 Octogent 终端；下面每一步都只用 CLI，不需要浏览器，也不需要自己去接 API 或 WebSocket。
 
 1. **派发**：先 `octogent tentacle create`，再为每个工人 `octogent terminal create`，**总是带 `--tentacle-id`**，并用 `--terminal-id` 给工人起一个你后面直接引用的 ID。任务书里写明成果交付在哪里：建议让工人把结论写到 `.octogent/tentacles/<触手ID>/RESULT.md`，并在最后一句回答里给出路径。

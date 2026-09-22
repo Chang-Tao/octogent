@@ -81,6 +81,14 @@ export const zhCN: TranslationMap = {
   "cli.worktreeGc.dryRun": "预演：将回收 {count} 个 worktree：",
   "cli.worktreeGc.reclaimed": "已回收 {count} 个已合并 worktree。",
   "cli.worktreeGc.failed": "{count} 个 worktree 回收失败，请查看服务端日志。",
+  "cli.setupAgents.installed": "已安装",
+  "cli.setupAgents.updated": "已更新",
+  "cli.setupAgents.removed": "已移除",
+  "cli.setupAgents.absent": "未安装",
+  "cli.setupAgents.done":
+    "完成。新的 Claude Code / Codex 会话会按需加载该 skill；运行 `octogent guide` 查看当前命令一览。",
+  "cli.setupAgents.missingSource":
+    "错误：在 {path} 找不到 skill 源文件。请在 Octogent 仓库里运行 `pnpm build`。",
   "cli.empty.projects": "尚未注册任何项目。在项目目录中运行 `octogent` 或 `octogent init`。",
   "cli.usage": `用法：
   octogent                             在当前项目中启动仪表盘
