@@ -6,6 +6,23 @@
 
 启动前设置 `OCTOGENT_SERVER_LOG=<路径>` 可改用其他位置，设置 `OCTOGENT_SERVER_LOG=off` 可禁用。文件中的局域网 URL 访问令牌会被掩码，钩子请求正文不会被记录。
 
+hub 为所有项目只写一个日志 `~/.octogent/hub/logs/server.log`，每行带 `[<slug>]` 标记；`octogent hub status` 会打印它的路径。
+
+## 端口 8787 被旧的单项目服务器占用
+
+`octogent hub start`（或任何会启动 hub 的命令）报错 `port 8787 is taken by pid <pid>, a single-project Octogent server for <path>, not a hub`。hub 使用固定端口，好让每个 CLI 都能找到它，而直接运行 `octogent` 启动的服务器先占了这个端口。两种处理方式：
+
+- 停掉那个服务器（在它的终端按 Ctrl-C，或 `kill <pid>`），再启动 hub。停掉它会结束它正在运行的终端，所以先在那个项目里看一眼 `octogent terminal list`。它停下之前，那个项目里的 CLI 命令仍然连它；停下之后会自动改连 hub。
+- 或者让它继续运行，给 hub 换个端口：在 shell 配置里设置 `OCTOGENT_HUB_PORT`（例如 `9787`），让 hub 和每个 CLI 用同一个值。
+
+如果提示说 pid 未知，说明端口被某个不是 Octogent 的程序占用；用 `lsof -i :8787` 或 `ss -ltnp 'sport = :8787'` 查看是谁。
+
+## hub 运行的是较旧的构建
+
+在 hub 持续运行期间升级或重新构建了 Octogent 后，命令会打印 `` 警告：hub 运行的是较旧的构建（hub …，CLI …）；等 worker 空闲时执行 `octogent hub restart`。 ``：hub 仍在运行它启动时加载的代码。大部分功能照常可用，但新构建里的修复和新路由要等重启后才生效。等 `octogent hub status` 显示没有运行中或待审阅的终端时，执行 `octogent hub restart`。还有这类终端时重启会被拒绝（它们会随 hub 一起终止）并列出它们；加 `--force` 则照样重启。
+
+如果提示的是"构建与 CLI 不同"而不是"较旧"，说明 CLI 和 hub 来自不同的安装或提交，例如全局安装与开发检出并存；检查 `PATH` 上排在最前的是哪个 `octogent`。工作代理不会打印这条警告（它们的 CLI 直接使用 `OCTOGENT_API_BASE`），所以不会诱使代理自行重启 hub。
+
 ## `pnpm test` 因浏览器 API 报错
 
 确认在仓库根目录安装了工作区依赖：
