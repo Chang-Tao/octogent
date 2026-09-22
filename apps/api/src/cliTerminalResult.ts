@@ -71,6 +71,8 @@ export type TerminalResult = {
   } | null;
   lastAssistantMessage: string | null;
   finishedWell: boolean;
+  /** Names passed with `--inherit-env` at creation; only present when there were any. */
+  inheritedEnv?: string[];
   screen?: TerminalScreen | null;
 };
 
@@ -107,8 +109,12 @@ export const buildTerminalResult = (
           message: asString(commit.message) ?? "",
         }))
     : [];
+  const inheritedEnv = Array.isArray(snapshot.inheritedEnv)
+    ? snapshot.inheritedEnv.filter((name): name is string => typeof name === "string")
+    : [];
   return {
     ...(screen !== undefined ? { screen } : {}),
+    ...(inheritedEnv.length > 0 ? { inheritedEnv } : {}),
     terminalId: asString(snapshot.terminalId) ?? "",
     lifecycleState,
     lifecycleReason: asString(snapshot.lifecycleReason),

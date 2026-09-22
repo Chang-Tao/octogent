@@ -131,6 +131,15 @@ describe("buildTerminalResult", () => {
     expect(result.finishedWell).toBe(false);
   });
 
+  it("lists the variable names the terminal inherited from its creator", () => {
+    const result = buildTerminalResult(
+      { terminalId: "t-2", lifecycleState: "running", inheritedEnv: ["PATH", "VIRTUAL_ENV", 7] },
+      null,
+    );
+    expect(result.inheritedEnv).toEqual(["PATH", "VIRTUAL_ENV"]);
+    expect(buildTerminalResult({ terminalId: "t-3" }, null)).not.toHaveProperty("inheritedEnv");
+  });
+
   it("picks the last non-empty assistant turn", () => {
     expect(
       lastAssistantMessage([

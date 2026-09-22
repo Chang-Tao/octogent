@@ -135,6 +135,84 @@ describe("parseTerminalCreateArgs", () => {
   });
 });
 
+describe("parseTerminalCreateArgs --inherit-env", () => {
+  const callerEnv = {
+    PATH: "/caller/.venv/bin:/usr/bin",
+    VIRTUAL_ENV: "/caller/.venv",
+    EMPTY: "",
+    AWS_SECRET_ACCESS_KEY: "never-sent",
+  };
+
+  it("sends exactly the named variables from the caller's shell", () => {
+    const result = parseTerminalCreateArgs(
+      createArgs("--inherit-env", "PATH,VIRTUAL_ENV"),
+      callerEnv,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      body: {
+        workspaceMode: "shared",
+        inheritEnv: ["PATH", "VIRTUAL_ENV"],
+        env: { PATH: "/caller/.venv/bin:/usr/bin", VIRTUAL_ENV: "/caller/.venv" },
+      },
+    });
+  });
+
+  it("trims, skips empty entries, removes duplicates and keeps empty values", () => {
+    const result = parseTerminalCreateArgs(
+      createArgs("--inherit-env", " VIRTUAL_ENV , ,EMPTY,VIRTUAL_ENV"),
+      callerEnv,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      body: {
+        workspaceMode: "shared",
+        inheritEnv: ["VIRTUAL_ENV", "EMPTY"],
+        env: { VIRTUAL_ENV: "/caller/.venv", EMPTY: "" },
+      },
+    });
+  });
+
+  it("sends nothing from the caller's environment without the flag", () => {
+    const result = parseTerminalCreateArgs(createArgs("--name", "docs"), callerEnv);
+
+    expect(result.ok && result.body).toEqual({ name: "docs", workspaceMode: "shared" });
+  });
+
+  it("rejects names the server would reject", () => {
+    for (const value of ["path", "BAD-NAME", "1ABC", ","]) {
+      expect(parseTerminalCreateArgs(createArgs("--inherit-env", value), callerEnv)).toEqual({
+        ok: false,
+        errorKey: "cli.error.invalidInheritEnv",
+        params: { value },
+      });
+    }
+  });
+
+  it("rejects more than 64 names", () => {
+    const names = Array.from({ length: 65 }, (_, index) => `VAR_${index}`);
+    const env = Object.fromEntries(names.map((name) => [name, "x"]));
+
+    expect(parseTerminalCreateArgs(createArgs("--inherit-env", names.join(",")), env)).toEqual({
+      ok: false,
+      errorKey: "cli.error.tooManyInheritEnv",
+      params: { max: "64" },
+    });
+  });
+
+  it("fails fast when a named variable is not set in the caller's shell", () => {
+    expect(
+      parseTerminalCreateArgs(createArgs("--inherit-env", "PATH,CONDA_PREFIX"), callerEnv),
+    ).toEqual({
+      ok: false,
+      errorKey: "cli.error.inheritEnvUnset",
+      params: { name: "CONDA_PREFIX" },
+    });
+  });
+});
+
 describe("formatUsageWarning", () => {
   it("warns when the create response carries an exhausted bucket", () => {
     const usageWarning = {
