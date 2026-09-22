@@ -52,15 +52,16 @@ describe("renderHubUnit", () => {
     );
   });
 
-  it("points at hub.env only when it exists, and says how to add one", () => {
+  it("references hub.env even before it exists, and says how to add one", () => {
     const unit = renderHubUnit({
       binaryPath: "/opt/octogent/bin/octogent",
       home: "/home/ada",
       envFileExists: false,
     });
-    expect(unit).not.toContain("EnvironmentFile=");
+    // `-` makes a missing file fine, so adding one later needs no reinstall.
+    expect(unit).toContain("EnvironmentFile=-/home/ada/.octogent/hub.env");
     expect(unit).toContain(
-      "# For more variables, write KEY=value lines to /home/ada/.octogent/hub.env and install again.",
+      "# For more variables, write KEY=value lines to /home/ada/.octogent/hub.env and restart the hub.",
     );
     expect(unit).not.toContain("PATH=");
   });

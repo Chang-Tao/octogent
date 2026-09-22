@@ -10,7 +10,7 @@ On Linux, systemd can run the [hub](../guides/hub.md) for you. It then starts wh
    cd ~/src/octogent && pnpm build
    ```
 
-2. Optionally write `~/.octogent/hub.env` now (see [Environment](#environment)); the unit only refers to it if it exists.
+2. Optionally write `~/.octogent/hub.env` now (see [Environment](#environment)); the unit always refers to it, so it can also be added later.
 3. Install from a normal login shell, one where `which claude` (or `which codex`) works:
 
    ```bash
@@ -53,10 +53,10 @@ WantedBy=default.target
 - `WorkingDirectory` is your home directory, so the long-lived hub does not hold any project directory open.
 - `PATH` is the installing shell's `PATH` with the running Node's directory in front. systemd reads no shell profile, yet the launcher needs `node` and the hub's agents need `claude`, `codex`, and `git`.
 - `OCTOGENT_HOME` is the state root the hub serves. The CLI also uses it to recognize the unit as its own hub's.
-- `EnvironmentFile` appears only when `hub.env` existed at install time.
+- `EnvironmentFile=-…` is always present; the `-` makes a missing `hub.env` fine.
 - `Restart=on-failure` restarts a crashed hub after 3 seconds, and systemd gives up after 5 failed starts within 2 minutes (a port that stays taken, say).
 
-Run `octogent hub install-service` again after moving the checkout, switching Node versions (nvm), changing `PATH`, or creating `hub.env`, then `octogent hub restart` to apply it. [`examples/octogent-hub.service`](../../examples/octogent-hub.service) is the same unit, for installing by hand.
+Run `octogent hub install-service` again after moving the checkout, switching Node versions (nvm) or changing `PATH`, then `octogent hub restart` to apply it. A new or edited `hub.env` only needs `octogent hub restart`. [`examples/octogent-hub.service`](../../examples/octogent-hub.service) is the same unit, for installing by hand.
 
 ## Environment
 

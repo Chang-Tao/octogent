@@ -97,9 +97,12 @@ export const renderHubUnit = ({
         ]
       : []),
     environmentLine("OCTOGENT_HOME", stateRoot),
-    envFileExists
-      ? `EnvironmentFile=-${escapeSpecifiers(envFile)}`
-      : `# For more variables, write KEY=value lines to ${envFile} and install again.`,
+    // Always referenced (`-` tolerates a missing file): the operator can add
+    // hub.env later and only restart the hub, without installing again.
+    ...(envFileExists
+      ? []
+      : [`# For more variables, write KEY=value lines to ${envFile} and restart the hub.`]),
+    `EnvironmentFile=-${escapeSpecifiers(envFile)}`,
     "Restart=on-failure",
     "RestartSec=3",
     "",

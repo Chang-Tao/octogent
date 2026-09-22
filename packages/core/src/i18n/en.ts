@@ -188,7 +188,7 @@ export const en: TranslationMap = {
     "Installed {path}; the hub now runs under systemd (`systemctl --user status octogent-hub`, logs: `journalctl --user -u octogent-hub`).",
   "cli.service.envFile": "The hub also reads {path}.",
   "cli.service.noEnvFile":
-    "For more variables (OCTOGENT_HUB_PORT, OCTOGENT_ACCESS_TOKEN, …), write KEY=value lines to {path} and run install-service again.",
+    "For more variables (OCTOGENT_HUB_PORT, OCTOGENT_ACCESS_TOKEN, …), write KEY=value lines to {path} and restart the hub.",
   "cli.service.hubAlreadyRunning":
     "A hub was already running (pid {pid}), so the service did not start another; `octogent hub restart` restarts it under systemd once its workers are idle.",
   "cli.service.lingerOff":

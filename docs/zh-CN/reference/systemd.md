@@ -10,7 +10,7 @@
    cd ~/src/octogent && pnpm build
    ```
 
-2. 可选：现在就写好 `~/.octogent/hub.env`（见[环境变量](#环境变量)）；只有该文件存在时，unit 才会引用它。
+2. 可选：现在就写好 `~/.octogent/hub.env`（见[环境变量](#环境变量)）；unit 始终引用它，之后再补也可以。
 3. 在正常的登录 shell 中安装，即 `which claude`（或 `which codex`）能找到命令的 shell：
 
    ```bash
@@ -53,10 +53,10 @@ WantedBy=default.target
 - `WorkingDirectory` 是你的主目录，长期运行的 hub 因此不会占住任何项目目录。
 - `PATH` 是安装时 shell 的 `PATH`，并把当前 Node 所在目录放在最前。systemd 不读取任何 shell 配置文件，而启动器需要 `node`，hub 的代理需要 `claude`、`codex` 和 `git`。
 - `OCTOGENT_HOME` 是 hub 服务的状态根目录。CLI 也靠它认出这个 unit 属于自己的 hub。
-- 只有安装时 `hub.env` 已存在，才会出现 `EnvironmentFile` 这一行。
+- `EnvironmentFile=-…` 始终存在；`-` 表示 `hub.env` 不存在也没关系。
 - `Restart=on-failure` 在 hub 崩溃 3 秒后重启它；2 分钟内连续 5 次启动失败（例如端口一直被占）后，systemd 不再重试。
 
-移动检出目录、切换 Node 版本（nvm）、修改 `PATH` 或新建 `hub.env` 之后，再运行一次 `octogent hub install-service`，然后用 `octogent hub restart` 让它生效。[`examples/octogent-hub.service`](../../../examples/octogent-hub.service) 是同一个 unit，供手动安装使用。
+移动检出目录、切换 Node 版本（nvm）或修改 `PATH` 之后，再运行一次 `octogent hub install-service`，然后用 `octogent hub restart` 让它生效。新建或修改 `hub.env` 只需 `octogent hub restart`。[`examples/octogent-hub.service`](../../../examples/octogent-hub.service) 是同一个 unit，供手动安装使用。
 
 ## 环境变量
 

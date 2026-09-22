@@ -176,7 +176,7 @@ export const zhCN: TranslationMap = {
     "已安装 {path}；hub 现在由 systemd 运行（`systemctl --user status octogent-hub`，日志：`journalctl --user -u octogent-hub`）。",
   "cli.service.envFile": "hub 还会读取 {path}。",
   "cli.service.noEnvFile":
-    "如需更多变量（OCTOGENT_HUB_PORT、OCTOGENT_ACCESS_TOKEN 等），把 KEY=value 行写入 {path}，再运行一次 install-service。",
+    "如需更多变量（OCTOGENT_HUB_PORT、OCTOGENT_ACCESS_TOKEN 等），把 KEY=value 行写入 {path}，再重启 hub 即可。",
   "cli.service.hubAlreadyRunning":
     "已有 hub 在运行（pid {pid}），所以服务没有再启动一个；等它的 worker 空闲后，`octogent hub restart` 会在 systemd 下重启它。",
   "cli.service.lingerOff":

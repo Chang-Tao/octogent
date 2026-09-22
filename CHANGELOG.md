@@ -103,6 +103,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Hub, phase 3: the hub is the default (2026-09-22)
+
+- Bare `octogent` now opens the current project on the hub: it starts the
+  hub if none answers, registers the project if needed (a git repository;
+  `octogent init` still does the full scaffold), and opens
+  `<hub>/p/<slug>/` — or `<hub>/` outside any project, or the project named
+  by `--project <slug>`. A project's own single-project server, when one is
+  still running, is opened instead of loading the project twice; a foreign
+  process on the hub port is reported, never worked around with another
+  port. `octogent --standalone` keeps the old single-project server. The
+  decision is a pure function (`resolveStartMode`).
+- The hub unloads a project after 30 minutes without a live PTY session, an
+  open dashboard, or a request (`OCTOGENT_HUB_PROJECT_IDLE_MS`; `0` keeps
+  everything loaded); its state stays on disk and the next request loads it
+  again, after the old context has finished writing.
+- `octogent hub install-service [--remove]` installs the hub as a systemd
+  user unit (`~/.config/systemd/user/octogent-hub.service`: the `octogent`
+  launcher's `hub start --foreground`, the installing shell's `PATH`,
+  `OCTOGENT_HOME`, `EnvironmentFile=~/.octogent/hub.env`, restart on
+  failure) and advises `loginctl enable-linger` when needed. Once installed,
+  every way of starting the hub — `hub start`, `hub restart`, auto-start,
+  bare `octogent` — goes through `systemctl --user start` so the hub never
+  escapes supervision; `--remove` disables the unit without stopping a hub
+  that may still have workers. `GET /api/hub/health` now reports the hub's
+  commit and build time next to its version.
+- Docs: a hub guide (`docs/guides/hub.md`, zh-CN too) linked from the
+  indexes, the READMEs and CLAUDE.md; the systemd reference rewritten for
+  the hub (`examples/octogent-hub.service`); quickstart, installation,
+  getting-work-done, CLI, API, filesystem-layout and troubleshooting
+  updated for the hub-first flow.
+
 ### Hub, phase 1: the hub CLI (2026-09-22)
 
 - `octogent hub start [--foreground]`, `hub status`, `hub stop`, `hub restart
