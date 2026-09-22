@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { usePromptLibrary } from "../app/hooks/usePromptLibrary";
 import { useT } from "../app/providers/LocaleProvider";
+import { buildTerminalsUrl } from "../runtime/runtimeEndpoints";
 import { SidebarPromptsList } from "./SidebarPromptsList";
 import { Terminal } from "./Terminal";
 import { ActionButton } from "./ui/ActionButton";
@@ -85,7 +86,7 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
   const handleNewPrompt = useCallback(async () => {
     setIsCreatingTerminal(true);
     try {
-      const res = await fetch("/api/terminals", {
+      const res = await fetch(buildTerminalsUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

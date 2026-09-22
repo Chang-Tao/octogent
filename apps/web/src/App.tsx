@@ -37,8 +37,11 @@ import { SidebarActionPanel } from "./components/SidebarActionPanel";
 import { TelemetryTape } from "./components/TelemetryTape";
 import { HttpTerminalSnapshotReader } from "./runtime/HttpTerminalSnapshotReader";
 import {
+  buildDeckTentacleSwarmUrl,
+  buildDeckTentaclesUrl,
   buildTerminalEventsSocketUrl,
   buildTerminalSnapshotsUrl,
+  buildTerminalsUrl,
 } from "./runtime/runtimeEndpoints";
 
 // Views that own the full canvas and never show the agents sidebar.
@@ -575,7 +578,7 @@ export const App = () => {
                   runningWorkspaceSetupStepId,
                   onRunWorkspaceSetupStep: handleRunWorkspaceSetupStep,
                   onLaunchWorkspaceSetupPlanner: async () => {
-                    const response = await fetch("/api/terminals", {
+                    const response = await fetch(buildTerminalsUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -608,7 +611,7 @@ export const App = () => {
                     return await createTerminal("worktree", undefined, OCTOBOSS_ID);
                   },
                   onCreateTentacle: async () => {
-                    const response = await fetch("/api/deck/tentacles", {
+                    const response = await fetch(buildDeckTentaclesUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ name: "", description: "" }),
@@ -617,18 +620,15 @@ export const App = () => {
                     await refreshColumns();
                   },
                   onSpawnSwarm: async (tentacleId, workspaceMode) => {
-                    const response = await fetch(
-                      `/api/deck/tentacles/${encodeURIComponent(tentacleId)}/swarm`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ workspaceMode }),
-                      },
-                    );
+                    const response = await fetch(buildDeckTentacleSwarmUrl(tentacleId), {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ workspaceMode }),
+                    });
                     if (!response.ok) return;
                   },
                   onOctobossAction: async (action) => {
-                    const response = await fetch("/api/terminals", {
+                    const response = await fetch(buildTerminalsUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -645,7 +645,7 @@ export const App = () => {
                       : undefined;
                   },
                   onTentacleAction: async (tentacleId, action) => {
-                    const response = await fetch("/api/terminals", {
+                    const response = await fetch(buildTerminalsUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
