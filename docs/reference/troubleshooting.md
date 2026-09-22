@@ -28,6 +28,15 @@ Check that your shell environment is available and executable.
 
 If startup fails with `Terminal session limit reached`, Octogent already has the configured number of live PTY-backed sessions. Stop unused terminals with `octogent terminal stop <terminal-id>` or prune inactive records with `octogent terminal prune`. The default cap is 32; set `OCTOGENT_MAX_TERMINAL_SESSIONS` to a positive integer before starting Octogent to adjust it.
 
+## A worker cannot find python, node, or a tool that your shell has
+
+Workers start from a clean baseline, not from the shell that started Octogent, so an activated virtualenv, a `conda` environment, or variables exported only in that shell do not reach them (see [Worker environment](cli.md#worker-environment)). `PATH` itself is kept, but `VIRTUAL_ENV` and anything outside the baseline are not.
+
+- For the whole project, add the variables to `<project>/.octogent/env`, e.g. `PATH=$PWD/.venv/bin:$PATH` and `VIRTUAL_ENV=$PWD/.venv`. `octogent init` writes this for a `.venv/` or `venv/` it finds. The file is re-read at each session start, so no restart is needed; lines it skipped appear in `octogent logs`.
+- For one worker, pass them from your shell: `octogent terminal create --inherit-env PATH,VIRTUAL_ENV ...`. These values are not persisted, so after a server restart use `.octogent/env` instead.
+- Cloud-provider credentials for the agents themselves (for example `AWS_PROFILE` for Bedrock or `GOOGLE_APPLICATION_CREDENTIALS` for Vertex) are outside the baseline too; add them the same way.
+- To confirm the difference is the environment, start Octogent with `OCTOGENT_PTY_ENV_MODE=inherit`, which copies the server's whole environment as before.
+
 ## A worker never picked up its initial prompt
 
 Octogent sends `--initial-prompt` when Claude or Codex reports `SessionStart`, with a fallback 15 seconds after the bootstrap command if readiness has not arrived. `UserPromptSubmit` acknowledges delivery. If `SessionStart` was seen but no acknowledgement arrives within 10 seconds of sending, Octogent retries the paste and Enter exactly once. Agents without a `SessionStart` hook are never retried, since missing hooks cannot distinguish a lost prompt from a delivered one.

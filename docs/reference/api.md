@@ -24,6 +24,8 @@ Most HTTP routes either read/write persisted files or create runtime records. We
 
 Terminal snapshots carry `providerError` (`{ kind, message, at }`, kind one of `usage-limit`, `rate-limit`, `api-error`, `auth`) while a provider banner the agent CLI printed stands; it clears on the agent's next tool call or completion verdict. `POST /api/terminals` adds `usageWarning` (`{ provider, bucket, usedPercent, resetAt }`) when the usage reading the server last fetched shows the chosen provider out of quota.
 
+`POST /api/terminals` accepts `inheritEnv` (array of up to 64 names matching `^[A-Z_][A-Z0-9_]*$`) together with `env` (object holding exactly those names, string values without NUL or newlines); the values are applied to that terminal's sessions on top of the project's `.octogent/env`. Any mismatch between the two fields is a `400`. Records and snapshots carry only the names, as `inheritedEnv`; the values are kept in memory and not persisted.
+
 Terminal snapshots include `lifecycleState` when known. Supported lifecycle states are `registered`, `running`, `stopped`, `exited`, and `stale`. Stale terminals are records that were persisted as running but could not be reattached to a live Octogent PTY session after startup.
 
 Creating a terminal registers metadata first. A PTY starts immediately only when an initial prompt is provided, a WebSocket attaches, or an internal direct listener starts the session. Worktree terminals also create their worktree before the terminal record is exposed.

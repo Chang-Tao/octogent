@@ -35,6 +35,7 @@ octogent
 - `OCTOGENT_ACCESS_TOKEN`：开启远程访问时非回环客户端必须携带的访问令牌；未设置时每次启动自动生成并随局域网地址打印
 - `OCTOGENT_VERBOSE_LOGS`：设为 `1`，同时把详细的钩子和运行时摘要打印到终端。无论是否设置，详细摘要都会写入服务日志
 - `OCTOGENT_SERVER_LOG`：设为 `off` 可禁用服务日志；设为文件路径可覆盖默认的 `<project-state-dir>/logs/server.log`
+- `OCTOGENT_PTY_ENV_MODE`：设为 `inherit` 时，代理终端重新拿到服务进程的完整环境（仍去掉 Claude 会话标记），而不是[工作代理的环境](#工作代理的环境)一节所述的基线。这是应急开关，用于基线漏掉的场景；`.octogent/env` 与 `--inherit-env` 仍会叠加在上面
 
 无界面服务器示例：
 
@@ -63,6 +64,8 @@ octogent init [project-name]
 在当前目录创建或更新 `.octogent/` 脚手架，但不启动工作面板。
 
 当你想显式初始化项目，或提前设置项目显示名时使用它。日常使用中，在代码库里直接运行 `octogent` 就足以完成初始化并启动应用。
+
+项目还没有 `.octogent/env` 时，`init` 会写入一份起步模板（见[工作代理的环境](#工作代理的环境)）。如果找到 `.venv/bin/activate` 或 `venv/bin/activate`，模板里的 virtualenv 行直接生效，工作代理会使用该环境；否则这些行保持注释，作为示例。已有的 `.octogent/env` 永远不会被覆盖，所以重复运行 `init` 是安全的。
 
 ## 列出已注册项目
 
@@ -112,8 +115,28 @@ octogent terminal create [options]
 - `--effort`：难度档位 `light`、`standard`、`heavy` 或 `max`；由服务端按 provider 映射到具体模型（见 `OCTOGENT_EFFORT_MODELS`）
 - `--prompt-template`：提示词模板名称
 - `--prompt-variables`：提示词模板变量的 JSON 对象
+- `--inherit-env NAME,...`：把当前 shell 中的这些变量传给该工作代理，例如 `--inherit-env PATH,VIRTUAL_ENV`。只有列出的变量会离开 CLI；变量名只能由大写字母、数字和 `_` 组成，最多 64 个；其中任何一个在当前 shell 中未设置时命令直接失败
 
 创建成功后，如果服务端最近一次获取的用量显示所选服务商额度已耗尽，CLI 会向 stderr 打印一行警告：Codex 看 5 小时或每周窗口达到 100%，或账号级的上限标记；Claude 看 5 小时或每周窗口，或所请求模型对应的每周额度达到 100%。重置时间已过的读数会被忽略。只使用服务端为用量接口已经取到的读数——创建终端从不调用用量服务——没有读数时什么也不打印。
+
+### 工作代理的环境
+
+代理终端不会继承启动 Octogent 的那个 shell 的环境：一个服务进程可能同时服务多个项目，一个项目的 virtualenv 或密钥不能漏进另一个项目的工作代理。每个终端的环境按以下顺序构建，后面的步骤覆盖前面的：
+
+1. **基线**，取自服务进程的环境：`HOME`、`USER`、`LOGNAME`、`SHELL`、`LANG`、`LC_*`、`TZ`、`PATH`、`TMPDIR`、`XDG_*`、`SSH_AUTH_SOCK`、`DISPLAY`、`WAYLAND_DISPLAY`、`DBUS_SESSION_BUS_ADDRESS`；代理 CLI 自己要读的：`ANTHROPIC_*`、`CLAUDE_CODE_*`、`CLAUDE_CONFIG_DIR`、`CODEX_*`、`OPENAI_*`、`OCTOGENT_*`、`NODE_*`、`NVM_*`；以及代理相关变量 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`、`ALL_PROXY`（大小写两种写法）和 `SSL_CERT_FILE`、`SSL_CERT_DIR`。其余一律丢弃——`VIRTUAL_ENV`、`DATABASE_URL`、云服务凭据都不会带过去。Claude 会话标记 `CLAUDECODE` 与 `CLAUDE_CODE_CHILD_SESSION` 始终被去掉：代理一旦以为自己是子会话，就不再保存 Octogent 依赖的转录。
+2. **`<项目>/.octogent/env`**（存在时）：`KEY=VALUE` 行，支持 `#` 注释、空行、可选的 `export ` 前缀，两侧的单引号或双引号会被去掉。`$VAR` 与 `${VAR}` 基于基线和前面的行展开；`$PWD` 是项目根目录，工作树终端也一样。单引号内的 `$` 保持原样。每次会话启动都会重新读取该文件，修改后下一个会话即生效，无需重启。格式错误的行会被跳过，并在每次会话启动时于服务日志中报告一次，不会阻止终端启动。
+3. **`--inherit-env` 变量**，来自创建该终端的 shell。
+4. **Octogent 自己的变量**：`TERM`、`COLORTERM`、`OCTOGENT_SESSION_ID`、`OCTOGENT_API_BASE`。
+
+Python 项目通常需要：
+
+```bash
+# .octogent/env
+PATH=$PWD/.venv/bin:$PATH
+VIRTUAL_ENV=$PWD/.venv
+```
+
+`.octogent/` 已被 git 忽略，所以这个文件只属于当前这份克隆。使用 `--inherit-env` 时，终端记录只保存变量名（`terminal result --json` 以 `inheritedEnv` 列出）；变量值只留在服务进程内存中，服务重启后再次启动的会话不会带上它们。需要持久生效的变量请写进 `.octogent/env`。`OCTOGENT_PTY_ENV_MODE=inherit` 可恢复为复制服务进程的完整环境。
 
 ## 列出终端
 

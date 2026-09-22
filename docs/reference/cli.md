@@ -35,6 +35,7 @@ If the current directory has not been initialized yet, the dashboard still start
 - `OCTOGENT_ACCESS_TOKEN`: Access token required from non-loopback clients when remote access is on; auto-generated per session (and printed with the LAN URL) when unset
 - `OCTOGENT_VERBOSE_LOGS`: Set to `1` to also print verbose hook and runtime summaries to the terminal. Verbose summaries are always written to the server log
 - `OCTOGENT_SERVER_LOG`: Set to `off` to disable the server log, or to a file path to override the default `<project-state-dir>/logs/server.log`
+- `OCTOGENT_PTY_ENV_MODE`: Set to `inherit` to hand agent terminals the server's whole environment again (minus the Claude session markers) instead of the baseline described in [Worker environment](#worker-environment). An escape hatch for setups the baseline misses; `.octogent/env` and `--inherit-env` still apply on top
 
 Example for headless servers:
 
@@ -63,6 +64,8 @@ octogent init [project-name]
 Creates or updates the `.octogent/` scaffold in the current directory without starting the dashboard.
 
 Use this when you want to initialize the project explicitly or set the project display name ahead of time. In normal use, running `octogent` inside the codebase is enough to initialize and start the app.
+
+`init` also writes a starter `.octogent/env` (see [Worker environment](#worker-environment)) when the project has none. If it finds `.venv/bin/activate` or `venv/bin/activate`, the virtualenv lines are live, so workers use that environment; otherwise they are left commented as an example. An existing `.octogent/env` is never overwritten, so running `init` again is safe.
 
 ## List registered projects
 
@@ -112,8 +115,28 @@ Options:
 - `--effort`: effort tier `light`, `standard`, `heavy`, or `max`; the server maps it to a per-provider model (see `OCTOGENT_EFFORT_MODELS`)
 - `--prompt-template`: prompt template name
 - `--prompt-variables`: JSON object of prompt template variables
+- `--inherit-env NAME,...`: pass these variables from your shell to this worker, e.g. `--inherit-env PATH,VIRTUAL_ENV`. Only the named variables leave the CLI; names are upper-case letters, digits, and `_`, at most 64, and the command fails if one is not set in your shell
 
 After a successful create, the CLI prints a warning to stderr when the server's last usage reading shows the chosen provider out of quota: for Codex, its 5-hour or weekly window at 100% or its account limit flag; for Claude, its 5-hour or weekly window, or the weekly bucket of the requested model, at 100%. A reading whose reset time has passed is ignored. Only readings the server already fetched for its usage routes are used — creating a terminal never calls a usage service — so with no reading nothing is printed.
+
+### Worker environment
+
+Agent terminals do not inherit the environment of the shell that started Octogent: one server can serve several projects, and one project's virtualenv or secrets must not leak into another's workers. Each terminal's environment is built in this order, later steps winning:
+
+1. **Baseline** from the server's environment: `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TZ`, `PATH`, `TMPDIR`, `XDG_*`, `SSH_AUTH_SOCK`, `DISPLAY`, `WAYLAND_DISPLAY`, `DBUS_SESSION_BUS_ADDRESS`; what the agent CLIs read: `ANTHROPIC_*`, `CLAUDE_CODE_*`, `CLAUDE_CONFIG_DIR`, `CODEX_*`, `OPENAI_*`, `OCTOGENT_*`, `NODE_*`, `NVM_*`; and the proxy family `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY` (upper and lower case) with `SSL_CERT_FILE` and `SSL_CERT_DIR`. Everything else — `VIRTUAL_ENV`, `DATABASE_URL`, cloud credentials — is dropped. The Claude session markers `CLAUDECODE` and `CLAUDE_CODE_CHILD_SESSION` are always removed: an agent that believes it is a child session stops saving the transcript Octogent reads.
+2. **`<project>/.octogent/env`**, when it exists: `KEY=VALUE` lines, `#` comments, blank lines, an optional `export ` prefix, surrounding single or double quotes stripped. `$VAR` and `${VAR}` expand against the baseline and the lines above; `$PWD` is the project root, also for worktree terminals. Single quotes keep `$` literal. The file is re-read whenever a session starts, so edits reach the next session without a restart. Malformed lines are skipped and reported once per session start in the server log; they never stop the terminal.
+3. **`--inherit-env` variables** from the shell that created the terminal.
+4. **Octogent's own**: `TERM`, `COLORTERM`, `OCTOGENT_SESSION_ID`, `OCTOGENT_API_BASE`.
+
+A Python project typically needs:
+
+```bash
+# .octogent/env
+PATH=$PWD/.venv/bin:$PATH
+VIRTUAL_ENV=$PWD/.venv
+```
+
+`.octogent/` is git-ignored, so the file belongs to this clone. With `--inherit-env`, the terminal record keeps only the variable names (`terminal result --json` lists them as `inheritedEnv`); the values stay in the server's memory, so a session started again after a server restart runs without them. Put anything that must persist in `.octogent/env`. `OCTOGENT_PTY_ENV_MODE=inherit` restores copying the server's whole environment.
 
 ## List terminals
 

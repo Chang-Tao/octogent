@@ -9,10 +9,13 @@ Octogent 按所有权划分文件。面向代理的项目上下文留在工作�
 主要路径：
 
 - `.octogent/project.json`
+- `.octogent/env`（可选）
 - `.octogent/tentacles/`
 - `.octogent/worktrees/`
 
 `project.json` 保存用于定位全局状态的稳定项目 ID。tentacles 目录用于存放代理可读的 markdown。worktrees 是生成出来的执行检出目录，不应当作上下文存储使用。
+
+`env` 是本项目工作代理的环境：`KEY=VALUE` 行，叠加在本项目每个代理终端的基线环境之上，每次会话启动时重新读取。`octogent init` 会写入起步模板（找到 `.venv/` 或 `venv/` 时直接启用它），且从不覆盖已有文件。它和 `.octogent/` 下的其他内容一样被 git 忽略，只属于当前这份克隆。语法与优先级见 [CLI 参考——工作代理的环境](cli.md#工作代理的环境)。
 
 触手示例：
 
