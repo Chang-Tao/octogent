@@ -82,6 +82,16 @@ export const createBaseEnvironment = (source: NodeJS.ProcessEnv = process.env) =
       env[key] = value;
     }
   }
+  // Dropping VIRTUAL_ENV is not enough: an activated virtualenv also puts its
+  // bin directory first on PATH, and that is what actually routes `python` to
+  // project A's interpreter inside project B's workers. Projects opt back in
+  // through `.octogent/env`.
+  if (!inheritAll && typeof source.VIRTUAL_ENV === "string" && env.PATH) {
+    const venvBin = join(source.VIRTUAL_ENV, "bin");
+    env.PATH = env.PATH.split(":")
+      .filter((entry) => entry !== venvBin && entry !== `${venvBin}/`)
+      .join(":");
+  }
   return env;
 };
 

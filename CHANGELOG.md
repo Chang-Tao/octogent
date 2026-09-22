@@ -103,6 +103,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Hub, phase 1: worker environment (2026-09-22)
+
+- Worker PTYs start from a clean baseline instead of a copy of the server's
+  environment (which leaked whatever shell started Octogent: one project's
+  virtualenv, secrets, Claude session markers). Only login-shell basics, the
+  agents' own families (`ANTHROPIC_*`, `CLAUDE_CODE_*`, `CODEX_*`, `OPENAI_*`,
+  `NODE_*`, `NVM_*`, proxy and CA variables) and `OCTOGENT_*` carry over;
+  the server's activated venv is also removed from `PATH`.
+  `OCTOGENT_PTY_ENV_MODE=inherit` restores the old behavior.
+- Each project declares what its workers need in `<workspace>/.octogent/env`
+  (`KEY=VALUE`, `$VAR` expansion, `PWD` = workspace; re-read at every session
+  start); `octogent init` writes a template and fills it in when a `.venv`
+  exists. `octogent terminal create --inherit-env PATH,VIRTUAL_ENV` copies
+  named variables from the caller's shell for one worker; only the names are
+  recorded. Order: baseline → `.octogent/env` → inherited → Octogent's own.
+
 ### Hub, phase 0: agents learn Octogent (2026-09-22)
 
 - `octogent setup-agents` installs a user-level skill for Claude Code and

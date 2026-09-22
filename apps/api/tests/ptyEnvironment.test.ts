@@ -96,6 +96,10 @@ const SERVER_ENV: NodeJS.ProcessEnv = {
   CLAUDE_CODE_CHILD_SESSION: "1",
 };
 
+// SERVER_ENV.PATH starts with the server's activated venv; the baseline drops
+// that entry so project A's interpreter cannot reach project B's workers.
+const BASELINE_PATH = "/usr/local/bin:/usr/bin";
+
 const KEPT = Object.keys(SERVER_ENV).filter(
   (key) =>
     ![
@@ -137,8 +141,10 @@ describe("createShellEnvironment", () => {
     const env = createShellEnvironment({ sourceEnv: SERVER_ENV });
 
     for (const key of KEPT) {
+      if (key === "PATH") continue; // the server's own venv bin is stripped, see below
       expect(env[key], key).toBe(SERVER_ENV[key]);
     }
+    expect(env.PATH).toBe(BASELINE_PATH);
     expect(env.TERM).toBe("xterm-256color");
     expect(env.COLORTERM).toBe("truecolor");
   });
@@ -196,7 +202,7 @@ describe("createShellEnvironment", () => {
       inheritedEnv: { EDITOR: "nano", OCTOGENT_API_BASE: "http://also-evil.example" },
     });
 
-    expect(env.PATH).toBe(`${workspace}/.venv/bin:${SERVER_ENV.PATH}`);
+    expect(env.PATH).toBe(`${workspace}/.venv/bin:${BASELINE_PATH}`);
     expect(env.VIRTUAL_ENV).toBe(`${workspace}/.venv`);
     expect(env.EDITOR).toBe("nano");
     expect(env.OCTOGENT_API_BASE).toBe("http://127.0.0.1:8787");
@@ -257,9 +263,34 @@ describe("createBaseEnvironment", () => {
   it("is the baseline without Octogent's terminal settings", () => {
     const base = createBaseEnvironment(SERVER_ENV);
 
-    expect(base.PATH).toBe(SERVER_ENV.PATH);
+    expect(base.PATH).toBe(BASELINE_PATH);
     expect(base.VIRTUAL_ENV).toBeUndefined();
     expect(base.OCTOGENT_SESSION_ID).toBeUndefined();
+  });
+});
+
+describe("createBaseEnvironment and the server's own virtualenv", () => {
+  it("removes the activated venv's bin from PATH along with VIRTUAL_ENV", () => {
+    const env = createBaseEnvironment({
+      PATH: "/home/dev/other/.venv/bin:/usr/local/bin:/usr/bin",
+      VIRTUAL_ENV: "/home/dev/other/.venv",
+      HOME: "/home/dev",
+    });
+    expect(env.PATH).toBe("/usr/local/bin:/usr/bin");
+    expect(env.VIRTUAL_ENV).toBeUndefined();
+  });
+
+  it("leaves PATH alone when no virtualenv is active or in inherit mode", () => {
+    expect(createBaseEnvironment({ PATH: "/usr/local/bin:/usr/bin", HOME: "/home/dev" }).PATH).toBe(
+      "/usr/local/bin:/usr/bin",
+    );
+    expect(
+      createBaseEnvironment({
+        PATH: "/home/dev/other/.venv/bin:/usr/bin",
+        VIRTUAL_ENV: "/home/dev/other/.venv",
+        OCTOGENT_PTY_ENV_MODE: "inherit",
+      }).PATH,
+    ).toBe("/home/dev/other/.venv/bin:/usr/bin");
   });
 });
 

@@ -26,6 +26,8 @@ Run everything from the project directory. No browser or API calls needed.
      --agent-provider claude-code|codex [--effort light|standard|heavy|max | --model <id>] \\
      --initial-prompt "<full task: goal, files, behavior, tests, gates, 'commit on your branch, do not push', 'end with a summary and doubts'>"
    Always pass --tentacle-id; without it the terminal reports directly to the octoboss.
+   Workers start from a clean environment: put a project's venv/PATH in <workspace>/.octogent/env,
+   or pass --inherit-env PATH,VIRTUAL_ENV to copy named variables from your shell for one worker.
    Effort tiers today: light = haiku / gpt-5.6-luna@low, standard = sonnet / gpt-5.6-sol@medium,
    heavy = opus / gpt-6-astra@medium, max = fable / gpt-6-astra@xhigh (Codex falls back per account).
 
@@ -68,6 +70,8 @@ const GUIDE_ZH = `Octogent — 协调者工作法（当前安装版本）
      --agent-provider claude-code|codex [--effort light|standard|heavy|max | --model <型号>] \\
      --initial-prompt "<完整任务：目标、文件范围、要求的行为、测试、门禁、'在自己分支提交不要 push'、'最后给总结和疑问'>"
    一定要带 --tentacle-id，不带就直属 octoboss。
+   工人从干净环境启动：项目的 venv/PATH 写在 <工作区>/.octogent/env，
+   或用 --inherit-env PATH,VIRTUAL_ENV 把你 shell 里指定的变量复制给这一个工人。
    当前档位：light = haiku / gpt-5.6-luna@low，standard = sonnet / gpt-5.6-sol@medium，
    heavy = opus / gpt-6-astra@medium，max = fable / gpt-6-astra@xhigh（Codex 按账号回退）。
 
