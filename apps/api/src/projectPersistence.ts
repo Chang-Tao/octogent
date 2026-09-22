@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -206,7 +207,12 @@ const backfillProjectSlugs = (registry: ProjectsRegistry): boolean => {
 
 export const saveProjectsRegistry = (registry: ProjectsRegistry) => {
   ensureGlobalOctogentDir();
-  writeFileSync(PROJECTS_FILE, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+  // Written aside and renamed into place: a hub, CLI calls, and other servers
+  // all read this file, and one that catches it half-written sees an empty
+  // registry and would save that back over everyone's projects.
+  const temporaryPath = `${PROJECTS_FILE}.${process.pid}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+  renameSync(temporaryPath, PROJECTS_FILE);
 };
 
 export const resolveProjectConfigPath = (workspaceCwd: string) =>
