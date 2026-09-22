@@ -103,6 +103,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Hub, phase 1: the hub server (2026-09-22)
+
+- One process can now serve every registered project: `createHubServer`
+  loads a project on the first request that names it (`/api/p/<slug-or-id>/api/…`,
+  WebSockets included) and keeps it loaded, each with its own runtime,
+  monitor, prompts, usage cache and health source (`createProjectContext`,
+  extracted from the single-project server, which now mounts one context at
+  the root). Hub-level routes: `GET /api/hub/health`, `GET /api/projects`
+  (id, name, slug, path, loaded, and a summary with running / awaiting-review
+  counts and last activity for loaded projects) and `POST /api/projects
+  { path, name? }` (loopback or token holders only; scaffolds the workspace
+  without touching `.gitignore`). `/` and `/p/<key>/…` serve the web app.
+- Registry entries carry a `slug` (backfilled on load, unique, kept stable
+  across renames with the old slug kept as an alias so bookmarked links keep
+  resolving); ids win over slugs and slugs over aliases. The registry is now
+  written atomically, since the hub, CLI calls and other servers all read it.
+- Under the hub every project's hooks, PTY environment (`OCTOGENT_API_BASE`)
+  and prompts use the id-scoped base `<hub>/api/p/<id>`; workers also get
+  `OCTOGENT_PROJECT_ID`. The server's own `OCTOGENT_PROJECT_ID` and
+  `OCTOGENT_API_ORIGIN` never reach workers, and the CLI now prefers the
+  per-worker `OCTOGENT_API_BASE` over the dev shell's `OCTOGENT_API_ORIGIN`.
+  Swarm prompts receive `{{apiBaseUrl}}` next to `{{apiPort}}`, since the
+  port alone reaches the hub root.
+- Session caps: 12 PTY sessions per project under the hub (or
+  `OCTOGENT_MAX_TERMINAL_SESSIONS`) and 32 hub-wide
+  (`OCTOGENT_HUB_MAX_TERMINAL_SESSIONS`); a refused create answers 429.
+  Log lines from a project are tagged `[<slug>]`, and `configureServerLogging`
+  accepts a `hubStateDir` (`~/.octogent/hub/logs/server.log`) for the hub.
+  Nothing starts the hub yet — the CLI side follows.
+
 ### Hub, phase 1: worker environment (2026-09-22)
 
 - Worker PTYs start from a clean baseline instead of a copy of the server's
