@@ -391,7 +391,11 @@ export const runHubStop = async (context: HubCliContext): Promise<number> => {
   }
 
   console.log(t(locale, "cli.hub.stopping", { pid: metadata.pid }));
-  process.kill(metadata.pid, "SIGTERM");
+  try {
+    process.kill(metadata.pid, "SIGTERM");
+  } catch {
+    // Exited on its own since the check; the wait below sees that.
+  }
   if (!(await waitForExit(metadata.pid, HUB_STOP_TIMEOUT_MS))) {
     console.error(t(locale, "cli.hub.killed", { seconds: HUB_STOP_TIMEOUT_MS / 1000 }));
     try {
@@ -465,19 +469,27 @@ const fetchBusyTerminals = async (apiBaseUrl: string): Promise<BusyTerminal[] | 
       (project.summary?.runningTerminals ?? 0) + (project.summary?.awaitingReviewTerminals ?? 0) >
         0,
   );
-  const withSnapshots = await Promise.all(
-    candidates.map(async (project) => {
-      const response = await fetch(
-        `${apiBaseUrl}/api/p/${encodeURIComponent(project.id)}/api/terminal-snapshots`,
-        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(5_000) },
-      );
-      const snapshots = response.ok
-        ? ((await response.json()) as Array<Record<string, unknown>>)
-        : [];
-      return { slug: project.slug, snapshots };
-    }),
-  );
-  return collectBusyTerminals(withSnapshots);
+  try {
+    const withSnapshots = await Promise.all(
+      candidates.map(async (project) => {
+        const response = await fetch(
+          `${apiBaseUrl}/api/p/${encodeURIComponent(project.id)}/api/terminal-snapshots`,
+          { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(5_000) },
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return {
+          slug: project.slug,
+          snapshots: (await response.json()) as Array<Record<string, unknown>>,
+        };
+      }),
+    );
+    return collectBusyTerminals(withSnapshots);
+  } catch {
+    // Unknown is not idle: the caller refuses without --force.
+    return null;
+  }
 };
 
 /** `octogent hub restart [--force]`. */
