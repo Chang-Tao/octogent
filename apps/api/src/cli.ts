@@ -16,6 +16,7 @@ import {
   runHubStatus,
   runHubStop,
 } from "./cliHub";
+import { runHubInstallService, runHubRemoveService } from "./cliHubService";
 import { runBareStart } from "./cliStart";
 import { formatUsageWarning, parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
@@ -1000,6 +1001,18 @@ const runHubCommand = async (subcommand: string | undefined): Promise<boolean> =
     }
     if (subcommand === "restart") {
       process.exit(await runHubRestart(hubContext, args.includes("--force")));
+    }
+    if (subcommand === "install-service") {
+      const serviceOptions = {
+        locale,
+        binaryPath: join(PACKAGE_ROOT, "bin", "octogent"),
+        bundlePath: join(PACKAGE_ROOT, "dist", "api", "cli.js"),
+      };
+      process.exit(
+        args.includes("--remove")
+          ? runHubRemoveService(serviceOptions)
+          : await runHubInstallService(serviceOptions),
+      );
     }
   } catch (error) {
     exitOnHubCliError(error);

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync } from "node:fs";
-import { networkInterfaces } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 
 import { type Locale, t } from "@octogent/core";
@@ -18,6 +18,14 @@ import {
   readLiveHubMetadata,
   writeHubMetadata,
 } from "./hubMetadata";
+import {
+  type CommandRunner,
+  HUB_UNIT_NAME,
+  describeCommandFailure,
+  isCommandSuccess,
+  isHubServiceInstalled,
+  runCommand,
+} from "./hubServiceUnit";
 import { type BuildIdentity, describeBuildDrift, formatBuildLabel } from "./hubVersionDrift";
 import {
   canListenOnPort,
@@ -50,6 +58,8 @@ export type HubCliContext = {
   webDistDir: string;
   promptsDir: string;
   env?: NodeJS.ProcessEnv;
+  /** For systemctl; tests substitute one that never runs it. */
+  runCommand?: CommandRunner;
 };
 
 /** A failure already worded for the operator. */
@@ -237,12 +247,51 @@ const readTail = (path: string, maxLines = 20): string => {
 };
 
 /**
- * Spawns `hub start --foreground` detached and waits until its hub.json is
- * written and its health answers. Callers hold the hub lock.
+ * With the hub's systemd unit installed, starting it anywhere else would
+ * leave a hub systemd neither restarts nor knows about. Null when there is
+ * no unit for this state root or systemctl refuses; the caller spawns one.
+ */
+const startHubService = async (context: HubCliContext): Promise<HubMetadata | null> => {
+  const { locale, env = process.env } = context;
+  if (!isHubServiceInstalled(env, homedir(), resolveGlobalOctogentDir())) {
+    return null;
+  }
+  const started = (context.runCommand ?? runCommand)("systemctl", [
+    "--user",
+    "start",
+    HUB_UNIT_NAME,
+  ]);
+  if (!isCommandSuccess(started)) {
+    console.error(
+      t(locale, "cli.hub.serviceStartFailed", { reason: describeCommandFailure(started) }),
+    );
+    return null;
+  }
+  const deadline = Date.now() + HUB_START_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const metadata = await readLiveHubMetadata();
+    if (metadata) {
+      return metadata;
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+  throw new HubCliError(
+    t(locale, "cli.hub.serviceStartTimeout", { seconds: HUB_START_TIMEOUT_MS / 1000 }),
+  );
+};
+
+/**
+ * Starts the hub, through its systemd unit when installed, else as a
+ * detached `hub start --foreground`, and waits until its hub.json is written
+ * and its health answers. Callers hold the hub lock.
  */
 const startHubDaemon = async (context: HubCliContext): Promise<HubMetadata> => {
   const { locale, env = process.env } = context;
   await assertHubCanStart(locale, env);
+  const viaService = await startHubService(context);
+  if (viaService) {
+    return viaService;
+  }
 
   const stderrPath = resolveDaemonStderrPath();
   mkdirSync(join(resolveHubStateDir(), "logs"), { recursive: true });

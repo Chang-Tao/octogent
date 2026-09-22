@@ -170,7 +170,33 @@ export const en: TranslationMap = {
   "cli.start.blockedStandalone":
     "Or run `octogent --standalone` for a single-project server on the next free port.",
   "cli.help.hub":
-    "octogent hub start [--foreground]    Start the hub: one server for every registered project\n  octogent hub status                  Show the hub's address, build, and projects (exit 1 if none answers)\n  octogent hub stop                    Stop the hub\n  octogent hub restart [--force]       Restart the hub; refuses while terminals run unless --force",
+    "octogent hub start [--foreground]    Start the hub: one server for every registered project\n  octogent hub status                  Show the hub's address, build, and projects (exit 1 if none answers)\n  octogent hub stop                    Stop the hub\n  octogent hub restart [--force]       Restart the hub; refuses while terminals run unless --force\n  octogent hub install-service [--remove]  Run the hub as a systemd user service (Linux)",
+  "cli.hub.serviceStartFailed":
+    "Warning: `systemctl --user start octogent-hub` failed ({reason}); starting the hub outside systemd.",
+  "cli.hub.serviceStartTimeout":
+    "Error: the octogent-hub service did not answer within {seconds} s. See `journalctl --user -u octogent-hub`.",
+  "cli.service.linuxOnly":
+    "Error: `octogent hub install-service` needs systemd, which runs only on Linux. Start the hub with `octogent hub start`, or have your system's service manager run `octogent hub start --foreground`.",
+  "cli.service.noSystemctl":
+    "Error: systemctl was not found, so there is no systemd here to run the hub (a container, perhaps). Start it with `octogent hub start` instead.",
+  "cli.service.noUserManager":
+    "Error: the systemd user manager is not reachable ({reason}). Run this from a normal login session (not `su` or `sudo`), or start the hub with `octogent hub start`.",
+  "cli.service.missingBuild":
+    "Error: {path} is missing; the service runs the built CLI. Run `pnpm build` in the Octogent checkout first.",
+  "cli.service.commandFailed": "Error: `{command}` failed: {reason}",
+  "cli.service.installed":
+    "Installed {path}; the hub now runs under systemd (`systemctl --user status octogent-hub`, logs: `journalctl --user -u octogent-hub`).",
+  "cli.service.envFile": "The hub also reads {path}.",
+  "cli.service.noEnvFile":
+    "For more variables (OCTOGENT_HUB_PORT, OCTOGENT_ACCESS_TOKEN, …), write KEY=value lines to {path} and run install-service again.",
+  "cli.service.hubAlreadyRunning":
+    "A hub was already running (pid {pid}), so the service did not start another; `octogent hub restart` restarts it under systemd once its workers are idle.",
+  "cli.service.lingerOff":
+    "Lingering is off, so the hub starts at your first login and stops at your last logout. To run it from boot: loginctl enable-linger {user}",
+  "cli.service.notInstalled": "The hub service is not installed ({path} does not exist).",
+  "cli.service.disableFailed": "Warning: could not disable the service: {reason}",
+  "cli.service.removed":
+    "Removed {path}. A hub already running keeps running until `octogent hub stop`.",
   "cli.help.start":
     "octogent                             Open the current project on the hub (starts the hub and registers the project if needed)",
   "cli.help.standalone":
