@@ -170,6 +170,7 @@ export const runHubForeground = async (context: HubCliContext): Promise<void> =>
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
     promptsDir,
     accessToken,
+    build,
   });
 
   let shuttingDown = false;

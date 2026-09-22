@@ -173,6 +173,17 @@ describe("createHubServer", () => {
     });
   });
 
+  it("reports the build it runs in its health, for drift checks", async () => {
+    const build = { version: "9.8.7", commit: "abc1234", builtAt: "2026-09-22T08:00:00.000Z" };
+    const { baseUrl } = await startHub({ build });
+
+    const health = (await (await fetch(`${baseUrl}/api/hub/health`)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(health).toMatchObject(build);
+  });
+
   it("loads only the project a request names, by slug or by id", async () => {
     const alpha = registerWorkspace("Alpha Project");
     const beta = registerWorkspace("Beta");

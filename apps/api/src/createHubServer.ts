@@ -24,6 +24,7 @@ import { isUpgradeAllowed } from "./createApiServer/upgradeHandler";
 import { type ProjectContext, createProjectContext } from "./createProjectContext";
 import { type TerminalHealthCounts, createHealthSnapshotSource } from "./healthSnapshot";
 import { type HubProjectRegistry, createFileProjectRegistry } from "./hubProjectRegistry";
+import type { BuildIdentity } from "./hubVersionDrift";
 import { toConnectableHost } from "./listenHost";
 import { log, logError, logVerbose } from "./logging";
 import type { ProjectRegistryEntry } from "./projectPersistence";
@@ -58,6 +59,8 @@ export type CreateHubServerOptions = {
    * OCTOGENT_HUB_PROJECT_IDLE_MS, then 30 minutes.
    */
   projectIdleMs?: number;
+  /** The build this hub runs, as hub.json records it; its health reports it too. */
+  build?: BuildIdentity | undefined;
 };
 
 type LoadedProject = {
@@ -147,6 +150,7 @@ export const createHubServer = ({
     HUB_DEFAULT_MAX_SESSIONS,
   maxSessionsPerProject,
   projectIdleMs = readProjectIdleMs(process.env.OCTOGENT_HUB_PROJECT_IDLE_MS),
+  build,
 }: CreateHubServerOptions = {}) => {
   const accessToken = configuredAccessToken?.trim() || null;
   let remoteBinding = false;
@@ -354,6 +358,8 @@ export const createHubServer = ({
         200,
         {
           ...hubHealth.readHealthSnapshot(readTotals()),
+          // The same identity hub.json carries, for whoever only has the address.
+          ...build,
           pid: process.pid,
           maxTerminalSessions: maxTotalSessions,
           projects: { registered: registry.load().projects.length, loaded: loaded.size },
