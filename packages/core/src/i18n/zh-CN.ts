@@ -10,11 +10,16 @@ export const zhCN: TranslationMap = {
     "用法：terminal input <id> [<text>] [--enter] [--keys enter,esc,up,down,tab,ctrl-c,1–9]（最多 4096 字节）",
   "cli.error.inputFailed": "终端输入失败（HTTP {status}），需要存活的会话。",
   "cli.help.resultScreen": "附加最后 20 行屏幕内容",
+  "cli.help.inheritEnv": "把当前 shell 中的这些变量（逗号分隔的变量名）传给该 worker",
   "cli.help.screenInput":
     "octogent terminal screen <id> [--lines N] [--raw]  查看屏幕（默认 40 行）\n  octogent terminal input <id> [<text>] [--enter] [--keys name,...]  直接向 PTY 输入",
   // ── CLI ──────────────────────────────────────────────
   "cli.init.initialized": "已初始化 Octogent 项目 {displayName}，路径：{path}",
   "cli.init.ready": "运行 `octogent` 启动仪表盘。",
+  "cli.init.envWrittenVenv":
+    "已写入 .octogent/env：本项目的 worker 将使用 {venv}/（编辑该文件可调整它们的环境）。",
+  "cli.init.envWritten":
+    "已写入 .octogent/env：可在其中为本项目的 worker 添加环境变量（内含已注释的 virtualenv 示例）。",
   "cli.server.running": "Octogent 运行中",
   "cli.server.project": "项目：",
   "cli.server.api": "API：",
@@ -56,6 +61,10 @@ export const zhCN: TranslationMap = {
   "cli.error.invalidAgentModel":
     "错误：--model {value} 不合法，只能使用字母、数字与 . _ - 组成的模型标识符。",
   "cli.error.invalidAgentEffort": "错误：--effort {value} 不合法，可选值：{allowed}。",
+  "cli.error.invalidInheritEnv":
+    "错误：--inherit-env {value} 不合法。请给出逗号分隔的变量名（大写字母、数字、_），例如 PATH,VIRTUAL_ENV。",
+  "cli.error.tooManyInheritEnv": "错误：--inherit-env 最多接受 {max} 个变量名。",
+  "cli.error.inheritEnvUnset": "错误：--inherit-env 指定了 {name}，但当前 shell 中没有设置它。",
   "cli.empty.tentacles": "未找到触手。",
   "cli.empty.terminals": "未找到终端。",
   "cli.error.terminalNotFound": "错误：未找到终端 {id}。",

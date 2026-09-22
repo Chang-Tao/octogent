@@ -24,6 +24,8 @@ API 涉及两类不同的状态：
 
 代理 CLI 打印的服务商错误横幅存在期间，终端快照带有 `providerError`（`{ kind, message, at }`，kind 为 `usage-limit`、`rate-limit`、`api-error` 或 `auth` 之一）；代理下一次工具调用或得到完成判定时清除。服务端最近一次获取的用量显示所选服务商额度耗尽时，`POST /api/terminals` 的响应会附加 `usageWarning`（`{ provider, bucket, usedPercent, resetAt }`）。
 
+`POST /api/terminals` 接受 `inheritEnv`（最多 64 个变量名，须匹配 `^[A-Z_][A-Z0-9_]*$`）以及 `env`（恰好包含这些变量名的对象，值为不含 NUL 与换行的字符串）；这些值会叠加在项目 `.octogent/env` 之上，用于该终端的会话。两个字段不一致时返回 `400`。记录与快照只以 `inheritedEnv` 保存变量名；变量值只保存在内存中，不会持久化。
+
 终端快照在已知时包含 `lifecycleState`。支持的生命周期状态为 `registered`、`running`、`stopped`、`exited` 与 `stale`。stale 终端是那些持久化为 running、但启动后无法重新接回活动 Octogent PTY 会话的记录。
 
 创建终端会先登记元数据。只有在提供初始提示词、WebSocket 接入或内部直连监听器启动会话时，PTY 才会立即启动。工作树终端还会在终端记录对外可见之前先创建其工作树。

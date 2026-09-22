@@ -1604,4 +1604,90 @@ describe("createSessionRuntime", () => {
 
     runtime.close();
   });
+
+  it("builds each session's environment from the project and the terminal's inherited variables", () => {
+    const workspaceCwd = createTemporaryDirectory();
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        "worker",
+        {
+          terminalId: "worker",
+          tentacleId: "worker",
+          tentacleName: "worker",
+          createdAt: new Date().toISOString(),
+          workspaceMode: "shared",
+          inheritedEnv: ["VIRTUAL_ENV"],
+        },
+      ],
+    ]);
+    const shellEnv = { PATH: "/usr/bin", VIRTUAL_ENV: "/caller/.venv" };
+    createShellEnvironmentMock.mockReturnValueOnce(shellEnv);
+    spawnMock.mockReturnValue(new FakePty());
+    const getInheritedEnv = vi.fn(() => ({ VIRTUAL_ENV: "/caller/.venv" }));
+    const runtime = createSessionRuntime({
+      websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions: new Map<string, TerminalSession>(),
+      workspaceCwd,
+      getTentacleWorkspaceCwd: () => workspaceCwd,
+      getInheritedEnv,
+      getApiBaseUrl: () => "http://127.0.0.1:9999",
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: workspaceCwd,
+      transcriptDirectoryPath: workspaceCwd,
+    });
+
+    runtime.startSession("worker");
+
+    expect(getInheritedEnv).toHaveBeenCalledWith("worker");
+    expect(createShellEnvironmentMock).toHaveBeenCalledWith({
+      octogentSessionId: "worker",
+      apiBaseUrl: "http://127.0.0.1:9999",
+      workspaceCwd,
+      inheritedEnv: { VIRTUAL_ENV: "/caller/.venv" },
+    });
+    expect(spawnMock.mock.calls[0]?.[2]).toMatchObject({ env: shellEnv });
+    runtime.close();
+  });
+
+  it("notes recorded inherited names whose values did not survive a restart", () => {
+    const logVerbose = vi.spyOn(logging, "logVerbose").mockImplementation(() => {});
+    const workspaceCwd = createTemporaryDirectory();
+    const terminals = new Map<string, PersistedTerminal>([
+      [
+        "worker",
+        {
+          terminalId: "worker",
+          tentacleId: "worker",
+          tentacleName: "worker",
+          createdAt: new Date().toISOString(),
+          workspaceMode: "shared",
+          inheritedEnv: ["PATH", "VIRTUAL_ENV"],
+        },
+      ],
+    ]);
+    spawnMock.mockReturnValue(new FakePty());
+    const runtime = createSessionRuntime({
+      websocketServer: new FakeWebSocketServer() as unknown as import("ws").WebSocketServer,
+      terminals,
+      sessions: new Map<string, TerminalSession>(),
+      workspaceCwd,
+      getTentacleWorkspaceCwd: () => workspaceCwd,
+      getInheritedEnv: () => undefined,
+      isDebugPtyLogsEnabled: false,
+      ptyLogDir: workspaceCwd,
+      transcriptDirectoryPath: workspaceCwd,
+    });
+
+    runtime.startSession("worker");
+
+    expect(createShellEnvironmentMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ inheritedEnv: expect.anything() }),
+    );
+    expect(logVerbose).toHaveBeenCalledWith(
+      expect.stringMatching(/inherited env PATH, VIRTUAL_ENV .*session=worker/),
+    );
+    logVerbose.mockRestore();
+    runtime.close();
+  });
 });

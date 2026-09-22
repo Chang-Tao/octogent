@@ -166,6 +166,11 @@ export type PersistedTerminal = {
   initialInputDraft?: string;
   lastActiveAt?: string;
   parentTerminalId?: string;
+  /**
+   * Names the creating caller passed along with `inheritEnv`. The values stay
+   * in the server's memory only, so this record never holds a caller's secrets.
+   */
+  inheritedEnv?: string[];
   lifecycleState?: TerminalLifecycleState | undefined;
   lifecycleReason?: string | undefined;
   completedAt?: string | undefined;

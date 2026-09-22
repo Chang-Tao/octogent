@@ -10,11 +10,17 @@ export const en: TranslationMap = {
     "Usage: terminal input <id> [<text>] [--enter] [--keys enter,esc,up,down,tab,ctrl-c,1–9] (max 4096 bytes)",
   "cli.error.inputFailed": "Terminal input failed (HTTP {status}). A live session is required.",
   "cli.help.resultScreen": "Append the last 20 screen lines",
+  "cli.help.inheritEnv":
+    "Pass these variables (comma-separated names) from this shell to the worker",
   "cli.help.screenInput":
     "octogent terminal screen <id> [--lines N] [--raw]  Read screen (default 40 lines)\n  octogent terminal input <id> [<text>] [--enter] [--keys name,...]  Send direct PTY input",
   // ── CLI ──────────────────────────────────────────────
   "cli.init.initialized": "Initialized Octogent project {displayName} at {path}",
   "cli.init.ready": "Run `octogent` to start the dashboard.",
+  "cli.init.envWrittenVenv":
+    "Wrote .octogent/env: this project's workers will use {venv}/ (edit the file to change their environment).",
+  "cli.init.envWritten":
+    "Wrote .octogent/env: add per-project variables for workers there (a commented virtualenv example is included).",
   "cli.server.running": "Octogent is running",
   "cli.server.project": "Project:",
   "cli.server.api": "API:",
@@ -61,6 +67,11 @@ export const en: TranslationMap = {
   "cli.error.invalidAgentModel":
     "Error: invalid --model {value}. Use a plain model identifier (letters, digits, . _ -).",
   "cli.error.invalidAgentEffort": "Error: invalid --effort {value}. Allowed values: {allowed}.",
+  "cli.error.invalidInheritEnv":
+    "Error: invalid --inherit-env {value}. Give comma-separated variable names (upper-case letters, digits, _), e.g. PATH,VIRTUAL_ENV.",
+  "cli.error.tooManyInheritEnv": "Error: --inherit-env accepts at most {max} names.",
+  "cli.error.inheritEnvUnset":
+    "Error: --inherit-env names {name}, but it is not set in this shell.",
   "cli.empty.tentacles": "No tentacles found.",
   "cli.empty.terminals": "No terminals found.",
   "cli.error.terminalNotFound": "Error: terminal {id} not found.",

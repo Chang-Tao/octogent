@@ -69,6 +69,8 @@ export type TerminalSnapshot = {
   createdAt: string;
   hasUserPrompt?: boolean;
   parentTerminalId?: string;
+  /** Variable names the creator passed along from its shell (`--inherit-env`); never values. */
+  inheritedEnv?: string[];
   /** Which agent CLI runs in this terminal. */
   agentProvider?: TerminalAgentProvider;
   /** Model requested at creation (explicitly or via an effort tier). */

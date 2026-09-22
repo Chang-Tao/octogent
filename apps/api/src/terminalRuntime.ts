@@ -88,6 +88,9 @@ export const createTerminalRuntime = ({
 }: CreateTerminalRuntimeOptions) => {
   const stateDir = projectStateDir ?? join(workspaceCwd, ".octogent");
   const sessions = new Map<string, TerminalSession>();
+  // Values a creating caller passed with `inheritEnv`. Kept out of the
+  // registry on purpose (they can be secrets), so they do not survive a restart.
+  const inheritedEnvByTerminal = new Map<string, Record<string, string>>();
   const websocketServer = new WebSocketServer({ noServer: true });
   const terminalEventsWebsocketServer = new WebSocketServer({ noServer: true });
   const terminalEventClients = new Set<WebSocket>();
@@ -574,6 +577,7 @@ export const createTerminalRuntime = ({
         }
       }
       terminals.delete(cascadeTerminalId);
+      inheritedEnvByTerminal.delete(cascadeTerminalId);
     }
 
     persistRegistry();
@@ -678,6 +682,7 @@ export const createTerminalRuntime = ({
     workspaceCwd,
     resolveTerminalSession,
     getTentacleWorkspaceCwd: worktreeManager.getTentacleWorkspaceCwd,
+    getInheritedEnv: (terminalId) => inheritedEnvByTerminal.get(terminalId),
     getApiBaseUrl,
     isDebugPtyLogsEnabled,
     ptyLogDir,
@@ -864,6 +869,7 @@ export const createTerminalRuntime = ({
       createdAt: terminal.createdAt,
       hasUserPrompt: isTerminalRecentlyActive(terminal),
       ...(terminal.parentTerminalId ? { parentTerminalId: terminal.parentTerminalId } : {}),
+      ...(terminal.inheritedEnv ? { inheritedEnv: [...terminal.inheritedEnv] } : {}),
       ...(terminal.agentProvider ? { agentProvider: terminal.agentProvider } : {}),
       ...(terminal.agentModel ? { agentModel: terminal.agentModel } : {}),
       ...(terminal.agentEffortTier ? { agentEffortTier: terminal.agentEffortTier } : {}),
@@ -943,6 +949,7 @@ export const createTerminalRuntime = ({
     parentTerminalId,
     nameOrigin,
     autoRenamePromptContext,
+    inheritedEnv,
   }: {
     terminalId?: string;
     tentacleId?: string;
@@ -958,6 +965,7 @@ export const createTerminalRuntime = ({
     parentTerminalId?: string;
     nameOrigin?: TerminalNameOrigin;
     autoRenamePromptContext?: string;
+    inheritedEnv?: Record<string, string>;
   }): TerminalSnapshot => {
     // Enforce max children per parent.
     if (parentTerminalId) {
@@ -1027,6 +1035,7 @@ export const createTerminalRuntime = ({
       ...(initialInputDraft ? { initialInputDraft } : {}),
       ...(initialPrompt ? { lastActiveAt: new Date().toISOString() } : {}),
       ...(parentTerminalId ? { parentTerminalId } : {}),
+      ...(inheritedEnv ? { inheritedEnv: Object.keys(inheritedEnv) } : {}),
     };
 
     const effectiveWorktreeId = worktreeId ?? tentacleId;
@@ -1053,6 +1062,9 @@ export const createTerminalRuntime = ({
     }
 
     terminals.set(terminalId, terminal);
+    if (inheritedEnv) {
+      inheritedEnvByTerminal.set(terminalId, { ...inheritedEnv });
+    }
     persistRegistry();
     broadcastTerminalEvent({
       type: "terminal-created",
@@ -1381,6 +1393,7 @@ export const createTerminalRuntime = ({
 
       for (const terminalId of prunedTerminalIds) {
         terminals.delete(terminalId);
+        inheritedEnvByTerminal.delete(terminalId);
       }
 
       persistRegistry();

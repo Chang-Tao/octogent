@@ -28,6 +28,15 @@ pnpm install
 
 如果启动失败并提示 `Terminal session limit reached`，说明 Octogent 已达到配置的活动 PTY 会话数上限。用 `octogent terminal stop <terminal-id>` 停掉不用的终端，或用 `octogent terminal prune` 清理不活跃的记录。默认上限是 32；在启动 Octogent 前把 `OCTOGENT_MAX_TERMINAL_SESSIONS` 设为正整数即可调整。
 
+## 工作代理找不到你的 shell 里有的 python、node 或其他工具
+
+工作代理从干净的基线环境启动，而不是继承启动 Octogent 的那个 shell，因此已激活的 virtualenv、`conda` 环境，或只在那个 shell 里 export 的变量都不会传给它们（见[工作代理的环境](cli.md#工作代理的环境)）。`PATH` 本身会保留，但 `VIRTUAL_ENV` 以及基线之外的变量不会。
+
+- 对整个项目：把变量写进 `<项目>/.octogent/env`，例如 `PATH=$PWD/.venv/bin:$PATH` 与 `VIRTUAL_ENV=$PWD/.venv`。`octogent init` 找到 `.venv/` 或 `venv/` 时会自动写好。每次会话启动都会重新读取，无需重启；被跳过的行可在 `octogent logs` 中看到。
+- 对单个工作代理：从当前 shell 传过去，`octogent terminal create --inherit-env PATH,VIRTUAL_ENV ...`。这些值不会持久化，服务重启后请改用 `.octogent/env`。
+- 代理自身要用的云服务凭据（例如 Bedrock 用的 `AWS_PROFILE`、Vertex 用的 `GOOGLE_APPLICATION_CREDENTIALS`）同样不在基线里，按同样方式添加。
+- 想确认问题出在环境上，可以用 `OCTOGENT_PTY_ENV_MODE=inherit` 启动 Octogent，它会像以前一样复制服务进程的完整环境。
+
 ## 工作代理一直没有收到初始提示词
 
 Octogent 在 Claude 或 Codex 上报 `SessionStart` 时发送 `--initial-prompt`；如果就绪信号一直未到，则在启动命令发出 15 秒后兜底发送。`UserPromptSubmit` 表示投递已确认。如果已收到 `SessionStart`，但发送后 10 秒内没有收到确认，Octogent 只会重试一次粘贴和回车。未收到 `SessionStart` 的代理不会重试，因为钩子缺失时无法判断提示词是丢失了还是已经送达。

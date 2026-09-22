@@ -2,6 +2,7 @@ import { type Locale, TERMINAL_AGENT_PROVIDERS, isTerminalAgentProvider, t } fro
 
 import type { EffortTier } from "./terminalRuntime/modelSelection";
 import { isEffortTier, isValidModelToken } from "./terminalRuntime/modelSelection";
+import { MAX_INHERITED_ENV_NAMES, isInheritableEnvName } from "./terminalRuntime/projectEnv";
 
 // modelSelection keeps its tier list private; this mirror only feeds the error
 // message, and the EffortTier annotation keeps it from drifting to bad values.
@@ -43,7 +44,60 @@ const parseJsonFlag = (
   }
 };
 
-export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResult => {
+type InheritEnvResult =
+  | { names: string[]; env: Record<string, string> }
+  | { error: TerminalCreateParseResult & { ok: false } };
+
+// Workers no longer see the environment of the shell that started the server;
+// this is how a caller hands its own variables (a venv's PATH, a token) to one
+// worker. Only the named variables ever leave this process.
+const parseInheritEnvFlag = (
+  args: string[],
+  callerEnv: NodeJS.ProcessEnv,
+): InheritEnvResult | undefined => {
+  const raw = parseFlag(args, "--inherit-env");
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const names = [
+    ...new Set(
+      raw
+        .split(",")
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0),
+    ),
+  ];
+  if (names.length === 0 || !names.every(isInheritableEnvName)) {
+    return {
+      error: { ok: false, errorKey: "cli.error.invalidInheritEnv", params: { value: raw } },
+    };
+  }
+  if (names.length > MAX_INHERITED_ENV_NAMES) {
+    return {
+      error: {
+        ok: false,
+        errorKey: "cli.error.tooManyInheritEnv",
+        params: { max: String(MAX_INHERITED_ENV_NAMES) },
+      },
+    };
+  }
+
+  const env: Record<string, string> = {};
+  for (const name of names) {
+    const value = callerEnv[name];
+    if (value === undefined) {
+      return { error: { ok: false, errorKey: "cli.error.inheritEnvUnset", params: { name } } };
+    }
+    env[name] = value;
+  }
+  return { names, env };
+};
+
+export const parseTerminalCreateArgs = (
+  args: string[],
+  callerEnv: NodeJS.ProcessEnv = process.env,
+): TerminalCreateParseResult => {
   const name = parseFlag(args, "--name", "-n");
   const initialPrompt = parseFlag(args, "--initial-prompt", "-p");
   const workspaceMode = parseFlag(args, "--workspace-mode", "-w") ?? "shared";
@@ -89,6 +143,11 @@ export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResu
   }
   const promptVariables = promptVariablesResult.value;
 
+  const inheritEnvResult = parseInheritEnvFlag(args, callerEnv);
+  if (inheritEnvResult && "error" in inheritEnvResult) {
+    return inheritEnvResult.error;
+  }
+
   const body: Record<string, unknown> = {};
   if (name) body.name = name;
   if (initialPrompt) body.initialPrompt = initialPrompt;
@@ -104,6 +163,10 @@ export const parseTerminalCreateArgs = (args: string[]): TerminalCreateParseResu
   if (agentProvider) body.agentProvider = agentProvider;
   if (agentModel) body.agentModel = agentModel;
   if (agentEffort) body.agentEffort = agentEffort;
+  if (inheritEnvResult) {
+    body.inheritEnv = inheritEnvResult.names;
+    body.env = inheritEnvResult.env;
+  }
 
   return { ok: true, body };
 };

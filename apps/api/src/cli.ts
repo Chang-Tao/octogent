@@ -60,6 +60,7 @@ import {
   collectStartupPrerequisiteReport,
   formatStartupPrerequisiteReport,
 } from "./startupPrerequisites";
+import { ensureProjectEnvTemplate } from "./terminalRuntime/ptyEnvironment";
 
 const locale: Locale = (process.env.OCTOGENT_LOCALE as Locale) ?? DEFAULT_LOCALE;
 
@@ -150,6 +151,16 @@ const initProject = (name?: string) => {
       path: projectPath,
     }),
   );
+  // Workers start from a clean baseline, so a Python project's virtualenv has
+  // to be named explicitly; offer the file where that happens.
+  const envTemplate = ensureProjectEnvTemplate(projectPath);
+  if (envTemplate.written) {
+    console.log(
+      envTemplate.venvDirectory
+        ? t(locale, "cli.init.envWrittenVenv", { venv: envTemplate.venvDirectory })
+        : t(locale, "cli.init.envWritten"),
+    );
+  }
   console.log(t(locale, "cli.init.ready"));
 };
 
@@ -1158,6 +1169,7 @@ const main = async () => {
     --parent-terminal-id               Parent terminal ID for child terminals
     --prompt-template                  Prompt template name
     --prompt-variables                 JSON object of prompt template variables
+    --inherit-env                      ${t(locale, "cli.help.inheritEnv")}
   octogent terminal list               List terminal lifecycle state
     --archived                         List only archived terminal records
   octogent terminal stop <id>          Stop a terminal session

@@ -9,10 +9,13 @@ Octogent splits files by ownership. Agent-facing project context stays in the wo
 Main paths:
 
 - `.octogent/project.json`
+- `.octogent/env` (optional)
 - `.octogent/tentacles/`
 - `.octogent/worktrees/`
 
 `project.json` holds the stable project ID used to find global state. The tentacles folder is intended for agent-readable markdown. Worktrees are generated execution checkouts and should not be treated as context storage.
+
+`env` is the project's worker environment: `KEY=VALUE` lines applied on top of the baseline environment of every agent terminal in this project, re-read at each session start. `octogent init` writes a starter file (activating `.venv/` or `venv/` when found) and never overwrites one. Like the rest of `.octogent/`, it is git-ignored and belongs to this clone. Syntax and precedence: [CLI reference — Worker environment](cli.md#worker-environment).
 
 Tentacle example:
 

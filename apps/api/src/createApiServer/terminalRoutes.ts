@@ -20,6 +20,7 @@ import {
 } from "./routeHelpers";
 import {
   parseTerminalAgentProvider,
+  parseTerminalInheritedEnv,
   parseTerminalModelSelection,
   parseTerminalName,
   parseTerminalNameOrigin,
@@ -122,6 +123,12 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     return true;
   }
 
+  const inheritedEnvResult = parseTerminalInheritedEnv(bodyReadResult.payload);
+  if (inheritedEnvResult.error) {
+    writeJson(response, 400, { error: inheritedEnvResult.error }, corsOrigin);
+    return true;
+  }
+
   try {
     const createTerminalInput: {
       terminalId?: string;
@@ -137,6 +144,7 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
       initialInputDraft?: string;
       autoRenamePromptContext?: string;
       parentTerminalId?: string;
+      inheritedEnv?: Record<string, string>;
     } = {
       workspaceMode: workspaceModeResult.workspaceMode,
     };
@@ -154,6 +162,9 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     }
     if (nameOriginResult.nameOrigin !== undefined) {
       createTerminalInput.nameOrigin = nameOriginResult.nameOrigin;
+    }
+    if (inheritedEnvResult.inheritedEnv !== undefined) {
+      createTerminalInput.inheritedEnv = inheritedEnvResult.inheritedEnv;
     }
     const bodyPayload = bodyReadResult.payload as Record<string, unknown> | null;
     if (

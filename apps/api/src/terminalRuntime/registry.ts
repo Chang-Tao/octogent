@@ -313,6 +313,12 @@ const parseV3Terminals = (
     if (typeof entry.worktreeId === "string") terminal.worktreeId = entry.worktreeId;
     if (typeof entry.parentTerminalId === "string")
       terminal.parentTerminalId = entry.parentTerminalId;
+    if (
+      Array.isArray(entry.inheritedEnv) &&
+      entry.inheritedEnv.every((name) => typeof name === "string")
+    ) {
+      terminal.inheritedEnv = entry.inheritedEnv as string[];
+    }
     if (isTerminalAgentProvider(entry.agentProvider)) terminal.agentProvider = entry.agentProvider;
     if (typeof entry.agentModel === "string") terminal.agentModel = entry.agentModel;
     if (typeof entry.agentEffortTier === "string") terminal.agentEffortTier = entry.agentEffortTier;
