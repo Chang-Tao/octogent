@@ -77,6 +77,7 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     promptsDir,
     userPromptsDir,
     getApiPort,
+    getApiBaseUrl,
     readCachedUsage,
   },
 ) => {
@@ -232,6 +233,11 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
       // Auto-inject apiPort so prompt templates can reference the local API.
       if (!templateVars.apiPort) {
         templateVars.apiPort = getApiPort();
+      }
+      // The full base, not just the port: under the hub the project lives
+      // under /api/p/<id>, and the port alone would reach the hub root.
+      if (!templateVars.apiBaseUrl) {
+        templateVars.apiBaseUrl = getApiBaseUrl();
       }
 
       // Auto-inject userPromptsDir so prompt templates know where to save user prompts.

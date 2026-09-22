@@ -36,6 +36,7 @@ const buildSingleTodoWorkerPrompt = async ({
   todoItemText,
   terminalId,
   apiPort,
+  apiBaseUrl,
 }: {
   promptsDir: string;
   workspaceCwd: string;
@@ -44,6 +45,7 @@ const buildSingleTodoWorkerPrompt = async ({
   todoItemText: string;
   terminalId: string;
   apiPort: string;
+  apiBaseUrl: string;
 }) => {
   const tentacleContextPath = join(workspaceCwd, ".octogent/tentacles", tentacleId);
 
@@ -54,6 +56,7 @@ const buildSingleTodoWorkerPrompt = async ({
     todoItemText,
     terminalId,
     apiPort,
+    apiBaseUrl,
     workspaceContextIntro:
       "You are working in the shared main workspace on the main branch, not in an isolated worktree.",
     workspaceGuidelines: [
@@ -403,7 +406,7 @@ const DECK_TODO_SOLVE_PATTERN = /^\/api\/deck\/tentacles\/([^/]+)\/todo\/solve$/
 
 export const handleDeckTodoSolveRoute: ApiRouteHandler = async (
   { request, response, requestUrl, corsOrigin },
-  { runtime, workspaceCwd, projectStateDir, promptsDir, getApiPort },
+  { runtime, workspaceCwd, projectStateDir, promptsDir, getApiPort, getApiBaseUrl },
 ) => {
   const match = requestUrl.pathname.match(DECK_TODO_SOLVE_PATTERN);
   if (!match) return false;
@@ -473,6 +476,7 @@ export const handleDeckTodoSolveRoute: ApiRouteHandler = async (
       todoItemText: todoItem.text,
       terminalId,
       apiPort: getApiPort(),
+      apiBaseUrl: getApiBaseUrl(),
     });
 
     const snapshot = runtime.createTerminal({
@@ -518,7 +522,7 @@ const DECK_TENTACLE_SWARM_PATTERN = /^\/api\/deck\/tentacles\/([^/]+)\/swarm$/;
 
 export const handleDeckTentacleSwarmRoute: ApiRouteHandler = async (
   { request, response, requestUrl, corsOrigin },
-  { runtime, workspaceCwd, projectStateDir, promptsDir, getApiPort },
+  { runtime, workspaceCwd, projectStateDir, promptsDir, getApiPort, getApiBaseUrl },
 ) => {
   const match = requestUrl.pathname.match(DECK_TENTACLE_SWARM_PATTERN);
   if (!match) return false;
@@ -616,6 +620,8 @@ export const handleDeckTentacleSwarmRoute: ApiRouteHandler = async (
   const tentacleName = deckEntry?.displayName ?? tentacleId;
 
   const apiPort = getApiPort();
+  // Under the hub the port alone names the hub root, not this project.
+  const apiBaseUrl = getApiBaseUrl();
   const needsParent = targetItems.length > 1;
   const parentTerminalId = needsParent ? `${tentacleId}-swarm-parent` : null;
   const tentacleContextPath = join(workspaceCwd, ".octogent/tentacles", tentacleId);
@@ -752,6 +758,7 @@ export const handleDeckTentacleSwarmRoute: ApiRouteHandler = async (
         todoItemText: item.text,
         terminalId: worker.terminalId,
         apiPort,
+        apiBaseUrl,
         workspaceContextIntro: buildWorkerContextIntro(),
         workspaceGuidelines: buildWorkerGuidelines(worker.terminalId),
         commitGuidance: buildWorkerCommitGuidance(),
@@ -806,6 +813,7 @@ export const handleDeckTentacleSwarmRoute: ApiRouteHandler = async (
             todoItemText: item.text,
             terminalId: workerTerminalId,
             apiPort,
+            apiBaseUrl,
             workspaceContextIntro: buildWorkerContextIntro(),
             workspaceGuidelines: buildWorkerGuidelines(workerTerminalId),
             commitGuidance: buildWorkerCommitGuidance(),
@@ -851,6 +859,7 @@ export const handleDeckTentacleSwarmRoute: ApiRouteHandler = async (
         baseBranch: parentBaseBranch,
         terminalId: parentTerminalId,
         apiPort,
+        apiBaseUrl,
       });
 
       runtime.createTerminal({

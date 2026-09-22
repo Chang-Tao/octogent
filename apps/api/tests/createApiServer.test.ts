@@ -2242,6 +2242,41 @@ describe("createApiServer", () => {
     expect(await accepted.json()).not.toHaveProperty("inheritedEnv");
   });
 
+  it("hands prompt templates the full API base, not just the port", async () => {
+    const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
+    temporaryDirectories.push(workspaceCwd);
+    const promptsDir = join(process.cwd(), "..", "..", "prompts");
+    const baseUrl = await startServer({ workspaceCwd, promptsDir });
+
+    const createResponse = await fetch(`${baseUrl}/api/terminals`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        workspaceMode: "shared",
+        promptTemplate: "swarm-worker",
+        promptVariables: { tentacleName: "Docs", tentacleId: "docs", todoItemText: "x" },
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const { terminalId } = (await createResponse.json()) as { terminalId: string };
+
+    // Under the hub the port alone reaches the hub root, so swarm prompts
+    // must carry the project-scoped base the server hands out.
+    const registryDocument = await waitForRegistryDocument<{
+      terminals: Array<{ terminalId: string; initialPrompt?: string }>;
+    }>(workspaceCwd, (document) =>
+      document.terminals.some(
+        (terminal) => terminal.terminalId === terminalId && Boolean(terminal.initialPrompt),
+      ),
+    );
+    const terminal = registryDocument.terminals.find((entry) => entry.terminalId === terminalId);
+    expect(terminal?.initialPrompt).toContain(`The API is at \`${baseUrl}\`.`);
+    expect(terminal?.initialPrompt).not.toContain("{{apiBaseUrl}}");
+  });
+
   it("injects a default tentacle context prompt for tentacle terminals", async () => {
     const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
     temporaryDirectories.push(workspaceCwd);
