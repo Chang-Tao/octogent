@@ -146,16 +146,47 @@ export const zhCN: TranslationMap = {
   "cli.hub.notAProject":
     "错误：{path} 不在任何已注册项目或 git 仓库内。请在项目中运行命令、传入 --project <slug>，或先在此运行 `octogent init`。",
   "cli.hub.autostartDisabled":
-    "错误：没有运行中的 hub，且 OCTOGENT_NO_AUTOSTART=1 阻止了自动启动。用 `octogent hub start` 启动它，或在项目中运行 `octogent` 使用单项目服务器。",
+    "错误：没有运行中的 hub，且 OCTOGENT_NO_AUTOSTART=1 阻止了自动启动。用 `octogent hub start` 启动它，或在项目中运行 `octogent --standalone` 使用单项目服务器。",
   "cli.hub.registered": "已将 {path} 注册到 hub，slug 为 {slug}。",
   "cli.hub.registerFailed": "错误：无法将 {path} 注册到 hub：{reason}",
-  "cli.hub.bareServing": "hub 已在服务这个项目：{url}",
-  "cli.hub.bareUseHub": "- 使用 hub：打开该地址；在这里运行的 octogent 命令已经会连到它。",
-  "cli.hub.bareStandalone": "- 或运行 `octogent --standalone`，像以前一样启动独立的单项目服务器。",
+  "cli.start.project": "{slug} 的 Octogent 仪表盘：{url}",
+  "cli.start.overview": "当前不在任何项目内；hub 的项目总览：{url}",
+  "cli.start.hubStarted":
+    "hub 会在后台持续运行：`octogent hub status` 查看状态，`octogent hub stop` 停止它。",
+  "cli.start.ownServer": "已有单项目服务器在服务这个项目：{url}",
+  "cli.start.ownServerHint": "要把项目迁到 hub 上，先停止该服务器，再运行一次 `octogent`。",
+  "cli.start.blockedStandalone":
+    "或运行 `octogent --standalone`，在下一个空闲端口启动单项目服务器。",
   "cli.help.hub":
-    "octogent hub start [--foreground]    启动 hub：一个服务器服务所有已注册项目\n  octogent hub status                  显示 hub 的地址、构建和项目（无 hub 响应时退出码 1）\n  octogent hub stop                    停止 hub\n  octogent hub restart [--force]       重启 hub；有终端在运行时拒绝，除非加 --force",
-  "cli.help.standalone":
-    "octogent --standalone                即使 hub 在服务该项目，也启动单项目服务器",
+    "octogent hub start [--foreground]    启动 hub：一个服务器服务所有已注册项目\n  octogent hub status                  显示 hub 的地址、构建和项目（无 hub 响应时退出码 1）\n  octogent hub stop                    停止 hub\n  octogent hub restart [--force]       重启 hub；有终端在运行时拒绝，除非加 --force\n  octogent hub install-service [--remove]  以 systemd 用户服务运行 hub（Linux）",
+  "cli.hub.serviceStartFailed":
+    "警告：`systemctl --user start octogent-hub` 失败（{reason}）；改为在 systemd 之外启动 hub。",
+  "cli.hub.serviceStartTimeout":
+    "错误：octogent-hub 服务在 {seconds} 秒内没有响应。请查看 `journalctl --user -u octogent-hub`。",
+  "cli.service.linuxOnly":
+    "错误：`octogent hub install-service` 需要 systemd，而 systemd 只在 Linux 上运行。请用 `octogent hub start` 启动 hub，或让系统的服务管理器运行 `octogent hub start --foreground`。",
+  "cli.service.noSystemctl":
+    "错误：找不到 systemctl，这里没有可运行 hub 的 systemd（可能是容器）。请改用 `octogent hub start` 启动。",
+  "cli.service.noUserManager":
+    "错误：无法连接 systemd 用户管理器（{reason}）。请在正常的登录会话中运行（不要用 `su` 或 `sudo`），或用 `octogent hub start` 启动 hub。",
+  "cli.service.missingBuild":
+    "错误：缺少 {path}；服务运行的是构建后的 CLI。请先在 Octogent 仓库里运行 `pnpm build`。",
+  "cli.service.commandFailed": "错误：`{command}` 失败：{reason}",
+  "cli.service.installed":
+    "已安装 {path}；hub 现在由 systemd 运行（`systemctl --user status octogent-hub`，日志：`journalctl --user -u octogent-hub`）。",
+  "cli.service.envFile": "hub 还会读取 {path}。",
+  "cli.service.noEnvFile":
+    "如需更多变量（OCTOGENT_HUB_PORT、OCTOGENT_ACCESS_TOKEN 等），把 KEY=value 行写入 {path}，再运行一次 install-service。",
+  "cli.service.hubAlreadyRunning":
+    "已有 hub 在运行（pid {pid}），所以服务没有再启动一个；等它的 worker 空闲后，`octogent hub restart` 会在 systemd 下重启它。",
+  "cli.service.lingerOff":
+    "未开启 lingering：hub 会在你首次登录时启动、最后一次登出时停止。要开机即运行：loginctl enable-linger {user}",
+  "cli.service.notInstalled": "hub 服务未安装（{path} 不存在）。",
+  "cli.service.disableFailed": "警告：无法禁用该服务：{reason}",
+  "cli.service.removed": "已删除 {path}。正在运行的 hub 会继续运行，直到 `octogent hub stop`。",
+  "cli.help.start":
+    "octogent                             在 hub 上打开当前项目（需要时启动 hub 并注册项目）",
+  "cli.help.standalone": "octogent --standalone                改为给当前项目启动单项目服务器",
   "cli.help.project":
     "--project <slug|id>                  用于以下命令：指定已注册的项目，而不是当前目录",
   "cli.hub.driftOlder":
@@ -163,7 +194,7 @@ export const zhCN: TranslationMap = {
   "cli.hub.driftDifferent":
     "警告：hub 运行的构建与 CLI 不同（hub {hub}，CLI {cli}）；等 worker 空闲时执行 `octogent hub restart`。",
   "cli.usage": `用法：
-  octogent                             在当前项目中启动仪表盘
+  octogent                             在 hub 上打开当前项目
   octogent init [项目名称]              显式初始化当前目录
   octogent projects                    列出已注册的项目
 

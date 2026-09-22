@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,7 +21,7 @@ vi.mock("node-pty", () => ({
   spawn: spawnMock,
 }));
 
-import { createHubServer } from "../src/createHubServer";
+import { createHubServer, readProjectIdleMs } from "../src/createHubServer";
 import {
   type ProjectRegistryEntry,
   loadProjectsRegistry,
@@ -103,6 +104,7 @@ describe("createHubServer", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     if (stopHub) {
       await stopHub();
       stopHub = null;
@@ -169,6 +171,17 @@ describe("createHubServer", () => {
       loadedProjects: [],
       ptySessions: 0,
     });
+  });
+
+  it("reports the build it runs in its health, for drift checks", async () => {
+    const build = { version: "9.8.7", commit: "abc1234", builtAt: "2026-09-22T08:00:00.000Z" };
+    const { baseUrl } = await startHub({ build });
+
+    const health = (await (await fetch(`${baseUrl}/api/hub/health`)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(health).toMatchObject(build);
   });
 
   it("loads only the project a request names, by slug or by id", async () => {
@@ -407,5 +420,118 @@ describe("createHubServer", () => {
       expect(response.status, path).toBe(403);
     }
     expect((await listProjects(baseUrl))[0]?.loaded).toBe(false);
+  });
+  describe("idle project unload", () => {
+    const IDLE_MS = 60_000;
+
+    // Only the sweep's clock is faked: sockets, fetch, and the polling below
+    // keep real timeouts.
+    const useFakeSweepClock = () =>
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+
+    const isLoaded = async (baseUrl: string, id: string) =>
+      (await listProjects(baseUrl)).find((project) => project.id === id)?.loaded ?? false;
+
+    const waitUntilUnloaded = async (baseUrl: string, id: string) => {
+      // performance.now(): Date is faked and would never reach the deadline.
+      const deadline = performance.now() + 5_000;
+      while (await isLoaded(baseUrl, id)) {
+        if (performance.now() > deadline) {
+          throw new Error(`project ${id} stayed loaded`);
+        }
+        await new Promise((resolveSleep) => setTimeout(resolveSleep, 20));
+      }
+    };
+
+    it("drops a project idle for the whole period and reloads it on the next request", async () => {
+      const alpha = registerWorkspace("Alpha");
+      useFakeSweepClock();
+      const { baseUrl } = await startHub({ projectIdleMs: IDLE_MS });
+
+      expect((await fetch(`${baseUrl}/api/p/alpha/api/health`)).status).toBe(200);
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+
+      vi.advanceTimersByTime(IDLE_MS / 2);
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+      // A request restarts the idle period.
+      expect((await fetch(`${baseUrl}/api/p/alpha/api/health`)).status).toBe(200);
+      vi.advanceTimersByTime(IDLE_MS / 2 + 1_000);
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+
+      vi.advanceTimersByTime(IDLE_MS);
+      await waitUntilUnloaded(baseUrl, alpha.id);
+      const health = (await (await fetch(`${baseUrl}/api/hub/health`)).json()) as Record<
+        string,
+        unknown
+      >;
+      expect(health).toMatchObject({ projects: { registered: 1, loaded: 0 }, loadedProjects: [] });
+
+      // Its state is on disk: the next request loads it again with its terminals.
+      const snapshots = await fetch(`${baseUrl}/api/p/${alpha.id}/api/terminal-snapshots`);
+      expect(snapshots.status).toBe(200);
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+    });
+
+    it("keeps a project with a live session loaded", async () => {
+      const alpha = registerWorkspace("Alpha");
+      useFakeSweepClock();
+      const { baseUrl } = await startHub({ projectIdleMs: IDLE_MS });
+
+      expect((await createTerminal(baseUrl, "alpha", { initialPrompt: "work" })).status).toBe(201);
+      vi.advanceTimersByTime(IDLE_MS * 5);
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+    });
+
+    it("keeps a project loaded while one of its requests is in flight", async () => {
+      const alpha = registerWorkspace("Alpha");
+      useFakeSweepClock();
+      const { baseUrl } = await startHub({ projectIdleMs: IDLE_MS });
+      expect((await fetch(`${baseUrl}/api/p/alpha/api/health`)).status).toBe(200);
+
+      // A body that never finishes arriving keeps the route waiting on it.
+      const url = new URL(baseUrl);
+      const pending = httpRequest({
+        host: url.hostname,
+        port: Number(url.port),
+        method: "POST",
+        path: "/api/p/alpha/api/deck/tentacles",
+        headers: { "Content-Type": "application/json", "Content-Length": "1000" },
+      });
+      const closed = new Promise<void>((resolveClose) => pending.once("close", resolveClose));
+      pending.on("error", () => {});
+      pending.write("{");
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+
+      vi.advanceTimersByTime(IDLE_MS * 3);
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+
+      pending.destroy();
+      await closed;
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+      vi.advanceTimersByTime(IDLE_MS + 1_000);
+      await waitUntilUnloaded(baseUrl, alpha.id);
+    });
+
+    it("never unloads when the idle period is 0", async () => {
+      const alpha = registerWorkspace("Alpha");
+      useFakeSweepClock();
+      const { baseUrl } = await startHub({ projectIdleMs: 0 });
+
+      expect((await fetch(`${baseUrl}/api/p/alpha/api/health`)).status).toBe(200);
+      vi.advanceTimersByTime(24 * 60 * 60_000);
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+      expect(await isLoaded(baseUrl, alpha.id)).toBe(true);
+    });
+
+    it("reads OCTOGENT_HUB_PROJECT_IDLE_MS, 0 included, and falls back on nonsense", () => {
+      expect(readProjectIdleMs(undefined)).toBe(30 * 60_000);
+      expect(readProjectIdleMs("")).toBe(30 * 60_000);
+      expect(readProjectIdleMs("0")).toBe(0);
+      expect(readProjectIdleMs(" 5000 ")).toBe(5000);
+      expect(readProjectIdleMs("-1")).toBe(30 * 60_000);
+      expect(readProjectIdleMs("soon")).toBe(30 * 60_000);
+    });
   });
 });

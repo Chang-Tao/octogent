@@ -10,7 +10,7 @@ hub 为所有项目只写一个日志 `~/.octogent/hub/logs/server.log`，每行
 
 ## 端口 8787 被旧的单项目服务器占用
 
-`octogent hub start`（或任何会启动 hub 的命令）报错 `port 8787 is taken by pid <pid>, a single-project Octogent server for <path>, not a hub`。hub 使用固定端口，好让每个 CLI 都能找到它，而直接运行 `octogent` 启动的服务器先占了这个端口。两种处理方式：
+`octogent`、`octogent hub start` 或任何其他会启动 hub 的命令报错 `port 8787 is taken by pid <pid>, a single-project Octogent server for <path>, not a hub`。hub 使用固定端口，好让每个 CLI 都能找到它，而某个单项目服务器先占了这个端口：用 `octogent --standalone` 启动的，或是在 `octogent` 默认改用 hub 之前直接运行 `octogent` 启动的。两种处理方式：
 
 - 停掉那个服务器（在它的终端按 Ctrl-C，或 `kill <pid>`），再启动 hub。停掉它会结束它正在运行的终端，所以先在那个项目里看一眼 `octogent terminal list`。它停下之前，那个项目里的 CLI 命令仍然连它；停下之后会自动改连 hub。
 - 或者让它继续运行，给 hub 换个端口：在 shell 配置里设置 `OCTOGENT_HUB_PORT`（例如 `9787`），让 hub 和每个 CLI 用同一个值。

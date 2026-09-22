@@ -24,6 +24,7 @@ import { isUpgradeAllowed } from "./createApiServer/upgradeHandler";
 import { type ProjectContext, createProjectContext } from "./createProjectContext";
 import { type TerminalHealthCounts, createHealthSnapshotSource } from "./healthSnapshot";
 import { type HubProjectRegistry, createFileProjectRegistry } from "./hubProjectRegistry";
+import type { BuildIdentity } from "./hubVersionDrift";
 import { toConnectableHost } from "./listenHost";
 import { log, logError, logVerbose } from "./logging";
 import type { ProjectRegistryEntry } from "./projectPersistence";
@@ -33,6 +34,9 @@ import type { GitClient } from "./terminalRuntime";
 /** Per project: lower than a lone server's default, since the hub cap is shared. */
 const HUB_DEFAULT_SESSIONS_PER_PROJECT = 12;
 const HUB_DEFAULT_MAX_SESSIONS = 32;
+const DEFAULT_PROJECT_IDLE_MS = 30 * 60_000;
+// The sweep's granularity: an idle project goes at most this long past its period.
+const MAX_IDLE_SWEEP_MS = 60_000;
 
 const PROJECT_API_MOUNT = /^\/api\/p\/([^/]+)(\/.*)?$/;
 const PROJECT_WEB_MOUNT = /^\/p\/[^/]+(\/.*)?$/;
@@ -49,9 +53,24 @@ export type CreateHubServerOptions = {
   maxTotalSessions?: number;
   /** Per-project cap; defaults to OCTOGENT_MAX_TERMINAL_SESSIONS when set, else 12. */
   maxSessionsPerProject?: number;
+  /**
+   * How long a loaded project may go without sessions or requests before it
+   * is unloaded; 0 keeps every project loaded. Defaults to
+   * OCTOGENT_HUB_PROJECT_IDLE_MS, then 30 minutes.
+   */
+  projectIdleMs?: number;
+  /** The build this hub runs, as hub.json records it; its health reports it too. */
+  build?: BuildIdentity | undefined;
 };
 
-type LoadedProject = { context: ProjectContext; slug: string };
+type LoadedProject = {
+  context: ProjectContext;
+  slug: string;
+  /** Requests still being answered; a response's `close` ends one. */
+  inFlight: number;
+  /** Last time the project was seen busy or asked for anything (ms). */
+  lastActiveAt: number;
+};
 
 class ProjectUnavailableError extends Error {}
 
@@ -59,6 +78,16 @@ const readPositiveInteger = (raw: string | undefined): number | undefined => {
   const parsed = Number(raw?.trim());
   return raw?.trim() && Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : undefined;
 };
+
+/** OCTOGENT_HUB_PROJECT_IDLE_MS; 0 disables unloading, anything unparsable falls back. */
+export const readProjectIdleMs = (raw: string | undefined): number => {
+  const trimmed = raw?.trim();
+  const parsed = Number(trimmed);
+  return trimmed && Number.isInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_PROJECT_IDLE_MS;
+};
+
+const formatDuration = (ms: number): string =>
+  ms >= 60_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 1000)} s`;
 
 const isExistingDirectory = (path: string): boolean => {
   try {
@@ -106,9 +135,9 @@ const sumHealthCounts = (counts: TerminalHealthCounts[]): TerminalHealthCounts =
 
 /**
  * One process serving every registered project. Projects load lazily on the
- * first request that names them (`/api/p/<slug-or-id>/…`) and stay loaded;
- * each gets its own context and an API base scoped to its id, so hooks and
- * the in-worker CLI reach exactly that project.
+ * first request that names them (`/api/p/<slug-or-id>/…`) and unload again
+ * once idle; each gets its own context and an API base scoped to its id, so
+ * hooks and the in-worker CLI reach exactly that project.
  */
 export const createHubServer = ({
   registry = createFileProjectRegistry(),
@@ -120,6 +149,8 @@ export const createHubServer = ({
   maxTotalSessions = readPositiveInteger(process.env.OCTOGENT_HUB_MAX_TERMINAL_SESSIONS) ??
     HUB_DEFAULT_MAX_SESSIONS,
   maxSessionsPerProject,
+  projectIdleMs = readProjectIdleMs(process.env.OCTOGENT_HUB_PROJECT_IDLE_MS),
+  build,
 }: CreateHubServerOptions = {}) => {
   const accessToken = configuredAccessToken?.trim() || null;
   let remoteBinding = false;
@@ -136,6 +167,9 @@ export const createHubServer = ({
   const resolvedWebDistDir = webDistDir && existsSync(webDistDir) ? webDistDir : null;
   const hubHealth = createHealthSnapshotSource();
   const loaded = new Map<string, LoadedProject>();
+  // Contexts still flushing their state after an unload, by project id.
+  const unloading = new Map<string, Promise<void>>();
+  let idleSweep: NodeJS.Timeout | null = null;
 
   const readTotals = () =>
     sumHealthCounts([...loaded.values()].map(({ context }) => context.runtime.readHealthCounts()));
@@ -145,10 +179,10 @@ export const createHubServer = ({
       ? `Hub terminal session limit reached (${maxTotalSessions}) across all projects. Close a terminal session in any project or increase OCTOGENT_HUB_MAX_TERMINAL_SESSIONS.`
       : null;
 
-  const loadProject = (entry: ProjectRegistryEntry): ProjectContext => {
+  const loadProject = (entry: ProjectRegistryEntry): LoadedProject => {
     const existing = loaded.get(entry.id);
     if (existing) {
-      return existing.context;
+      return existing;
     }
     // Loading scaffolds .octogent/ in the workspace, which would quietly
     // recreate a directory the operator deleted or moved.
@@ -159,7 +193,7 @@ export const createHubServer = ({
     const { projectId, projectStateDir } = registry.prepare(entry);
     const alreadyLoaded = loaded.get(projectId);
     if (alreadyLoaded) {
-      return alreadyLoaded.context;
+      return alreadyLoaded;
     }
 
     const slug = entry.slug ?? toProjectSlug(entry.name);
@@ -178,19 +212,66 @@ export const createHubServer = ({
       logPrefix: `[${slug}]`,
       ...(gitClient ? { gitClient } : {}),
     });
-    loaded.set(projectId, { context, slug });
+    const project: LoadedProject = { context, slug, inFlight: 0, lastActiveAt: Date.now() };
+    loaded.set(projectId, project);
     log(`[Hub] Loaded project ${slug} (${projectId}) at ${entry.path}`);
-    return context;
+    return project;
   };
 
-  const resolveProjectContext = (key: string): ProjectContext | null => {
+  const resolveProject = async (key: string): Promise<LoadedProject | null> => {
     // Hooks and worker CLIs address projects by id, so that path skips the registry read.
     const loadedById = loaded.get(key);
     if (loadedById) {
-      return loadedById.context;
+      return loadedById;
     }
     const entry = key.length > 0 ? resolveProjectKey(registry.load(), key) : null;
-    return entry ? loadProject(entry) : null;
+    if (!entry) {
+      return null;
+    }
+    // A fresh context must not read the registry and transcripts while the
+    // unloaded one is still writing them out.
+    await unloading.get(entry.id);
+    return loadProject(entry);
+  };
+
+  const isProjectBusy = ({ context, inFlight }: LoadedProject): boolean => {
+    const counts = context.runtime.readHealthCounts();
+    // A live PTY covers running and awaiting-review terminals alike. An open
+    // dashboard holds the terminal-events socket; unloading under it would
+    // only make the page reconnect and load the project straight back.
+    return inFlight > 0 || counts.ptySessions > 0 || counts.terminalEventClients > 0;
+  };
+
+  const unloadProject = (projectId: string, project: LoadedProject) => {
+    loaded.delete(projectId);
+    const stopping = project.context
+      .stop()
+      .catch((error: unknown) => {
+        logError(
+          `[Hub] Failed to stop idle project ${project.slug} (${projectId})`,
+          error instanceof Error ? (error.stack ?? error.message) : error,
+        );
+      })
+      .finally(() => {
+        unloading.delete(projectId);
+      });
+    unloading.set(projectId, stopping);
+    log(
+      `[Hub] Unloaded project ${project.slug} (${projectId}): no sessions or requests for ${formatDuration(projectIdleMs)}`,
+    );
+  };
+
+  const sweepIdleProjects = () => {
+    const now = Date.now();
+    for (const [projectId, project] of loaded) {
+      if (isProjectBusy(project)) {
+        // Idle time counts from the end of the last session, not from the
+        // last request: a worker can run for hours without calling the API.
+        project.lastActiveAt = now;
+      } else if (now - project.lastActiveAt >= projectIdleMs) {
+        unloadProject(projectId, project);
+      }
+    }
   };
 
   const toProjectListing = (entry: ProjectRegistryEntry) => {
@@ -277,6 +358,8 @@ export const createHubServer = ({
         200,
         {
           ...hubHealth.readHealthSnapshot(readTotals()),
+          // The same identity hub.json carries, for whoever only has the address.
+          ...build,
           pid: process.pid,
           maxTerminalSessions: maxTotalSessions,
           projects: { registered: registry.load().projects.length, loaded: loaded.size },
@@ -333,9 +416,9 @@ export const createHubServer = ({
 
       const mount = matchProjectMount(pathname);
       if (mount) {
-        let project: ProjectContext | null;
+        let project: LoadedProject | null;
         try {
-          project = resolveProjectContext(mount.key);
+          project = await resolveProject(mount.key);
         } catch (error) {
           if (!(error instanceof ProjectUnavailableError)) {
             throw error;
@@ -347,9 +430,19 @@ export const createHubServer = ({
           writeJson(response, 404, { error: `Unknown project: ${mount.key}` }, corsOrigin);
           return;
         }
+        const active = project;
+        active.inFlight += 1;
+        active.lastActiveAt = Date.now();
+        // `close` rather than the handler's promise: it also fires for a
+        // response that streams on after the handler returns, or a client
+        // that hangs up mid-request.
+        response.once("close", () => {
+          active.inFlight -= 1;
+          active.lastActiveAt = Date.now();
+        });
         // Mount semantics: the project's routes only ever see their own paths.
         request.url = `${mount.rest}${requestUrl.search}`;
-        await project.handleRequest(request, response);
+        await active.context.handleRequest(request, response);
         return;
       }
 
@@ -382,24 +475,29 @@ export const createHubServer = ({
     }
   };
 
+  const upgradeToProject = async (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+    try {
+      const requestUrl = new URL(request.url ?? "/", "http://localhost");
+      const mount = matchProjectMount(requestUrl.pathname);
+      const project = mount ? await resolveProject(mount.key) : null;
+      if (!mount || !project) {
+        socket.destroy();
+        return;
+      }
+      project.lastActiveAt = Date.now();
+      request.url = `${mount.rest}${requestUrl.search}`;
+      project.context.handleUpgrade(request, socket, head);
+    } catch {
+      socket.destroy();
+    }
+  };
+
   const handleUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     if (!isUpgradeAllowed(request, guardOptions)) {
       socket.destroy();
       return;
     }
-    try {
-      const requestUrl = new URL(request.url ?? "/", "http://localhost");
-      const mount = matchProjectMount(requestUrl.pathname);
-      const project = mount ? resolveProjectContext(mount.key) : null;
-      if (!mount || !project) {
-        socket.destroy();
-        return;
-      }
-      request.url = `${mount.rest}${requestUrl.search}`;
-      project.handleUpgrade(request, socket, head);
-    } catch {
-      socket.destroy();
-    }
+    void upgradeToProject(request, socket, head);
   };
 
   const server = createServer(handleRequest);
@@ -431,13 +529,24 @@ export const createHubServer = ({
       const resolvedPort = typeof address === "object" && address ? address.port : port;
       // A wildcard bind is not a destination; hooks and worker CLIs must dial something real.
       boundBaseUrl = `http://${toConnectableHost(host)}:${resolvedPort}`;
+      if (projectIdleMs > 0 && !idleSweep) {
+        idleSweep = setInterval(sweepIdleProjects, Math.min(projectIdleMs, MAX_IDLE_SWEEP_MS));
+        idleSweep.unref();
+      }
       return { host, port: resolvedPort };
     },
     async stop() {
+      if (idleSweep) {
+        clearInterval(idleSweep);
+        idleSweep = null;
+      }
       hubHealth.close();
       const projects = [...loaded.values()];
       loaded.clear();
-      await Promise.allSettled(projects.map(({ context }) => context.stop()));
+      await Promise.allSettled([
+        ...projects.map(({ context }) => context.stop()),
+        ...unloading.values(),
+      ]);
       if (!server.listening) {
         return;
       }

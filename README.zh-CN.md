@@ -145,7 +145,7 @@ octogent --help
 
 </details>
 
-首次运行时，**Octogent** 会自动创建本地 `.octogent/` 脚手架、分配稳定的项目 ID、从 `8787` 开始选择可用的本地 API 端口，并打开 UI（除非设置了 `OCTOGENT_NO_OPEN=1`）。
+然后在项目目录（git 仓库）里运行 `octogent`。没有 hub 在运行时，它会启动 **hub**（一个后台服务器，在 `127.0.0.1:8787` 上服务所有项目）；接着注册项目，即创建带稳定项目 ID 的 `.octogent/` 脚手架；再打开项目页面 `http://127.0.0.1:8787/p/<slug>/`（设置了 `OCTOGENT_NO_OPEN=1` 时不打开）。想让项目使用自己的服务器，改用 `octogent --standalone`。见[通过 hub 运行 Octogent](docs/zh-CN/guides/hub.md)。
 
 ## 环境要求
 
@@ -168,6 +168,7 @@ PTY 会话在空闲宽限期内可以在浏览器刷新后存活，但**不能**
 ## 文档
 
 - [用 Octogent 完成第一份工作](docs/zh-CN/guides/getting-work-done.md)
+- [通过 hub 运行 Octogent](docs/zh-CN/guides/hub.md)
 - [文档首页](docs/zh-CN/index.md)
 - [安装](docs/zh-CN/getting-started/installation.md)
 - [快速入门](docs/zh-CN/getting-started/quickstart.md)
@@ -181,6 +182,7 @@ PTY 会话在空闲宽限期内可以在浏览器刷新后存活，但**不能**
 - [文件系统布局](docs/reference/filesystem-layout.md)
 - [API 参考](docs/reference/api.md)
 - [实验性功能](docs/reference/experimental-features.md)
+- [以 systemd 用户服务运行 hub](docs/zh-CN/reference/systemd.md)
 - [故障排除](docs/reference/troubleshooting.md)
 - [贡献指南](CONTRIBUTING.zh-CN.md)
 

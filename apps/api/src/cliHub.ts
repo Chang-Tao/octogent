@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync } from "node:fs";
-import { networkInterfaces } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 
 import { type Locale, t } from "@octogent/core";
@@ -18,6 +18,14 @@ import {
   readLiveHubMetadata,
   writeHubMetadata,
 } from "./hubMetadata";
+import {
+  type CommandRunner,
+  HUB_UNIT_NAME,
+  describeCommandFailure,
+  isCommandSuccess,
+  isHubServiceInstalled,
+  runCommand,
+} from "./hubServiceUnit";
 import { type BuildIdentity, describeBuildDrift, formatBuildLabel } from "./hubVersionDrift";
 import {
   canListenOnPort,
@@ -32,7 +40,6 @@ import {
   resolveGlobalOctogentDir,
   resolveHubStateDir,
 } from "./projectPersistence";
-import { toProjectSlug } from "./projectSlug";
 import { readRuntimeMetadata } from "./runtimeMetadata";
 import { logStartupPrerequisites } from "./startupPrerequisites";
 
@@ -51,6 +58,8 @@ export type HubCliContext = {
   webDistDir: string;
   promptsDir: string;
   env?: NodeJS.ProcessEnv;
+  /** For systemctl; tests substitute one that never runs it. */
+  runCommand?: CommandRunner;
 };
 
 /** A failure already worded for the operator. */
@@ -72,7 +81,7 @@ const resolveHubLogPath = () => join(resolveHubStateDir(), "logs", "server.log")
 // to server.log, such as a crash while loading.
 const resolveDaemonStderrPath = () => join(resolveHubStateDir(), "logs", "daemon-stderr.log");
 
-type PortOccupant =
+export type PortOccupant =
   | { kind: "free" }
   | { kind: "hub"; pid: number | null }
   | { kind: "other"; pid: number | null; workspaceCwd: string | null };
@@ -95,7 +104,7 @@ const findRuntimeOnPort = (port: number): { pid: number; workspaceCwd: string } 
   return null;
 };
 
-const inspectHubPort = async (port: number, host: string): Promise<PortOccupant> => {
+export const inspectHubPort = async (port: number, host: string): Promise<PortOccupant> => {
   if (await canListenOnPort(port, host)) {
     return { kind: "free" };
   }
@@ -105,6 +114,27 @@ const inspectHubPort = async (port: number, host: string): Promise<PortOccupant>
   }
   const runtime = findRuntimeOnPort(port);
   return { kind: "other", pid: runtime?.pid ?? null, workspaceCwd: runtime?.workspaceCwd ?? null };
+};
+
+/** Why the hub cannot take its port from this occupant; null when the port is free. */
+export const describePortOccupant = (
+  locale: Locale,
+  port: number,
+  occupant: PortOccupant,
+): string | null => {
+  if (occupant.kind === "hub") {
+    return t(locale, "cli.hub.portHeldByOrphanHub", { port, pid: occupant.pid ?? "?" });
+  }
+  if (occupant.kind === "other") {
+    return occupant.pid === null
+      ? t(locale, "cli.hub.portTakenUnknown", { port })
+      : t(locale, "cli.hub.portTaken", {
+          port,
+          pid: occupant.pid,
+          workspace: occupant.workspaceCwd ?? "?",
+        });
+  }
+  return null;
 };
 
 /** Throws a worded error unless the hub may bind here. */
@@ -124,21 +154,9 @@ const assertHubCanStart = async (
   }
 
   const occupant = await inspectHubPort(port, host);
-  if (occupant.kind === "hub") {
-    throw new HubCliError(
-      t(locale, "cli.hub.portHeldByOrphanHub", { port, pid: occupant.pid ?? "?" }),
-    );
-  }
-  if (occupant.kind === "other") {
-    throw new HubCliError(
-      occupant.pid === null
-        ? t(locale, "cli.hub.portTakenUnknown", { port })
-        : t(locale, "cli.hub.portTaken", {
-            port,
-            pid: occupant.pid,
-            workspace: occupant.workspaceCwd ?? "?",
-          }),
-    );
+  const blocked = describePortOccupant(locale, port, occupant);
+  if (blocked) {
+    throw new HubCliError(blocked);
   }
   return { port, host, accessToken };
 };
@@ -170,6 +188,7 @@ export const runHubForeground = async (context: HubCliContext): Promise<void> =>
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
     promptsDir,
     accessToken,
+    build,
   });
 
   let shuttingDown = false;
@@ -228,12 +247,51 @@ const readTail = (path: string, maxLines = 20): string => {
 };
 
 /**
- * Spawns `hub start --foreground` detached and waits until its hub.json is
- * written and its health answers. Callers hold the hub lock.
+ * With the hub's systemd unit installed, starting it anywhere else would
+ * leave a hub systemd neither restarts nor knows about. Null when there is
+ * no unit for this state root or systemctl refuses; the caller spawns one.
+ */
+const startHubService = async (context: HubCliContext): Promise<HubMetadata | null> => {
+  const { locale, env = process.env } = context;
+  if (!isHubServiceInstalled(env, homedir(), resolveGlobalOctogentDir())) {
+    return null;
+  }
+  const started = (context.runCommand ?? runCommand)("systemctl", [
+    "--user",
+    "start",
+    HUB_UNIT_NAME,
+  ]);
+  if (!isCommandSuccess(started)) {
+    console.error(
+      t(locale, "cli.hub.serviceStartFailed", { reason: describeCommandFailure(started) }),
+    );
+    return null;
+  }
+  const deadline = Date.now() + HUB_START_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const metadata = await readLiveHubMetadata();
+    if (metadata) {
+      return metadata;
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+  throw new HubCliError(
+    t(locale, "cli.hub.serviceStartTimeout", { seconds: HUB_START_TIMEOUT_MS / 1000 }),
+  );
+};
+
+/**
+ * Starts the hub, through its systemd unit when installed, else as a
+ * detached `hub start --foreground`, and waits until its hub.json is written
+ * and its health answers. Callers hold the hub lock.
  */
 const startHubDaemon = async (context: HubCliContext): Promise<HubMetadata> => {
   const { locale, env = process.env } = context;
   await assertHubCanStart(locale, env);
+  const viaService = await startHubService(context);
+  if (viaService) {
+    return viaService;
+  }
 
   const stderrPath = resolveDaemonStderrPath();
   mkdirSync(join(resolveHubStateDir(), "logs"), { recursive: true });
@@ -574,28 +632,6 @@ export const runHubStatus = async (context: HubCliContext): Promise<number> => {
     console.log(`${marker} ${project.slug.padEnd(slugWidth)}  ${state}  ${project.path}`);
   }
   return 0;
-};
-
-/**
- * Bare `octogent` while a hub already serves this project: point at it
- * rather than start a second server over the same state. True when it did.
- */
-export const announceHubForCurrentProject = async (context: HubCliContext): Promise<boolean> => {
-  const hub = await readLiveHubMetadata();
-  if (!hub) {
-    return false;
-  }
-  const cwd = process.cwd();
-  const project = findCurrentProject(loadProjectsRegistry(), cwd, findProjectConfigRoot(cwd));
-  if (!project) {
-    return false;
-  }
-  const slug = project.slug ?? toProjectSlug(project.name);
-  const url = `${hub.apiBaseUrl.replace(/\/+$/, "")}/p/${encodeURIComponent(slug)}/`;
-  console.log(t(context.locale, "cli.hub.bareServing", { url }));
-  console.log(`  ${t(context.locale, "cli.hub.bareUseHub")}`);
-  console.log(`  ${t(context.locale, "cli.hub.bareStandalone")}`);
-  return true;
 };
 
 /** Reports a worded hub failure and exits; anything else is a real bug and rethrows. */

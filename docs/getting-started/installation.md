@@ -57,16 +57,16 @@ Octogent is not published to the npm registry yet, so `npm install -g octogent` 
 
 ## First run behavior
 
-Running `octogent` inside a project directory will:
+Running `octogent` inside a project directory (a git repository) will:
 
-- create `.octogent/` if it does not exist
-- add `.octogent` to `.gitignore` or create `.gitignore` when it is missing
-- write a stable project ID to `.octogent/project.json`
+- start the hub on `127.0.0.1:8787` in the background if none is running (see [Running Octogent through the hub](../guides/hub.md))
+- create `.octogent/` if it does not exist, with a stable project ID in `.octogent/project.json`
 - register the project under `~/.octogent/projects.json`
-- move runtime state to `~/.octogent/projects/<project-id>/state/`
-- choose an open local API port starting at `8787`
-- open the browser unless `OCTOGENT_NO_OPEN=1`
+- keep runtime state in `~/.octogent/projects/<project-id>/state/`
+- open the project's page, `http://127.0.0.1:8787/p/<slug>/`, unless `OCTOGENT_NO_OPEN=1`
 - show a Deck setup card until the first tentacle is created
+
+`octogent init` additionally adds `.octogent` to `.gitignore` (creating `.gitignore` when it is missing) and writes a starter `.octogent/env`. `octogent --standalone` starts a single-project server instead, on the first open port from `8787`.
 
 ## Startup rules
 

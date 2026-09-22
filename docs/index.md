@@ -14,6 +14,7 @@ Octogent has three main layers:
 - [Installation](getting-started/installation.md)
 - [Quickstart](getting-started/quickstart.md)
 - [Mental Model](concepts/mental-model.md) explains the boundaries between tentacles, terminals, worktrees, and runtime state
+- [Running Octogent Through the Hub](guides/hub.md) covers starting the one server every project shares, registering projects, the worker environment, and upgrading
 
 ## Concepts
 
@@ -33,7 +34,7 @@ Octogent has three main layers:
 - [Filesystem Layout](reference/filesystem-layout.md)
 - [API](reference/api.md)
 - [Experimental Features](reference/experimental-features.md)
-- [Running as a systemd User Service](reference/systemd.md)
+- [Running the Hub as a systemd User Service](reference/systemd.md)
 - [Troubleshooting](reference/troubleshooting.md)
 
 ## Contributor policy

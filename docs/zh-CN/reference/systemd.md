@@ -1,81 +1,130 @@
-# 以 systemd 用户服务运行 Octogent
+# 以 systemd 用户服务运行 hub
 
-本指南介绍如何在 Linux 机器上使用 systemd 用户服务让 Octogent 常驻后台运行。可直接修改的示例 unit 文件位于 [`examples/octogent.service`](../../../examples/octogent.service)。
+在 Linux 上，可以让 systemd 替你运行 [hub](../guides/hub.md)。这样它会在你登录时启动（开启 lingering 后则在开机时启动），崩溃后自动恢复，日志同时写入 journal 和 `~/.octogent/hub/logs/server.log`。
 
-## 安装步骤
+## 安装
 
-1. 找到 `octogent` 启动器的绝对路径。systemd 不会加载你的 shell 配置文件，因此 unit 不能依赖 `PATH`：
-
-   ```bash
-   which octogent
-   ```
-
-2. 将示例 unit 复制到用户 unit 目录：
+1. 先构建检出目录；服务运行的是构建后的 CLI：
 
    ```bash
-   mkdir -p ~/.config/systemd/user
-   cp examples/octogent.service ~/.config/systemd/user/octogent.service
+   cd ~/src/octogent && pnpm build
    ```
 
-3. 编辑 `~/.config/systemd/user/octogent.service`：
-
-   - 将 `ExecStart=/absolute/path/to/octogent` 替换为第 1 步得到的路径。
-   - 将 `WorkingDirectory=%h/your-project` 替换为希望仪表盘管理的项目目录。
-   - 按需取消注释 `OCTOGENT_ALLOW_REMOTE_ACCESS=1` 或 `OCTOGENT_API_PORT` 对应的 `Environment=` 行（全部受支持的变量见 [CLI 参考](cli.md)）。
-
-4. 重新加载 unit 并启动服务：
+2. 可选：现在就写好 `~/.octogent/hub.env`（见[环境变量](#环境变量)）；只有该文件存在时，unit 才会引用它。
+3. 在正常的登录 shell 中安装，即 `which claude`（或 `which codex`）能找到命令的 shell：
 
    ```bash
-   systemctl --user daemon-reload
-   systemctl --user enable --now octogent
+   octogent hub install-service
    ```
 
-5. 确认运行状态：
+   它会写入 `~/.config/systemd/user/octogent-hub.service`（遵循 `$XDG_CONFIG_HOME`），执行 `systemctl --user daemon-reload` 和 `systemctl --user enable --now octogent-hub.service`，并在 lingering 未开启时提示你。
+4. 检查：
 
    ```bash
-   systemctl --user status octogent
+   systemctl --user status octogent-hub
+   octogent hub status
    ```
 
-## 开机自启
+没有 systemd 的环境（macOS、大多数容器、没有用户管理器的 `su`/`sudo` shell）中，该命令会报错说明原因，且不写入任何文件；这些环境请改用 `octogent hub start` 启动 hub。如果安装时已有 hub 在运行（例如由 `octogent` 启动的），服务自己的 hub 会让开；等那个 hub 的工作代理空闲后，`octogent hub restart` 会把 hub 迁到 systemd 下。
 
-默认情况下，systemd 用户服务只在你有活跃登录会话时运行。要让 Octogent 在开机时启动、并在你注销后继续运行，需要为你的用户启用 lingering：
+## unit 的内容
+
+```ini
+[Unit]
+Description=Octogent hub
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/home/ada/src/octogent/bin/octogent hub start --foreground
+WorkingDirectory=/home/ada
+Environment="PATH=/home/ada/.nvm/versions/node/v22.9.0/bin:/home/ada/.local/bin:/usr/bin:/bin"
+Environment="OCTOGENT_HOME=/home/ada/.octogent"
+EnvironmentFile=-/home/ada/.octogent/hub.env
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+```
+
+- `ExecStart` 是执行 `install-service` 的那个检出目录里的启动器。
+- `WorkingDirectory` 是你的主目录，长期运行的 hub 因此不会占住任何项目目录。
+- `PATH` 是安装时 shell 的 `PATH`，并把当前 Node 所在目录放在最前。systemd 不读取任何 shell 配置文件，而启动器需要 `node`，hub 的代理需要 `claude`、`codex` 和 `git`。
+- `OCTOGENT_HOME` 是 hub 服务的状态根目录。CLI 也靠它认出这个 unit 属于自己的 hub。
+- 只有安装时 `hub.env` 已存在，才会出现 `EnvironmentFile` 这一行。
+- `Restart=on-failure` 在 hub 崩溃 3 秒后重启它；2 分钟内连续 5 次启动失败（例如端口一直被占）后，systemd 不再重试。
+
+移动检出目录、切换 Node 版本（nvm）、修改 `PATH` 或新建 `hub.env` 之后，再运行一次 `octogent hub install-service`，然后用 `octogent hub restart` 让它生效。[`examples/octogent-hub.service`](../../../examples/octogent-hub.service) 是同一个 unit，供手动安装使用。
+
+## 环境变量
+
+服务里的 hub 看不到你 shell 中的变量。把它需要的变量写进 `~/.octogent/hub.env`，每行一个 `KEY=value`；文件里有令牌时注意设为私有：
+
+```bash
+cat > ~/.octogent/hub.env <<'EOF'
+OCTOGENT_HUB_PROJECT_IDLE_MS=3600000
+OCTOGENT_ALLOW_REMOTE_ACCESS=1
+OCTOGENT_ACCESS_TOKEN=replace-with-at-least-32-random-characters
+EOF
+chmod 600 ~/.octogent/hub.env
+octogent hub install-service    # 若缺少 EnvironmentFile 行会补上
+octogent hub restart
+```
+
+`hub.env` 中的变量会覆盖 unit 中同名的变量。无论 hub 本身以什么环境启动，工作代理都只拿到[工作代理的环境](cli.md#工作代理的环境)中描述的基线。
+
+## 日常命令
+
+- `octogent hub status`、`stop`、`restart` 照常使用。装了 unit 之后，每次启动 hub（`hub start`、`hub restart`、自动启动、直接运行 `octogent`）都会执行 `systemctl --user start octogent-hub`，因此唯一的 hub 就是 systemd 监管的那个。如果 systemctl 拒绝执行，CLI 会给出警告，改为启动一个后台 hub。
+- `octogent hub stop` 也能停止服务里的 hub。hub 正常退出，所以 systemd 会让它保持停止，直到下次启动、登录或开机。
+- `systemctl --user restart octogent-hub` 同样可用，但它不会像 `octogent hub restart` 那样检查是否有活跃的工作代理。
+
+## 开机启动
+
+除非开启 lingering，systemd 用户服务只在你有登录会话时运行：
 
 ```bash
 loginctl enable-linger "$USER"
 ```
 
-未启用 lingering 时，服务会在你首次登录时启动，并在最后一个会话结束时停止。
+不开启 lingering 时，hub 会在你首次登录时启动，在最后一个会话结束时停止。`install-service` 会用 `loginctl show-user` 检查，并在 lingering 未开启时打印这条建议。
 
 ## 查看日志
 
-服务输出会写入 systemd journal：
-
 ```bash
-journalctl --user -u octogent -f
+journalctl --user -u octogent-hub -f
+tail -f ~/.octogent/hub/logs/server.log
 ```
 
-去掉 `-f` 可以分页浏览历史日志，而不是实时跟随输出。
+## 移除服务
 
-## systemd 与守护脚本的取舍
+```bash
+octogent hub install-service --remove
+```
 
-两种方式都能让 Octogent 保持运行，按你的环境选择：
+它会禁用服务、删除 unit 文件并重新加载 systemd。正在运行的 hub 会继续运行，因为它可能还有活跃的工作代理；等它们结束后用 `octogent hub stop` 停止。
 
-- **systemd 用户服务**（本指南）：进程被直接监管——崩溃后数秒内自动重启（`Restart=on-failure`、`RestartSec=3`），日志进入 journal，启动/停止/查看状态都用标准的 `systemctl --user` 命令。在任何带 systemd 的 Linux 主机上优先选择这种方式。
-- **守护脚本**（cron 或轮询 `GET /api/health` 的循环脚本，见 [API 参考](api.md)）：适用于没有 systemd 用户服务的环境（容器、macOS、精简镜像），并且可以叠加进程存活之外的自定义健康检查逻辑。代价是重启检测更慢（依赖轮询间隔而非即时监管），日志处理也需要自行搭建。
+## 故障排查
 
-## 常见问题
+### `status=127`，或启动器找不到 `node`
 
-### nvm 环境下出现 `status=127` 或 "command not found"
+unit 的 `PATH` 写的是安装时的 Node 目录，nvm 升级后该目录会被删除。在已有新 Node 的 shell 里重新运行 `octogent hub install-service`，然后执行 `octogent hub restart`。
 
-nvm 把 Node 和全局包安装在 `~/.nvm/versions/node/<version>/bin` 下，该目录由 shell 配置文件加入 `PATH`——systemd 完全看不到它。必须保证两处都能解析：
+### "the hub cannot start without the tools listed above"
 
-1. `ExecStart` 必须使用 `which octogent` 打印的绝对路径。
-2. 启动脚本本身以 `#!/usr/bin/env node` 开头，因此 `node` 也必须能被找到。取消注释 unit 中的 `Environment=PATH=...` 行，并把 `which node` 打印的目录加进去。
+`claude` 或 `codex` 不在 unit 的 `PATH` 上。在 `which claude`（或 `which codex`）能找到命令的 shell 中重新安装，或在 `hub.env` 里用 `PATH=` 行补上所在目录。
 
-编辑 unit 后，运行 `systemctl --user daemon-reload` 并重启服务。注意：`nvm use`/`nvm install` 切换 Node 版本会改变这些路径，升级 Node 后需要同步更新 unit。
+### 端口已被占用
 
-### 端口被占用
+journal 中出现 `port 8787 is taken by pid …`：有单项目服务器（`octogent --standalone`，或 hub 出现之前启动的服务器）占着端口。停掉它，或在 `hub.env` 中设置 `OCTOGENT_HUB_PORT`。连续 5 次启动失败后，systemd 会停止尝试，直到你清除失败状态：
 
-如果 journal 中出现 bind 错误，说明另一个进程（通常是手动启动的 `octogent`）已占用该端口（默认：`8787`）。可以停掉那个进程，或取消注释 unit 中的 `Environment=OCTOGENT_API_PORT=...` 改用其他端口，然后 `daemon-reload` 并重启服务。
+```bash
+systemctl --user reset-failed octogent-hub
+systemctl --user start octogent-hub
+```
 
-> 本文件是 [../../reference/systemd.md](../../reference/systemd.md) 的中文翻译版本。如有歧义，以英文原文为准。
+### 没有 systemd
+
+在 macOS 或容器中，运行 `octogent hub start`（后台 hub），或让你自己的进程管理器运行 `octogent hub start --foreground`。用循环或 cron 任务轮询 `GET /api/hub/health`，可以在它不再响应时重启它。

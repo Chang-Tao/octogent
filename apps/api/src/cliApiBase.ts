@@ -56,9 +56,10 @@ export const readLiveRuntimeMetadata = async (
   return null;
 };
 
-type RegisteredProject = { id: string; slug: string; created: boolean };
+export type RegisteredProject = { id: string; slug: string; created: boolean };
 
-const registerWithHub = async (
+/** POST /api/projects on the hub; a worded error when it refuses. */
+export const registerWithHub = async (
   hubBaseUrl: string,
   path: string,
   context: HubCliContext,

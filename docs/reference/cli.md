@@ -3,14 +3,16 @@
 ## Start the dashboard
 
 ```bash
-octogent
+octogent                        # the current project, on the hub
+octogent --project <slug|id>    # another registered project, from any directory
+octogent --standalone           # a single-project server instead
 ```
 
-Starts the local API for the current project and opens the UI when bundled web assets are present.
+Bare `octogent` (or `octogent start`) opens the current project on the [hub](#run-the-hub). It starts the hub when none answers, as `octogent hub start` would, and registers the project when the hub does not know it yet: a git repository, or a directory with `.octogent/project.json`, which is the same rule [every other command](#which-server-a-command-talks-to) follows. Then it prints `<hub>/p/<slug>/` and opens it in the browser, unless `OCTOGENT_NO_OPEN=1` (or `CI=1`) is set or the web bundle is missing. Outside any project it opens `<hub>/`, the overview of every project. The command returns once the page is open, and the hub keeps running in the background until `octogent hub stop`. `OCTOGENT_NO_AUTOSTART=1` makes it fail with a hint instead of starting a hub. The [hub guide](../guides/hub.md) walks through the whole setup.
 
-If the current directory has not been initialized yet, the dashboard still starts, but it runs against a temporary state root and shows a setup card asking you to run `octogent init`. The local `.octogent/` scaffold is created by `octogent init` (or the setup card's **Initialize workspace** action), not by the dashboard itself. Anything created before that point is migrated into the project on initialization.
+It never starts a hub on another port. If something that is not a hub holds the hub's port (typically a single-project server from before the hub), it fails the way `hub start` does, naming that process's pid and its project when known, and points at `--standalone`. If the current project's own single-project server is still running, it prints that server's address and opens it instead: loading the project into the hub as well would put two runtimes over one set of state files. Stop that server and run `octogent` again to move the project to the hub.
 
-When a [hub](#run-the-hub) is already running and serves the current project, bare `octogent` does not start a second server over the same project: it prints the project's address under the hub, `<hub>/p/<slug>/`, and the two ways on — keep using the hub (CLI commands in the project already reach it), or run `octogent --standalone`, which always starts a single-project server as before (on the next free port while the hub holds `8787`). The dashboard under the hub is that same `/p/<slug>/` address, and `<hub>/` lists every project.
+`octogent --standalone` starts a single-project server for the current directory, which stays in the foreground until Ctrl-C and takes the first free port from `8787` (`OCTOGENT_API_PORT` or `PORT`). If the directory has not been initialized yet, that server runs against a temporary state root and shows a setup card asking you to run `octogent init`. The local `.octogent/` scaffold is created by `octogent init` (or the setup card's **Initialize workspace** action), not by the server itself, and anything created before that point is migrated into the project on initialization.
 
 ### Environment Variables
 
@@ -34,17 +36,19 @@ When a [hub](#run-the-hub) is already running and serves the current project, ba
 - `OCTOGENT_CODEX_RATE_LIMIT_PROMPT`: What Octogent does when Codex shows its "Approaching rate limits — Switch to <cheaper model>?" prompt, which no hook reports and which would otherwise swallow the next pasted message: `keep` (default — answer "Keep current model", so the worker stays on the model you chose; the real limit, when it comes, surfaces as a provider error), `switch` (accept the cheaper model), or `ask` (leave it on screen and mark the worker as waiting for the user, so `terminal wait` exits 3)
 - `OCTOGENT_CODEX_APPROVAL_POLICY`: Codex approval policy: `on-request` or `never` (default: `never`, so unattended terminals are not stranded on approval prompts)
 - `OCTOGENT_CODEX_CONFIG`: Override the path of the Codex `config.toml` that Octogent seeds with project trust and hook trust hashes (mainly for test isolation)
-- `OCTOGENT_ACCESS_TOKEN`: Access token required from non-loopback clients when remote access is on; auto-generated per session (and printed with the LAN URL) when unset
+- `OCTOGENT_ACCESS_TOKEN`: Access token required from non-loopback clients when remote access is on. A single-project server generates one per session (and prints it with the LAN URL) when unset; the hub requires one of at least 32 characters
 - `OCTOGENT_VERBOSE_LOGS`: Set to `1` to also print verbose hook and runtime summaries to the terminal. Verbose summaries are always written to the server log
 - `OCTOGENT_SERVER_LOG`: Set to `off` to disable the server log, or to a file path to override the default `<project-state-dir>/logs/server.log` (`~/.octogent/hub/logs/server.log` for the hub)
 - `OCTOGENT_PTY_ENV_MODE`: Set to `inherit` to hand agent terminals the server's whole environment again (minus the Claude session markers) instead of the baseline described in [Worker environment](#worker-environment). An escape hatch for setups the baseline misses; `.octogent/env` and `--inherit-env` still apply on top
 
-Example for headless servers:
+Example for headless servers. The hub reads these variables when it starts, so restart a running one to change them:
 
 ```bash
-OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
-# or specify a custom host
-HOST=192.168.1.100 octogent
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 OCTOGENT_ACCESS_TOKEN="$(openssl rand -hex 32)" octogent hub start
+# or bind one address
+HOST=192.168.1.100 OCTOGENT_ACCESS_TOKEN="$(openssl rand -hex 32)" octogent hub start
+# or a single-project server, which generates a token for the session
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent --standalone
 ```
 
 ## Run the hub
@@ -54,16 +58,22 @@ octogent hub start [--foreground]
 octogent hub status
 octogent hub stop
 octogent hub restart [--force]
+octogent hub install-service [--remove]
 ```
 
-The hub is one server for every registered project (see [Hub mode](api.md#hub-mode)). `start` runs it on a fixed port, `OCTOGENT_HUB_PORT` (default `8787`), and never moves to another one: every CLI has to find the one hub without asking. If the port is taken by something that is not a hub — typically a single-project server started by bare `octogent` — `start` fails and names that process's pid, and its project when the server's `runtime.json` records it. Without `--foreground` the hub runs detached: `start` waits up to 15 seconds for it to write `~/.octogent/hub.json` and answer `GET /api/hub/health`, then prints its address. `--foreground` keeps it in the current terminal until Ctrl-C. Either way it logs to `~/.octogent/hub/logs/server.log`; a detached hub's own stderr (a crash before logging starts, say) goes to `~/.octogent/hub/logs/daemon-stderr.log`.
+The hub is one server for every registered project (see [Hub mode](api.md#hub-mode)). `start` runs it on a fixed port, `OCTOGENT_HUB_PORT` (default `8787`), and never moves to another one: every CLI has to find the one hub without asking. If the port is taken by something that is not a hub, typically a single-project server (`octogent --standalone`, or one from before the hub), `start` fails and names that process's pid, and its project when the server's `runtime.json` records it. Without `--foreground` the hub runs detached: `start` waits up to 15 seconds for it to write `~/.octogent/hub.json` and answer `GET /api/hub/health`, then prints its address. `--foreground` keeps it in the current terminal until Ctrl-C. Either way it logs to `~/.octogent/hub/logs/server.log`; a detached hub's own stderr (a crash before logging starts, say) goes to `~/.octogent/hub/logs/daemon-stderr.log`.
 
 `status` prints the hub's address and whether it answers, its pid and start time, its build next to this CLI's, the log path, and every registered project (`*` marks the current one) with whether it is loaded and how many terminals are running or awaiting review. It exits `1` when no hub answers. `stop` sends `SIGTERM` and waits for the hub to exit, then sends `SIGKILL` after 10 seconds. Because pids are reused after a crash, it signals the pid in `hub.json` only while that process answers as the hub (or, on Linux, its command line shows it is one). `restart` is `stop` followed by `start`, but it refuses while any project has terminals `running` or `awaiting-review` — those sessions die with the hub — and lists them; `--force` restarts anyway.
+
+A project loads on the first request that names it. It unloads after `OCTOGENT_HUB_PROJECT_IDLE_MS` without a PTY session, an open dashboard page, or a request in flight: its context stops, the log records it, and `hub status` and `GET /api/projects` show it as not loaded. Its state stays on disk, and the next request loads it again. A terminal awaiting review keeps its project loaded only while its PTY is open.
+
+`install-service` makes the hub a systemd user service on Linux; see [Running the hub as a systemd user service](systemd.md). Once that unit is installed, every start of the hub (`hub start`, `hub restart`, the automatic start, bare `octogent`) runs `systemctl --user start octogent-hub`, so systemd supervises the only hub. If systemctl refuses, the CLI warns and starts a detached hub as before. `--remove` disables the service and deletes the unit, and leaves a running hub alone.
 
 The hub binds `127.0.0.1`. With `OCTOGENT_ALLOW_REMOTE_ACCESS=1` (or an explicit `HOST`) it binds beyond loopback only when `OCTOGENT_ACCESS_TOKEN` holds a token of at least 32 characters. Unlike a single-project server it never generates one, because a detached hub's token would change on every restart.
 
 - `OCTOGENT_HUB_PORT`: the hub's port (default `8787`)
 - `OCTOGENT_NO_AUTOSTART`: set to `1` so commands fail with a hint instead of starting a hub (step 4 below)
+- `OCTOGENT_HUB_PROJECT_IDLE_MS`: how long a loaded project may go without sessions or requests before it unloads (default `1800000`, 30 minutes; `0` keeps every project loaded)
 - `OCTOGENT_HUB_MAX_TERMINAL_SESSIONS`: PTY sessions across all projects (default `32`); each project also keeps its own cap, `OCTOGENT_MAX_TERMINAL_SESSIONS` (default `12` under a hub)
 
 ### Which server a command talks to
@@ -71,7 +81,7 @@ The hub binds `127.0.0.1`. With `OCTOGENT_ALLOW_REMOTE_ACCESS=1` (or an explicit
 Every command that needs a server (`tentacle`, `terminal`, `worktree`, `channel`) picks one in this order:
 
 1. **An explicit base:** `OCTOGENT_API_BASE`, else `OCTOGENT_API_ORIGIN`, used as is. Octogent sets `OCTOGENT_API_BASE` in every worker, already scoped to the worker's project, so the CLI inside a worker always reaches its own project.
-2. **The project's own server:** the current project's single-project server, when its `runtime.json` names a live process that answers. Servers started by bare `octogent` keep working.
+2. **The project's own server:** the current project's single-project server, when its `runtime.json` names a live process that answers. Servers started by `octogent --standalone` keep working.
 3. **The hub**, when `~/.octogent/hub.json` names a live hub: the command goes to `<hub>/api/p/<id>` for the project named by `--project <slug|id>` or, without it, the project the current directory belongs to (the nearest `.octogent/project.json`, else the registered project whose path contains it). A git repository that is not registered yet is registered on the spot, which scaffolds its `.octogent/`, and the CLI prints one line with its slug; any other directory fails with a hint.
 4. **No hub:** the command starts one, as `octogent hub start` would, and continues with step 3. `~/.octogent/hub.lock` makes concurrent commands start a single hub while the others wait for it. `OCTOGENT_NO_AUTOSTART=1` turns this step into an error.
 
@@ -95,7 +105,7 @@ octogent init [project-name]
 
 Creates or updates the `.octogent/` scaffold in the current directory without starting the dashboard.
 
-Use this when you want to initialize the project explicitly or set the project display name ahead of time. In normal use, running `octogent` inside the codebase is enough to initialize and start the app.
+Use this when you want to initialize the project explicitly or set the project display name ahead of time. In normal use, running `octogent` inside a git repository is enough: the hub registers it and creates `.octogent/`. `init` also adds `.octogent` to `.gitignore` and writes `.octogent/env`, which registration leaves alone.
 
 `init` also writes a starter `.octogent/env` (see [Worker environment](#worker-environment)) when the project has none. If it finds `.venv/bin/activate` or `venv/bin/activate`, the virtualenv lines are live, so workers use that environment; otherwise they are left commented as an example. An existing `.octogent/env` is never overwritten, so running `init` again is safe.
 
@@ -113,7 +123,7 @@ Lists each registered project as its slug (the key in its hub address, `/p/<slug
 octogent logs [--lines N] [--follow]
 ```
 
-Prints the last 100 lines of the current project's server log. Use `--lines N` to choose another positive line count and `--follow` to keep streaming new lines, including across log rotation.
+Prints the last 100 lines of the current project's own server log, the one a `--standalone` server writes. Under the hub, every project logs to `~/.octogent/hub/logs/server.log`, each line tagged `[<slug>]`. Use `--lines N` to choose another positive line count and `--follow` to keep streaming new lines, including across log rotation.
 
 ## Create a tentacle
 

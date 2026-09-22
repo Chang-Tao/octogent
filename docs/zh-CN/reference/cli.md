@@ -3,14 +3,16 @@
 ## 启动工作面板
 
 ```bash
-octogent
+octogent                        # 当前项目，在 hub 上
+octogent --project <slug|id>    # 另一个已注册项目，可在任意目录运行
+octogent --standalone           # 改为启动单项目服务器
 ```
 
-为当前项目启动本地 API，并在存在打包好的 Web 资源时打开 UI。
+直接运行 `octogent`（或 `octogent start`）会在 [hub](#运行-hub) 上打开当前项目。没有 hub 响应时，它会像 `octogent hub start` 那样启动一个；hub 还不认识该项目时，它会注册项目：git 仓库，或含有 `.octogent/project.json` 的目录，与[其他所有命令](#命令连到哪个服务器)遵循同一条规则。随后它打印 `<hub>/p/<slug>/` 并在浏览器中打开，除非设置了 `OCTOGENT_NO_OPEN=1`（或 `CI=1`）或缺少 Web 构建产物。不在任何项目中时，它打开 `<hub>/`，即所有项目的总览。页面打开后命令即返回，hub 留在后台运行，直到 `octogent hub stop`。设置 `OCTOGENT_NO_AUTOSTART=1` 时，它会报错并给出提示，而不是启动 hub。完整流程见 [hub 指南](../guides/hub.md)。
 
-如果当前目录尚未初始化，工作面板依然会启动，但会运行在一个临时状态根目录之上，并显示一张引导卡片提示你运行 `octogent init`。本地 `.octogent/` 脚手架由 `octogent init`（或引导卡片上的**初始化工作区**操作）创建，工作面板本身不会创建。初始化之前创建的任何内容都会在初始化时迁移进项目。
+它绝不会在别的端口上启动 hub。如果占着 hub 端口的不是 hub（通常是 hub 出现之前的单项目服务器），它会像 `hub start` 一样失败，给出该进程的 pid 以及已知的项目，并提示可以用 `--standalone`。如果当前项目自己的单项目服务器仍在运行，它会打印并打开那个服务器的地址：让 hub 再加载一次该项目，会让两个运行时共用同一组状态文件。停掉那个服务器后再运行一次 `octogent`，项目就迁到 hub 上了。
 
-如果 [hub](#运行-hub) 已在运行并服务当前项目，直接运行 `octogent` 不会为同一个项目再启动第二个服务器，而是打印该项目在 hub 下的地址 `<hub>/p/<slug>/`，并给出两条路：继续使用 hub（项目里运行的 CLI 命令已经会连到它），或运行 `octogent --standalone`——它总是像以前一样启动单项目服务器（hub 占着 `8787` 时顺延到下一个空闲端口）。hub 下的工作面板就是同一个 `/p/<slug>/` 地址，`<hub>/` 则列出所有项目。
+`octogent --standalone` 为当前目录启动单项目服务器，它留在前台直到按 Ctrl-C，从 `8787` 起取第一个空闲端口（`OCTOGENT_API_PORT` 或 `PORT`）。如果当前目录尚未初始化，这个服务器会运行在临时状态根目录之上，并显示一张引导卡片提示你运行 `octogent init`。本地 `.octogent/` 脚手架由 `octogent init`（或引导卡片上的**初始化工作区**操作）创建，服务器本身不会创建。初始化之前创建的任何内容都会在初始化时迁移进项目。
 
 ### 环境变量
 
@@ -34,17 +36,19 @@ octogent
 - `OCTOGENT_CODEX_RATE_LIMIT_PROMPT`：Codex 弹出"Approaching rate limits — Switch to <更省的模型>?"提示时 Octogent 的做法。这个提示没有任何钩子上报，不处理的话会吞掉下一条粘贴进去的消息：`keep`（默认——回答"Keep current model"，工人留在你选的模型上；真撞到限额时会作为供应商错误报出来）、`switch`（接受更省的模型）、`ask`（留在屏幕上并把工人标为等待用户，`terminal wait` 以 3 退出）
 - `OCTOGENT_CODEX_APPROVAL_POLICY`：Codex 审批策略：`on-request` 或 `never`（默认 `never`，避免无人值守的终端卡在审批提示上）
 - `OCTOGENT_CODEX_CONFIG`：覆盖 Octogent 用于预置项目信任与钩子信任哈希的 Codex `config.toml` 路径（主要用于测试隔离）
-- `OCTOGENT_ACCESS_TOKEN`：开启远程访问时非回环客户端必须携带的访问令牌；未设置时每次启动自动生成并随局域网地址打印
+- `OCTOGENT_ACCESS_TOKEN`：开启远程访问时非回环客户端必须携带的访问令牌。未设置时，单项目服务器每次启动自动生成并随局域网地址打印；hub 则必须设置至少 32 个字符的令牌
 - `OCTOGENT_VERBOSE_LOGS`：设为 `1`，同时把详细的钩子和运行时摘要打印到终端。无论是否设置，详细摘要都会写入服务日志
 - `OCTOGENT_SERVER_LOG`：设为 `off` 可禁用服务日志；设为文件路径可覆盖默认的 `<project-state-dir>/logs/server.log`（hub 为 `~/.octogent/hub/logs/server.log`）
 - `OCTOGENT_PTY_ENV_MODE`：设为 `inherit` 时，代理终端重新拿到服务进程的完整环境（仍去掉 Claude 会话标记），而不是[工作代理的环境](#工作代理的环境)一节所述的基线。这是应急开关，用于基线漏掉的场景；`.octogent/env` 与 `--inherit-env` 仍会叠加在上面
 
-无界面服务器示例：
+无界面服务器示例。hub 只在启动时读取这些变量，要修改就重启正在运行的 hub：
 
 ```bash
-OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
-# 或指定自定义主机
-HOST=192.168.1.100 octogent
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 OCTOGENT_ACCESS_TOKEN="$(openssl rand -hex 32)" octogent hub start
+# 或绑定指定地址
+HOST=192.168.1.100 OCTOGENT_ACCESS_TOKEN="$(openssl rand -hex 32)" octogent hub start
+# 或使用单项目服务器，它会为本次运行生成令牌
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent --standalone
 ```
 
 ## 运行 hub
@@ -54,16 +58,22 @@ octogent hub start [--foreground]
 octogent hub status
 octogent hub stop
 octogent hub restart [--force]
+octogent hub install-service [--remove]
 ```
 
-hub 是一个服务器服务所有已注册项目（见 [Hub 模式](api.md#hub-模式)）。`start` 在固定端口 `OCTOGENT_HUB_PORT`（默认 `8787`）上运行它，绝不换到别的端口：每个 CLI 都得不经询问就找到这唯一的 hub。如果端口被一个不是 hub 的进程占用——通常是直接运行 `octogent` 启动的单项目服务器——`start` 会失败并给出该进程的 pid，若该服务器的 `runtime.json` 有记录，还会给出它的项目。不带 `--foreground` 时 hub 在后台独立运行：`start` 最多等 15 秒，等它写好 `~/.octogent/hub.json` 并能响应 `GET /api/hub/health`，然后打印它的地址。`--foreground` 让它留在当前终端，直到按 Ctrl-C。两种方式都写日志到 `~/.octogent/hub/logs/server.log`；后台 hub 自己的 stderr（例如日志开始前就崩溃）写到 `~/.octogent/hub/logs/daemon-stderr.log`。
+hub 是一个服务器服务所有已注册项目（见 [Hub 模式](api.md#hub-模式)）。`start` 在固定端口 `OCTOGENT_HUB_PORT`（默认 `8787`）上运行它，绝不换到别的端口：每个 CLI 都得不经询问就找到这唯一的 hub。如果端口被一个不是 hub 的进程占用（通常是单项目服务器：`octogent --standalone`，或 hub 出现之前启动的服务器），`start` 会失败并给出该进程的 pid，若该服务器的 `runtime.json` 有记录，还会给出它的项目。不带 `--foreground` 时 hub 在后台独立运行：`start` 最多等 15 秒，等它写好 `~/.octogent/hub.json` 并能响应 `GET /api/hub/health`，然后打印它的地址。`--foreground` 让它留在当前终端，直到按 Ctrl-C。两种方式都写日志到 `~/.octogent/hub/logs/server.log`；后台 hub 自己的 stderr（例如日志开始前就崩溃）写到 `~/.octogent/hub/logs/daemon-stderr.log`。
 
 `status` 打印 hub 的地址及是否响应、pid 与启动时间、它的构建与本 CLI 构建的对照、日志路径，以及每个已注册项目（`*` 标出当前项目）是否已加载、有几个终端在运行或待审阅。没有 hub 响应时退出码为 `1`。`stop` 发送 `SIGTERM` 并等待 hub 退出，10 秒后仍未退出则发送 `SIGKILL`。由于崩溃后 pid 会被复用，只有当 `hub.json` 里的 pid 仍以 hub 身份响应（或在 Linux 上其命令行表明它就是 hub）时才会向它发信号。`restart` 即先 `stop` 再 `start`，但只要有项目存在 `running` 或 `awaiting-review` 的终端就拒绝执行——这些会话会随 hub 一起终止——并列出它们；加 `--force` 则照样重启。
+
+项目在第一次被请求点名时加载。在 `OCTOGENT_HUB_PROJECT_IDLE_MS` 时长内既没有 PTY 会话、没有打开的仪表盘页面、也没有进行中的请求时，它会被卸载：上下文停止，日志记下这一事件，`hub status` 与 `GET /api/projects` 显示它未加载。它的状态留在磁盘上，下一次请求会重新加载它。待审阅的终端只有在 PTY 仍打开时才会让项目保持加载。
+
+`install-service` 在 Linux 上把 hub 装成 systemd 用户服务，见[以 systemd 用户服务运行 hub](systemd.md)。装好该 unit 后，每次启动 hub（`hub start`、`hub restart`、自动启动、直接运行 `octogent`）都会执行 `systemctl --user start octogent-hub`，因此唯一的 hub 由 systemd 监管。如果 systemctl 拒绝执行，CLI 会给出警告，照旧启动后台 hub。`--remove` 禁用服务并删除 unit，不影响正在运行的 hub。
 
 hub 绑定 `127.0.0.1`。设置 `OCTOGENT_ALLOW_REMOTE_ACCESS=1`（或显式的 `HOST`）时，只有 `OCTOGENT_ACCESS_TOKEN` 持有至少 32 个字符的令牌，它才会绑定到回环以外的地址。与单项目服务器不同，hub 从不自动生成令牌，因为后台 hub 的令牌每次重启都会变。
 
 - `OCTOGENT_HUB_PORT`：hub 的端口（默认 `8787`）
 - `OCTOGENT_NO_AUTOSTART`：设为 `1` 时命令不会自动启动 hub，而是给出提示并失败（见下面第 4 步）
+- `OCTOGENT_HUB_PROJECT_IDLE_MS`：已加载的项目在没有会话和请求的情况下多久后卸载（默认 `1800000`，即 30 分钟；`0` 表示始终保持加载）
 - `OCTOGENT_HUB_MAX_TERMINAL_SESSIONS`：所有项目合计的 PTY 会话上限（默认 `32`）；每个项目另有自己的上限 `OCTOGENT_MAX_TERMINAL_SESSIONS`（hub 下默认 `12`）
 
 ### 命令连到哪个服务器
@@ -71,7 +81,7 @@ hub 绑定 `127.0.0.1`。设置 `OCTOGENT_ALLOW_REMOTE_ACCESS=1`（或显式的 
 每个需要服务器的命令（`tentacle`、`terminal`、`worktree`、`channel`）按以下顺序选择：
 
 1. **显式地址**：`OCTOGENT_API_BASE`，其次 `OCTOGENT_API_ORIGIN`，原样使用。Octogent 会在每个工作代理里设置 `OCTOGENT_API_BASE`，且已限定到该代理的项目，所以工作代理里的 CLI 总是连到自己的项目。
-2. **项目自己的服务器**：当前项目的单项目服务器，前提是它的 `runtime.json` 记录的进程仍存活并能响应。直接运行 `octogent` 启动的服务器照常可用。
+2. **项目自己的服务器**：当前项目的单项目服务器，前提是它的 `runtime.json` 记录的进程仍存活并能响应。`octogent --standalone` 启动的服务器照常可用。
 3. **hub**：当 `~/.octogent/hub.json` 记录的 hub 存活时，命令发往 `<hub>/api/p/<id>`，项目取自 `--project <slug|id>`，没有该参数时取当前目录所属的项目（最近的 `.octogent/project.json`，否则是路径包含当前目录的已注册项目）。尚未注册的 git 仓库会当场注册（同时创建它的 `.octogent/`），CLI 打印一行注明其 slug；其他目录则给出提示并失败。
 4. **没有 hub**：命令会像 `octogent hub start` 那样启动一个，然后继续第 3 步。`~/.octogent/hub.lock` 保证并发的多个命令只启动一个 hub，其余的等它就绪。`OCTOGENT_NO_AUTOSTART=1` 会把这一步变成报错。
 
@@ -95,7 +105,7 @@ octogent init [project-name]
 
 在当前目录创建或更新 `.octogent/` 脚手架，但不启动工作面板。
 
-当你想显式初始化项目，或提前设置项目显示名时使用它。日常使用中，在代码库里直接运行 `octogent` 就足以完成初始化并启动应用。
+当你想显式初始化项目，或提前设置项目显示名时使用它。日常使用中，在 git 仓库里直接运行 `octogent` 就够了：hub 会注册它并创建 `.octogent/`。`init` 还会把 `.octogent` 加进 `.gitignore` 并写入 `.octogent/env`，注册时不会动这两处。
 
 项目还没有 `.octogent/env` 时，`init` 会写入一份起步模板（见[工作代理的环境](#工作代理的环境)）。如果找到 `.venv/bin/activate` 或 `venv/bin/activate`，模板里的 virtualenv 行直接生效，工作代理会使用该环境；否则这些行保持注释，作为示例。已有的 `.octogent/env` 永远不会被覆盖，所以重复运行 `init` 是安全的。
 
@@ -113,7 +123,7 @@ octogent projects
 octogent logs [--lines N] [--follow]
 ```
 
-打印当前项目服务日志的最后 100 行。用 `--lines N` 指定其他正整数行数；用 `--follow` 持续输出新日志，日志轮转后也会继续跟随。
+打印当前项目自己的服务日志（即 `--standalone` 服务器写的那份）的最后 100 行。在 hub 下，所有项目都写入 `~/.octogent/hub/logs/server.log`，每行带 `[<slug>]` 标记。用 `--lines N` 指定其他正整数行数；用 `--follow` 持续输出新日志，日志轮转后也会继续跟随。
 
 ## 创建触手
 

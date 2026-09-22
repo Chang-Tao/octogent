@@ -22,6 +22,8 @@ octogent
 
 Octogent 尚未发布到 npm，因此 `npm install -g octogent` 目前不是有效的快速入门路径。
 
+在项目目录（git 仓库）里运行 `octogent`。没有 hub 在运行时它会启动一个，然后注册项目，并打开项目页面 `http://127.0.0.1:8787/p/<slug>/`；`http://127.0.0.1:8787/` 列出所有项目。hub 会留在后台运行。见[通过 hub 运行 Octogent](../guides/hub.md)；想让项目使用自己的服务器，用 `octogent --standalone`。
+
 在新的工作空间上，Octogent 会首先打开 Deck 设置流程。设置卡会在你创建触手之前验证工作空间文件、`.gitignore` 和本地先决条件。
 
 ## 2. 创建或检查触手
