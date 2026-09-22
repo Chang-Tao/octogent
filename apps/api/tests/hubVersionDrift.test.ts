@@ -35,9 +35,7 @@ describe("describeBuildDrift", () => {
   });
 
   it("compares commits when both sides know theirs", () => {
-    expect(
-      describeBuildDrift({ version: "0.2.0", commit: "aaaaaaa", builtAt: cli.builtAt }, cli),
-    ).toBe("different");
+    expect(describeBuildDrift({ ...cli, commit: "aaaaaaa" }, cli)).toBe("different");
   });
 
   it("falls back to the bundle build time when a commit is unknown", () => {

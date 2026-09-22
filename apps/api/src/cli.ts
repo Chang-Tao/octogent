@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -26,19 +25,14 @@ import {
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
 import { resolveRootVersion } from "./healthSnapshot";
 import {
+  canListenOnPort,
   isRemoteAccessEnabled,
   isWildcardHost,
   listLanAddresses,
   resolveListenHost,
   toConnectableHost,
 } from "./listenHost";
-import {
-  configureServerLogging,
-  installUncaughtErrorLogging,
-  log,
-  logError,
-  logWarn,
-} from "./logging";
+import { configureServerLogging, installUncaughtErrorLogging, log } from "./logging";
 import {
   ensureOctogentGitignoreEntry,
   ensureProjectScaffold,
@@ -56,10 +50,7 @@ import {
   readServerLogTail,
   resolveServerLogPath,
 } from "./serverLogs";
-import {
-  collectStartupPrerequisiteReport,
-  formatStartupPrerequisiteReport,
-} from "./startupPrerequisites";
+import { logStartupPrerequisites } from "./startupPrerequisites";
 import { ensureProjectEnvTemplate } from "./terminalRuntime/ptyEnvironment";
 
 const locale: Locale = (process.env.OCTOGENT_LOCALE as Locale) ?? DEFAULT_LOCALE;
@@ -164,16 +155,6 @@ const initProject = (name?: string) => {
   console.log(t(locale, "cli.init.ready"));
 };
 
-const canListenOnPort = (port: number, host: string): Promise<boolean> =>
-  new Promise((resolvePort) => {
-    const server = createServer();
-    server.once("error", () => resolvePort(false));
-    server.once("listening", () => {
-      server.close(() => resolvePort(true));
-    });
-    server.listen(port, host);
-  });
-
 const findOpenPort = async (startPort: number, host: string): Promise<number> => {
   for (let offset = 0; offset < MAX_PORT_ATTEMPTS; offset += 1) {
     const port = startPort + offset;
@@ -262,23 +243,8 @@ const startServer = async () => {
   installUncaughtErrorLogging();
   log(`  Server log: ${serverLogPath ?? "off"}`);
 
-  const startupPrerequisiteReport = collectStartupPrerequisiteReport();
-  const startupPrerequisiteLines = formatStartupPrerequisiteReport(
-    startupPrerequisiteReport,
-    locale,
-  );
-  if (startupPrerequisiteLines.length > 0) {
-    for (const line of startupPrerequisiteLines) {
-      if (startupPrerequisiteReport.errors.length > 0) {
-        logError(line);
-      } else {
-        logWarn(line);
-      }
-    }
-    if (startupPrerequisiteReport.errors.length > 0) {
-      process.exit(1);
-    }
-    logWarn("");
+  if (!logStartupPrerequisites(locale)) {
+    process.exit(1);
   }
 
   const promptsDir = resolveRuntimeAssetPath(["dist", "prompts"], ["prompts"]);

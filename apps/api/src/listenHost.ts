@@ -1,3 +1,5 @@
+import { createServer } from "node:net";
+
 const LOOPBACK_HOST = "127.0.0.1";
 const WILDCARD_HOSTS = new Set(["0.0.0.0", "::", "[::]"]);
 
@@ -63,3 +65,14 @@ export const listLanAddresses = (
     .flatMap((entries) => entries ?? [])
     .filter((entry) => entry.family === "IPv4" && !entry.internal)
     .map((entry) => entry.address);
+
+/** Whether a fresh server could bind here right now. */
+export const canListenOnPort = (port: number, host: string): Promise<boolean> =>
+  new Promise((resolvePort) => {
+    const server = createServer();
+    server.once("error", () => resolvePort(false));
+    server.once("listening", () => {
+      server.close(() => resolvePort(true));
+    });
+    server.listen(port, host);
+  });
