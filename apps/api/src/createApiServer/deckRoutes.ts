@@ -18,6 +18,7 @@ import { MAX_CHILDREN_PER_PARENT, RuntimeInputError } from "../terminalRuntime";
 import type { ApiRouteHandler } from "./routeHelpers";
 import {
   readJsonBodyOrWriteError,
+  runtimeInputErrorStatus,
   writeJson,
   writeMethodNotAllowed,
   writeNoContent,
@@ -501,7 +502,7 @@ export const handleDeckTodoSolveRoute: ApiRouteHandler = async (
     return true;
   } catch (error) {
     if (error instanceof RuntimeInputError) {
-      writeJson(response, 400, { error: error.message }, corsOrigin);
+      writeJson(response, runtimeInputErrorStatus(error), { error: error.message }, corsOrigin);
       return true;
     }
 
@@ -865,7 +866,7 @@ export const handleDeckTentacleSwarmRoute: ApiRouteHandler = async (
     }
   } catch (error) {
     if (error instanceof RuntimeInputError) {
-      writeJson(response, 400, { error: error.message }, corsOrigin);
+      writeJson(response, runtimeInputErrorStatus(error), { error: error.message }, corsOrigin);
       return true;
     }
     throw error;

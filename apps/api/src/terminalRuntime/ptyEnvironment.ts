@@ -11,14 +11,22 @@ const require = createRequire(import.meta.url);
 // known-harmful markers are scrubbed; deliberate CLAUDE_CODE_* overrides the
 // operator exports stay intact.
 const INHERITED_SESSION_MARKERS = new Set(["CLAUDE_CODE_CHILD_SESSION", "CLAUDECODE"]);
+// A server started from inside a hub worker would otherwise hand that
+// worker's project id to its own agents, next to its own API base.
+const SERVER_OWNED_VARIABLES = new Set(["OCTOGENT_PROJECT_ID"]);
 
 export const createShellEnvironment = (options?: {
   octogentSessionId?: string;
   apiBaseUrl?: string;
+  projectId?: string;
 }) => {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (typeof value === "string" && !INHERITED_SESSION_MARKERS.has(key)) {
+    if (
+      typeof value === "string" &&
+      !INHERITED_SESSION_MARKERS.has(key) &&
+      !SERVER_OWNED_VARIABLES.has(key)
+    ) {
       env[key] = value;
     }
   }
@@ -32,6 +40,11 @@ export const createShellEnvironment = (options?: {
     // Octogent instances on one machine, each event only reaches the instance
     // that owns the session (terminal ids repeat across instances).
     env.OCTOGENT_API_BASE = options.apiBaseUrl;
+  }
+  if (options?.projectId) {
+    // Under the hub the base already names the project; the id is spelled out
+    // so a CLI in the worker can say which project it acts on.
+    env.OCTOGENT_PROJECT_ID = options.projectId;
   }
   return env;
 };

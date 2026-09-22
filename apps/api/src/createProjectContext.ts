@@ -40,9 +40,17 @@ export type CreateProjectContextOptions = Omit<
   apiBaseUrl: string | (() => string);
   /** Feeds CORS decisions; the Host/Origin/token checks run before dispatch. */
   isRemoteBinding: () => boolean;
-  /** Registry id; defaults to the workspace's project.json id. */
+  /**
+   * Registry id. When given it is also exported to sessions as
+   * OCTOGENT_PROJECT_ID; a single-project server leaves it out so its PTY
+   * environment stays as it always was.
+   */
   projectId?: string | undefined;
   projectName?: string | undefined;
+  /** Per-project PTY session limit; unset defers to OCTOGENT_MAX_TERMINAL_SESSIONS. */
+  maxConcurrentSessions?: number | undefined;
+  /** A cap shared beyond this project (the hub's), checked before each new session. */
+  checkSessionAdmission?: (() => string | null) | undefined;
   /** Tags every log line the project emits, so one shared hub log stays attributable. */
   logPrefix?: string | undefined;
 };
@@ -77,6 +85,8 @@ const buildProjectContext = ({
   isRemoteBinding,
   projectId,
   projectName,
+  maxConcurrentSessions,
+  checkSessionAdmission,
   logPrefix,
   gitClient,
   readClaudeUsageSnapshot,
@@ -154,6 +164,9 @@ const buildProjectContext = ({
     workspaceCwd: resolvedWorkspaceCwd,
     projectStateDir: resolvedStateDir,
     getApiBaseUrl,
+    projectId,
+    maxConcurrentSessions,
+    checkSessionAdmission,
   };
   if (gitClient) {
     runtimeOptions.gitClient = gitClient;

@@ -222,10 +222,20 @@ export type GitClient = {
 
 export class RuntimeInputError extends Error {}
 
+/** A new session would exceed a concurrency cap shared beyond this request; answered as 429. */
+export class SessionLimitError extends RuntimeInputError {}
+
 export type CreateTerminalRuntimeOptions = {
   workspaceCwd: string;
   projectStateDir?: string | undefined;
   gitClient?: GitClient;
   getApiBaseUrl?: () => string;
   maxConcurrentSessions?: number | undefined;
+  /** Hub registry id, exported to sessions as OCTOGENT_PROJECT_ID. */
+  projectId?: string | undefined;
+  /**
+   * Consulted before any new PTY session starts, after the per-project limit:
+   * the hub's cap across all projects. Returns the refusal message, or null.
+   */
+  checkSessionAdmission?: (() => string | null) | undefined;
 };

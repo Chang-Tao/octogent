@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createShellEnvironment } from "../src/terminalRuntime/ptyEnvironment";
 
@@ -45,5 +45,27 @@ describe("createShellEnvironment", () => {
     expect(env.TERM).toBe("xterm-256color");
     expect(env.OCTOGENT_SESSION_ID).toBe("terminal-9");
     expect(env.PATH).toBe(process.env.PATH);
+  });
+
+  it("tells the in-worker CLI which hub project and base it belongs to", () => {
+    const env = createShellEnvironment({
+      octogentSessionId: "terminal-1",
+      apiBaseUrl: "http://127.0.0.1:8787/api/p/project-a",
+      projectId: "project-a",
+    });
+
+    expect(env.OCTOGENT_API_BASE).toBe("http://127.0.0.1:8787/api/p/project-a");
+    expect(env.OCTOGENT_PROJECT_ID).toBe("project-a");
+  });
+
+  it("does not pass an inherited OCTOGENT_PROJECT_ID to agents", () => {
+    // A server launched from inside a hub worker must not hand that worker's
+    // project to its own agents.
+    vi.stubEnv("OCTOGENT_PROJECT_ID", "outer-project");
+
+    const env = createShellEnvironment({ apiBaseUrl: "http://127.0.0.1:8787" });
+
+    expect(env.OCTOGENT_PROJECT_ID).toBeUndefined();
+    vi.unstubAllEnvs();
   });
 });
