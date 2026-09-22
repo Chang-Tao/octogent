@@ -57,16 +57,16 @@ Octogent 尚未发布到 npm 注册表，因此 `npm install -g octogent` 会失
 
 ## 首次运行行为
 
-在项目目录中运行 `octogent` 将会：
+在项目目录（git 仓库）中运行 `octogent` 将会：
 
-- 如果 `.octogent/` 不存在则创建它
-- 将 `.octogent` 添加到 `.gitignore`，如果 `.gitignore` 不存在则创建它
-- 将稳定的项目 ID 写入 `.octogent/project.json`
+- 如果没有 hub 在运行，在后台启动 hub，监听 `127.0.0.1:8787`（见[通过 hub 运行 Octogent](../guides/hub.md)）
+- 如果 `.octogent/` 不存在则创建它，并把稳定的项目 ID 写入 `.octogent/project.json`
 - 在 `~/.octogent/projects.json` 中注册该项目
-- 将运行时状态移至 `~/.octogent/projects/<project-id>/state/`
-- 从 `8787` 开始选择一个可用的本地 API 端口
-- 除非设置了 `OCTOGENT_NO_OPEN=1`，否则打开浏览器
+- 把运行时状态保存在 `~/.octogent/projects/<project-id>/state/`
+- 除非设置了 `OCTOGENT_NO_OPEN=1`，否则打开项目页面 `http://127.0.0.1:8787/p/<slug>/`
 - 显示 Deck 设置卡片，直到创建第一个触手
+
+`octogent init` 还会把 `.octogent` 添加到 `.gitignore`（不存在时创建 `.gitignore`），并写入一份起始的 `.octogent/env`。`octogent --standalone` 则改为启动单项目服务器，从 `8787` 起取第一个可用端口。
 
 ## 启动规则
 

@@ -84,6 +84,7 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
   projects.json
   hub.json
   hub.lock
+  hub.env
   hub/
     logs/
       server.log
@@ -94,7 +95,10 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
 - `projects.json` 是项目注册表。每个条目有 `id`、`name`、`path`、`createdAt`、`lastOpenedAt`，以及两个供 hub 使用的字段：`slug`，项目在 hub 地址（`/p/<slug>/`）中的键，在整个注册表内唯一，旧文件加载时自动补齐；`aliases`，项目改名前用过的 slug，保留下来让旧链接继续可用，且永不分配给别的项目。该文件先写到临时文件名再改名替换，读取方不会读到写了一半的内容。
 - `hub.json` 描述运行中的 hub：`{ apiBaseUrl, host, port, pid, startedAt, version, commit?, builtAt? }`。`commit` 取自 `OCTOGENT_BUILD_COMMIT`，`builtAt` 是 `dist/api/cli.js` 的修改时间；CLI 用它们与自身构建对比，以提示构建不一致。hub 开始监听后写入该文件，关闭时删除。除非其中的 pid 存活且 `GET /api/hub/health` 以同一 pid 响应，CLI 都视其为过期。
 - `hub.lock` 只在某个 CLI 正在启动 hub 时存在，保证并发的 CLI 只启动一个 hub。它以独占方式创建，记录启动者的 pid，60 秒后或该 pid 退出后即视为过期。
+- `hub.env` 可选，由你自己编写：每行一个 `KEY=value`，由 [systemd 服务](systemd.md)载入 hub 的环境（`OCTOGENT_HUB_PORT`、`OCTOGENT_ACCESS_TOKEN` 等）。以其他方式启动的 hub 不读取它。
 - `hub/logs/server.log` 是 hub 的服务日志：所有项目共用一个文件，每行带 `[<slug>]` 标记，轮转方式与项目日志相同。`daemon-stderr.log` 保存后台 hub 最近一次启动时的 stderr（日志开始前或服务日志之外打印的内容，例如加载时崩溃）。
+
+`octogent hub install-service` 还会在状态根目录之外写一个文件：`~/.config/systemd/user/octogent-hub.service`（设置了 `$XDG_CONFIG_HOME` 时位于其下），即 hub 的 systemd 用户 unit。它用一行 `OCTOGENT_HOME=` 写明所服务的状态根目录；只有这一行指向 CLI 自己的状态根目录时，CLI 才会经由 systemd 启动 hub。
 
 ## 提示词存储
 

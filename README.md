@@ -73,7 +73,8 @@
 - **打开即见进度全景页**，以伪 3D 把整个舰队按层级铺开，悬停卡讲述每个节点的角色与上一步/当前/下一步
 - **在保留期后自动归档收尾的终端**（`OCTOGENT_TERMINAL_RETENTION_HOURS`，默认 72 小时），并回收已合并的 worktree（`octogent worktree gc`）——未合并的工作绝不会被任何自动路径删除
 - **提供 `GET /api/health`**，供守护进程与监控探活
-- **支持 systemd 用户服务常驻部署**，让 Octogent 在后台长期运行
+- **用一个 hub 服务所有项目**：一个后台服务器监听 `127.0.0.1:8787`，每个项目在 `/p/<slug>/`，`/` 是总览
+- **支持把 hub 装成 systemd 用户服务**（`octogent hub install-service`），让 Octogent 在后台长期运行
 - **可切换 Claude 用量数据源**，通过 `OCTOGENT_CLAUDE_USAGE_SOURCE`（auto/oauth/cli/off，默认优先 OAuth）
 
 **触手（tentacle）**是 `.octogent/tentacles/<tentacle-id>/` 下的一个文件夹，存放代理可读的 markdown，例如 `CONTEXT.md`、`todo.md`，以及该代码库切片所需的其他笔记。
@@ -168,7 +169,7 @@ octogent --help
 
 </details>
 
-首次运行时，**Octogent** 会从 `8787` 起挑选一个可用的本地 API 端口，并在未设置 `OCTOGENT_NO_OPEN=1` 时打开 UI。在尚未初始化的目录里，它会先运行在临时状态根目录上并提示你执行 `octogent init`——该命令创建本地 `.octogent/` 脚手架、分配稳定的项目 ID，并接管此前创建的所有内容。
+然后在项目目录（git 仓库）里运行 `octogent`。没有 hub 在运行时，它会启动 **hub**（一个后台服务器，在 `127.0.0.1:8787` 上服务所有项目）；接着注册项目，即创建带稳定项目 ID 的 `.octogent/` 脚手架；再打开项目页面 `http://127.0.0.1:8787/p/<slug>/`（设置了 `OCTOGENT_NO_OPEN=1` 时不打开）。`octogent init` 还会把 `.octogent` 加进 `.gitignore`。想让项目使用自己的服务器，改用 `octogent --standalone`。见[通过 hub 运行 Octogent](docs/zh-CN/guides/hub.md)。
 
 ## 环境要求
 
@@ -191,6 +192,7 @@ PTY 会话能在空闲宽限期内撑过浏览器刷新，但**不会**在 API �
 ## 文档
 
 - [用 Octogent 完成第一份工作](docs/zh-CN/guides/getting-work-done.md)
+- [通过 hub 运行 Octogent](docs/zh-CN/guides/hub.md)
 - [文档首页](docs/zh-CN/index.md)
 - [安装](docs/zh-CN/getting-started/installation.md)
 - [快速入门](docs/zh-CN/getting-started/quickstart.md)
@@ -204,7 +206,7 @@ PTY 会话能在空闲宽限期内撑过浏览器刷新，但**不会**在 API �
 - [文件系统布局](docs/zh-CN/reference/filesystem-layout.md)
 - [API 参考](docs/zh-CN/reference/api.md)
 - [实验性功能](docs/zh-CN/reference/experimental-features.md)
-- [以 systemd 用户服务运行](docs/zh-CN/reference/systemd.md)
+- [以 systemd 用户服务运行 hub](docs/zh-CN/reference/systemd.md)
 - [故障排查](docs/zh-CN/reference/troubleshooting.md)
 - [贡献指南](CONTRIBUTING.zh-CN.md)
 

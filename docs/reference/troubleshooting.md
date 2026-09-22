@@ -10,7 +10,7 @@ The hub keeps one log for every project, `~/.octogent/hub/logs/server.log`, with
 
 ## Port 8787 is taken by an old single-project server
 
-`octogent hub start`, or any command that starts the hub, fails with `port 8787 is taken by pid <pid>, a single-project Octogent server for <path>, not a hub`. The hub uses one fixed port so every CLI can find it, and a server started by bare `octogent` got there first. Either:
+`octogent`, `octogent hub start`, or any other command that starts the hub fails with `port 8787 is taken by pid <pid>, a single-project Octogent server for <path>, not a hub`. The hub uses one fixed port so every CLI can find it, and a single-project server got there first: one started with `octogent --standalone`, or by bare `octogent` before it defaulted to the hub. Either:
 
 - stop that server (Ctrl-C in its terminal, or `kill <pid>`) and start the hub again. Stopping it ends its running terminals, so check `octogent terminal list` in that project first. Until it stops, CLI commands in that project keep using it; afterwards they move to the hub on their own.
 - or leave it running and give the hub another port: set `OCTOGENT_HUB_PORT` (for example `9787`) in your shell profile, so the hub and every CLI agree on it.

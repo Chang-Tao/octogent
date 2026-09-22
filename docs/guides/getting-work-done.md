@@ -6,7 +6,8 @@ Before starting: install Octogent, sign in to `claude` or `codex`, and have a Gi
 
 ### 1. Start Octogent
 
-Run these two lines in the project directory and leave this window running.
+Run these two lines in the project directory.
+`octogent` starts the hub in the background if it is not running, registers the project, and opens its page, `http://127.0.0.1:8787/p/<slug>/`.
 The octoboss (big octopus) on the page is the project's coordination entry point.
 
 ```bash
@@ -18,8 +19,8 @@ Optional: commit the ignore rule that `init` adds to `.gitignore`.
 
 ### 2. Create a tentacle
 
-Open another command-line window in the same project directory.
-Create a tentacle (little octopus) to hold this work stream's background, todos, and handoff files.
+In the same project directory,
+create a tentacle (little octopus) to hold this work stream's background, todos, and handoff files.
 
 ```bash
 octogent tentacle create first-task --description "First dispatch, review, and merge"
@@ -89,33 +90,33 @@ Replace `first-worker` in examples with a current worker ID; Part 1 deleted it. 
 ### Before you start, and how to check startup
 
 - Requirements: Node.js 22+, pnpm 10+, Git, `curl`, and a signed-in agent; Linux also needs a `node-pty` toolchain, covered in the [installation guide](../getting-started/installation.md). Work from the project root, save changes, and configure your Git commit identity; worktrees include only committed versions.
-- `octogent init` creates `.octogent/` configuration and ignore rules; `octogent` starts the service, using a temporary state root and initialization card for uninitialized projects.
-- Ports start at `127.0.0.1:8787` and increment when occupied; `OCTOGENT_API_PORT` or `PORT` sets the starting point. Check startup output for the actual address; an initialized project's CLI reads it automatically.
-- Use `OCTOGENT_NO_OPEN=1` without a browser; redirect logs to the file created and printed by `mktemp` to investigate startup, hooks, and retries.
+- `octogent init` creates `.octogent/` configuration and ignore rules; `octogent` opens the project on the hub (one background process serving every registered project), starting the hub and registering the project when needed. See the [hub guide](hub.md).
+- The hub listens on `127.0.0.1:8787` (`OCTOGENT_HUB_PORT`) and never moves to another port; `octogent hub status` shows its address, build, and projects. The project's CLI finds it automatically.
+- Use `OCTOGENT_NO_OPEN=1` without a browser. The hub logs everything, verbose hook and retry summaries included, to `~/.octogent/hub/logs/server.log`, each line tagged with the project's slug; follow it to investigate startup, hooks, and retries.
 
 ```bash
 octogent init
-octogent_log=$(mktemp)
-printf 'Octogent log: %s\n' "$octogent_log"
-OCTOGENT_NO_OPEN=1 OCTOGENT_VERBOSE_LOGS=1 octogent >"$octogent_log" 2>&1 &
+OCTOGENT_NO_OPEN=1 octogent
+tail -f ~/.octogent/hub/logs/server.log
 ```
 
-Verify from another window; substitute the port from startup output. An empty list also means connection succeeded:
+Verify from another window. An empty list also means the connection succeeded:
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:8787/api/health
+curl --fail --silent --show-error http://127.0.0.1:8787/api/hub/health
 octogent terminal list
 ```
 
-For LAN access, use this startup method: it binds to `0.0.0.0` by default, overridable with `HOST`. The CLI prints access links containing an automatically generated token; alternatively, set a high-entropy `OCTOGENT_ACCESS_TOKEN` of at least 32 characters. Tokens control the project, so give logs containing them only to authorized users.
+For LAN access, start the hub with remote access and a high-entropy `OCTOGENT_ACCESS_TOKEN` of at least 32 characters (the hub never generates one). It binds to `0.0.0.0` by default, which `HOST` overrides. A hub that is already running must be stopped first, because it reads these only at start. Tokens control every project on the hub, so give logs containing them only to authorized users.
 
 ```bash
-OCTOGENT_NO_OPEN=1 OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
+octogent hub stop
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 OCTOGENT_ACCESS_TOKEN="$(openssl rand -hex 32)" octogent hub start
 ```
 
-Choose one startup method per project.
+Choose one server per project: the hub, or a single-project server from `octogent --standalone`, which binds from port `8787` upward and generates a LAN token for the session itself.
 
-With a hub running (one process serving every registered project), open `http://127.0.0.1:8787/` for an overview of all projects, with running and awaiting-review counts and a form to add one, or `http://127.0.0.1:8787/p/<slug>/` to go straight to one project; the switcher at the left of the top bar moves between them. A LAN link's `?token=` works on either address.
+`http://127.0.0.1:8787/` is an overview of all projects, with running and awaiting-review counts and a form to add one; `http://127.0.0.1:8787/p/<slug>/` goes straight to one project, and the switcher at the left of the top bar moves between them. A LAN link's `?token=` works on either address.
 
 ### The mental model in five sentences
 
@@ -284,12 +285,12 @@ Based on the 2026-09-05 through 09-08 DEIMv2 and DiveoDevOps trial records:
 - **Workers appear under the octoboss** → Missing `--tentacle-id` → Pass the ID every time; the CLI now includes a direct-reporting hint.
 - **`npm install` dependency errors** → This repository uses pnpm workspaces → Run `pnpm install` at the root; clean old dependencies using the [installation guide](../getting-started/installation.md). `npm install -g .` installs the global CLI.
 - **Claude commits but never awaits review** → Older versions treated unignored `.claude/` hooks as changes → Completion now ignores `.claude/settings.json`, and the installer adds it to Git `info/exclude`; check other uncommitted files.
-- **Tool records stop updating** → Hooks may not arrive → Start with `OCTOGENT_VERBOSE_LOGS=1`, look for `[Hook] Received hook`, and inspect the agent directory's `.claude/settings.json` or user-level `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`), plus sign-in and trust prompts.
+- **Tool records stop updating** → Hooks may not arrive → Look for `[Hook] Received hook` in `~/.octogent/hub/logs/server.log` (verbose summaries always go there), and inspect the agent directory's `.claude/settings.json` or user-level `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`), plus sign-in and trust prompts.
 - **Workers launched together stay silent** → The old fixed four-second delivery preceded input readiness → Now uses `SessionStart`, a 15-second fallback, and one retry. Check `reason=initial prompt not acknowledged` and retry logs; resend after confirming the task did not start.
 - **`channel list` is missing messages** → Checking before sending, or treating initial tasks and answers as messages → Confirm `send` succeeded and query the same service; messages from before restart are lost.
 - **Seeing `stalled` leads to duplicate dispatch** → Confusing inactivity with exit → Check the terminal, transcript, and `reason=`; tool calls and output now refresh activity, while silence can mean waiting for input.
 - **Closure five minutes after the first turn** → Old per-turn keep-alive release → Sessions now persist between turns by default; check `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1`. End deliberately with `terminal stop` or archive.
-- **Restart kills the wrong process or the service restarts itself** → Confusing worker PID, service PID, and parent process → Find the service PID in the global project directory's `state/runtime.json`; inspect it and its parent with `ps -o pid,ppid,args -p <service-pid>`. For systemd, follow the [service guide](../reference/systemd.md). Finish workers first; backend updates require a restart after rebuilding.
+- **Restart kills the wrong process or the service restarts itself** → Confusing worker PID, service PID, and parent process → `octogent hub status` prints the hub's PID (a `--standalone` server's is in the global project directory's `state/runtime.json`); inspect it and its parent with `ps -o pid,ppid,args -p <service-pid>`. Restart with `octogent hub restart`, which refuses while workers are live; for systemd, follow the [service guide](../reference/systemd.md). Finish workers first; backend updates require a restart after rebuilding.
 - **GPT-6 availability differs by account** → Different model lists → Use `--effort` for local-cache fallback and check `model=`; explicit `--model` requires account availability and skips tier fallback.
 
 ### Further reading
@@ -300,9 +301,9 @@ Based on the 2026-09-05 through 09-08 DEIMv2 and DiveoDevOps trial records:
 
 ### Complete headless coordinator example
 
-Run blocks in the same Bash or AI coordinator shell. Use a clean repository with `README.md` and a configured commit identity, both agents signed in, default state paths, and no API-address overrides; the project must have no service running yet.
+Run blocks in the same Bash or AI coordinator shell. Use a clean repository with `README.md` and a configured commit identity, both agents signed in, default state paths, and no API-address overrides; the project must have no `--standalone` server running.
 
-Block one: save logs, wait for readiness, create a tentacle, and dispatch two non-overlapping documentation tasks.
+Block one: open the project on the hub (the command returns once the hub answers), create a tentacle, and dispatch two non-overlapping documentation tasks.
 
 ```bash
 set -euo pipefail
@@ -314,28 +315,9 @@ test -n "$octogent_base"
 octogent init
 git add .gitignore
 git diff --cached --quiet || git commit -m "chore: ignore Octogent workspace"
-octogent_log=$(mktemp)
-nohup env OCTOGENT_NO_OPEN=1 OCTOGENT_VERBOSE_LOGS=1 octogent >"$octogent_log" 2>&1 < /dev/null &
-octogent_server_pid=$!
-printf 'Service PID: %s; log: %s\n' "$octogent_server_pid" "$octogent_log"
-octogent_project_id=$(node -p "JSON.parse(require('node:fs').readFileSync('.octogent/project.json', 'utf8')).projectId")
-octogent_state="$HOME/.octogent/projects/$octogent_project_id/state"
-octogent_ready=0
-for octogent_attempt in {1..30}; do
-  if test -f "$octogent_state/runtime.json"; then
-    octogent_api=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).apiBaseUrl" "$octogent_state/runtime.json")
-    octogent_metadata_pid=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).pid" "$octogent_state/runtime.json")
-    if test "$octogent_metadata_pid" = "$octogent_server_pid" && curl --fail --silent --show-error "$octogent_api/api/health"; then
-      octogent_ready=1
-      break
-    fi
-  fi
-  sleep 1
-done
-if test "$octogent_ready" != 1; then
-  cat "$octogent_log"
-  exit 1
-fi
+# Starts the hub if none runs and returns once it answers; it logs to ~/.octogent/hub/logs/server.log.
+OCTOGENT_NO_OPEN=1 octogent
+octogent hub status
 octogent terminal list
 octogent_batch="docs-batch-$(date +%s)-$$"
 octogent_claude="$octogent_batch-claude"
@@ -373,7 +355,7 @@ done
 git -C ".octogent/worktrees/$octogent_codex" check-ignore .octogent/project.json
 ```
 
-Run the final block after review passes; request corrections with `channel send` and recheck first if needed. Conflicts or failed checks stop execution and retain worktrees; the service and logs remain afterward.
+Run the final block after review passes; request corrections with `channel send` and recheck first if needed. Conflicts or failed checks stop execution and retain worktrees; the hub and its log remain afterward.
 
 ```bash
 test "$(git branch --show-current)" = "$octogent_base"

@@ -6,7 +6,8 @@
 
 ### 1. 启动 Octogent
 
-在项目目录运行下面两行，启动后保持这个窗口运行。
+在项目目录运行下面两行。
+`octogent` 会在 hub 没运行时把它启动到后台，注册项目，并打开项目页面 `http://127.0.0.1:8787/p/<slug>/`。
 网页里的 octoboss（大章鱼）是项目的总协调入口。
 
 ```bash
@@ -18,7 +19,7 @@ octogent
 
 ### 2. 建一个触手
 
-另开一个命令行窗口，进入同一项目目录。
+在同一项目目录中，
 创建一个触手（tentacle，也叫小章鱼），保存这条工作的背景、待办和交接文件。
 
 ```bash
@@ -89,33 +90,33 @@ octogent terminal delete first-worker --with-worktree
 ### 开始之前与启动检查
 
 - 需要 Node.js 22+、pnpm 10+、Git、`curl` 和已登录的代理；Linux 还需 `node-pty` 编译工具链，见[安装指南](../getting-started/installation.md)。在项目根目录操作，先保存改动、配置 Git 提交身份；工作树只带走已提交版本。
-- `octogent init` 创建 `.octogent/` 配置和忽略规则；`octogent` 启动服务，未初始化时使用临时状态根并显示初始化卡。
-- 默认从 `127.0.0.1:8787` 找空闲端口，遇占用递增；`OCTOGENT_API_PORT` 或 `PORT` 设置起点。看启动输出的实际地址，已初始化项目的 CLI 会自动读取它。
-- 无浏览器用 `OCTOGENT_NO_OPEN=1`；日志重定向到 `mktemp` 创建并打印的文件，便于追查启动、钩子和重试。
+- `octogent init` 创建 `.octogent/` 配置和忽略规则；`octogent` 在 hub（一个后台进程服务所有已登记项目）上打开项目，需要时启动 hub 并注册项目。见 [hub 指南](hub.md)。
+- hub 监听 `127.0.0.1:8787`（`OCTOGENT_HUB_PORT`），绝不换端口；`octogent hub status` 显示它的地址、构建和项目。项目里的 CLI 会自动找到它。
+- 无浏览器用 `OCTOGENT_NO_OPEN=1`。hub 把所有日志（包括详细的钩子与重试摘要）写入 `~/.octogent/hub/logs/server.log`，每行带项目 slug；追查启动、钩子和重试时跟踪这个文件。
 
 ```bash
 octogent init
-octogent_log=$(mktemp)
-printf 'Octogent log: %s\n' "$octogent_log"
-OCTOGENT_NO_OPEN=1 OCTOGENT_VERBOSE_LOGS=1 octogent >"$octogent_log" 2>&1 &
+OCTOGENT_NO_OPEN=1 octogent
+tail -f ~/.octogent/hub/logs/server.log
 ```
 
-另开窗口验证；端口按启动输出替换，空列表也表示连接成功：
+另开窗口验证，空列表也表示连接成功：
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:8787/api/health
+curl --fail --silent --show-error http://127.0.0.1:8787/api/hub/health
 octogent terminal list
 ```
 
-局域网用下面的启动方式，默认绑定 `0.0.0.0`，`HOST` 可覆盖；CLI 打印含自动生成令牌的访问链接，也可用至少 32 字符的高熵 `OCTOGENT_ACCESS_TOKEN`。令牌可控制项目，含令牌的日志仅给授权者。
+局域网访问时，用远程访问和至少 32 字符的高熵 `OCTOGENT_ACCESS_TOKEN` 启动 hub（hub 从不自动生成令牌）。默认绑定 `0.0.0.0`，`HOST` 可覆盖。已在运行的 hub 只在启动时读取这些变量，要先停掉。令牌可控制 hub 上的所有项目，含令牌的日志仅给授权者。
 
 ```bash
-OCTOGENT_NO_OPEN=1 OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
+octogent hub stop
+OCTOGENT_ALLOW_REMOTE_ACCESS=1 OCTOGENT_ACCESS_TOKEN="$(openssl rand -hex 32)" octogent hub start
 ```
 
-每个项目选一种启动方式。
+每个项目只用一个服务器：hub，或 `octogent --standalone` 启动的单项目服务器（从 `8787` 起找空闲端口，局域网令牌由它自行生成）。
 
-如果运行的是 hub（一个进程服务所有已登记项目），打开 `http://127.0.0.1:8787/` 查看全部项目总览（含运行中与待审阅计数，以及添加项目的表单），或打开 `http://127.0.0.1:8787/p/<slug>/` 直接进入某个项目；顶栏左侧的项目切换器可在项目间跳转。局域网链接里的 `?token=` 对这两种地址都有效。
+`http://127.0.0.1:8787/` 是全部项目总览（含运行中与待审阅计数，以及添加项目的表单）；`http://127.0.0.1:8787/p/<slug>/` 直接进入某个项目，顶栏左侧的项目切换器可在项目间跳转。局域网链接里的 `?token=` 对这两种地址都有效。
 
 ### 五句话理解分工
 
@@ -284,12 +285,12 @@ octogent terminal delete first-worker --with-worktree
 - **工人挂在大章鱼下** → 漏 `--tentacle-id` → 每次传 ID；CLI 已增加直属提示。
 - **`npm install` 报依赖错误** → 本仓库用 pnpm workspace → 根目录运行 `pnpm install`，旧依赖按[安装指南](../getting-started/installation.md)清理；`npm install -g .` 用于全局安装 CLI。
 - **Claude 提交后仍不进入待审阅** → 旧版把未忽略的 `.claude/` 钩子当作改动 → 当前完成检测忽略 `.claude/settings.json`，安装器将该文件加入 Git `info/exclude`；检查其他未提交文件。
-- **工具记录不更新** → 钩子可能未到 → 启动时开 `OCTOGENT_VERBOSE_LOGS=1`，看 `[Hook] Received hook`；检查代理目录 `.claude/settings.json` 或用户级 `$CODEX_HOME/hooks.json`（默认 `~/.codex/hooks.json`），以及登录、信任提示。
+- **工具记录不更新** → 钩子可能未到 → 在 `~/.octogent/hub/logs/server.log` 里找 `[Hook] Received hook`（详细摘要总会写入该日志）；检查代理目录 `.claude/settings.json` 或用户级 `$CODEX_HOME/hooks.json`（默认 `~/.codex/hooks.json`），以及登录、信任提示。
 - **同时创建的工人沉默** → 旧版四秒固定投递早于输入就绪 → 已改 `SessionStart`、15 秒兜底和一次重试；查 `reason=initial prompt not acknowledged`、重试日志，确认任务未开始后重发。
 - **`channel list` 少消息** → 先查后发，或把初始任务、回答当消息 → 确认 `send` 成功并查询同一服务；重启前的消息不保留。
 - **见 `stalled` 就重复派活** → 把无活动当退出 → 查终端、转录和 `reason=`；当前工具调用和输出均刷新活动，静默也可能在等输入。
 - **首轮后五分钟关闭** → 旧版每轮释放保活 → 当前默认跨回合保持，检查 `OCTOGENT_TERMINAL_RELEASE_AFTER_TURN=1`；结束时主动 `terminal stop` 或归档。
-- **重启杀错进程或服务自行重启** → 工人 PID、服务 PID、父进程混淆 → 从全局项目目录的 `state/runtime.json` 找服务 PID，用 `ps -o pid,ppid,args -p <服务PID>` 查它和父 PID；systemd 按[服务指南](../reference/systemd.md)操作。先收尾工人；后端更新构建后需重启生效。
+- **重启杀错进程或服务自行重启** → 工人 PID、服务 PID、父进程混淆 → `octogent hub status` 打印 hub 的 PID（`--standalone` 服务器的 PID 在全局项目目录的 `state/runtime.json`），用 `ps -o pid,ppid,args -p <服务PID>` 查它和父 PID。用 `octogent hub restart` 重启，有活跃工人时它会拒绝；systemd 按[服务指南](../reference/systemd.md)操作。先收尾工人；后端更新构建后需重启生效。
 - **账号间 GPT-6 可用性不同** → 模型列表不同 → 用 `--effort` 按本地缓存回退、查 `model=`；显式 `--model` 需账号可用，不走档位回退。
 
 ### 继续查阅
@@ -300,9 +301,9 @@ octogent terminal delete first-worker --with-worktree
 
 ### 完整的无浏览器协调者示例
 
-人在 Bash 或 AI 协调者的同一个 shell 中逐段执行。准备有 `README.md`、提交身份已配置的干净仓库，登录两个代理，使用默认状态目录且无 API 地址覆盖；项目尚未启动服务。
+人在 Bash 或 AI 协调者的同一个 shell 中逐段执行。准备有 `README.md`、提交身份已配置的干净仓库，登录两个代理，使用默认状态目录且无 API 地址覆盖；项目没有在运行的 `--standalone` 服务器。
 
-第一段：保存日志、等服务就绪、建触手、派两个互不重叠的文档任务。
+第一段：在 hub 上打开项目（hub 响应后命令即返回）、建触手、派两个互不重叠的文档任务。
 
 ```bash
 set -euo pipefail
@@ -314,28 +315,9 @@ test -n "$octogent_base"
 octogent init
 git add .gitignore
 git diff --cached --quiet || git commit -m "chore: ignore Octogent workspace"
-octogent_log=$(mktemp)
-nohup env OCTOGENT_NO_OPEN=1 OCTOGENT_VERBOSE_LOGS=1 octogent >"$octogent_log" 2>&1 < /dev/null &
-octogent_server_pid=$!
-printf 'Service PID: %s; log: %s\n' "$octogent_server_pid" "$octogent_log"
-octogent_project_id=$(node -p "JSON.parse(require('node:fs').readFileSync('.octogent/project.json', 'utf8')).projectId")
-octogent_state="$HOME/.octogent/projects/$octogent_project_id/state"
-octogent_ready=0
-for octogent_attempt in {1..30}; do
-  if test -f "$octogent_state/runtime.json"; then
-    octogent_api=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).apiBaseUrl" "$octogent_state/runtime.json")
-    octogent_metadata_pid=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).pid" "$octogent_state/runtime.json")
-    if test "$octogent_metadata_pid" = "$octogent_server_pid" && curl --fail --silent --show-error "$octogent_api/api/health"; then
-      octogent_ready=1
-      break
-    fi
-  fi
-  sleep 1
-done
-if test "$octogent_ready" != 1; then
-  cat "$octogent_log"
-  exit 1
-fi
+# 没有 hub 时启动它，等它响应后返回；日志在 ~/.octogent/hub/logs/server.log。
+OCTOGENT_NO_OPEN=1 octogent
+octogent hub status
 octogent terminal list
 octogent_batch="docs-batch-$(date +%s)-$$"
 octogent_claude="$octogent_batch-claude"
@@ -373,7 +355,7 @@ done
 git -C ".octogent/worktrees/$octogent_codex" check-ignore .octogent/project.json
 ```
 
-审阅通过后执行最后一段；有问题先 `channel send` 修正并复查。冲突或检查失败会停止执行、保留工作树；结束后服务和日志保留。
+审阅通过后执行最后一段；有问题先 `channel send` 修正并复查。冲突或检查失败会停止执行、保留工作树；结束后 hub 和它的日志保留。
 
 ```bash
 test "$(git branch --show-current)" = "$octogent_base"

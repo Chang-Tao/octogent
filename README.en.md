@@ -75,7 +75,8 @@ This repo is a personal exploration of what an AI coding environment might look 
 - **Opens on the flow progress view** — a pseudo-3D layered spread of the whole fleet, with hover cards narrating each node's role and its previous/current/next step
 - **Auto-archives finished terminals after a retention period** (`OCTOGENT_TERMINAL_RETENTION_HOURS`, default 72h) and reclaims merged worktrees (`octogent worktree gc`) — unmerged work is never deleted by any automated path
 - **Exposes `GET /api/health`** for daemon and monitor probes
-- **Runs as a systemd user service** so Octogent can stay up in the background
+- **Serves every project from one hub**: one background server on `127.0.0.1:8787`, each project at `/p/<slug>/`, with an overview at `/`
+- **Runs the hub as a systemd user service** (`octogent hub install-service`) so Octogent can stay up in the background
 - **Lets you switch the Claude usage source** via `OCTOGENT_CLAUDE_USAGE_SOURCE` (auto/oauth/cli/off, OAuth first by default)
 
 A **tentacle** is a folder under `.octogent/tentacles/<tentacle-id>/` that holds agent-readable markdown such as `CONTEXT.md`, `todo.md`, and any extra notes needed for that slice of the codebase.
@@ -170,7 +171,7 @@ Do not run `npm install` inside the clone. Full steps and troubleshooting: [inst
 
 </details>
 
-On first run, **Octogent** picks an available local API port starting at `8787` and opens the UI unless `OCTOGENT_NO_OPEN=1` is set. In a directory that has not been initialized yet it starts against a temporary state root and prompts you to run `octogent init`, which creates the local `.octogent/` scaffold, assigns a stable project ID, and adopts anything created beforehand.
+Then run `octogent` in a project directory (a git repository). It starts the **hub**, one background server for every project on `127.0.0.1:8787`, if none is running; registers the project, which creates its `.octogent/` scaffold with a stable project ID; and opens the project's page at `http://127.0.0.1:8787/p/<slug>/` unless `OCTOGENT_NO_OPEN=1` is set. `octogent init` additionally adds `.octogent` to `.gitignore`. `octogent --standalone` runs a server of the project's own instead. See [Running Octogent through the hub](docs/guides/hub.md).
 
 ## Requirements
 
@@ -193,6 +194,7 @@ PTY sessions survive browser reloads during the idle grace period, but they do *
 ## Docs
 
 - [Get Work Done](docs/guides/getting-work-done.md)
+- [Running Octogent Through the Hub](docs/guides/hub.md)
 - [Docs Home](docs/index.md)
 - [Installation](docs/getting-started/installation.md)
 - [Quickstart](docs/getting-started/quickstart.md)
@@ -206,7 +208,7 @@ PTY sessions survive browser reloads during the idle grace period, but they do *
 - [Filesystem Layout](docs/reference/filesystem-layout.md)
 - [API Reference](docs/reference/api.md)
 - [Experimental Features](docs/reference/experimental-features.md)
-- [Running as a systemd User Service](docs/reference/systemd.md)
+- [Running the Hub as a systemd User Service](docs/reference/systemd.md)
 - [Troubleshooting](docs/reference/troubleshooting.md)
 - [Contributing](CONTRIBUTING.md)
 
