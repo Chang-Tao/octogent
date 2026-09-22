@@ -115,6 +115,8 @@ OCTOGENT_NO_OPEN=1 OCTOGENT_ALLOW_REMOTE_ACCESS=1 octogent
 
 Choose one startup method per project.
 
+With a hub running (one process serving every registered project), open `http://127.0.0.1:8787/` for an overview of all projects, with running and awaiting-review counts and a form to add one, or `http://127.0.0.1:8787/p/<slug>/` to go straight to one project; the switcher at the left of the top bar moves between them. A LAN link's `?token=` works on either address.
+
 ### The mental model in five sentences
 
 1. A person or AI coordinator uses the octoboss (big octopus) to assign and review work: tentacles group it, terminals execute it.

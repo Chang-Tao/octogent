@@ -32,13 +32,17 @@ import { ActiveAgentsSidebar } from "./components/ActiveAgentsSidebar";
 import { ConsolePrimaryNav } from "./components/ConsolePrimaryNav";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PrimaryViewRouter } from "./components/PrimaryViewRouter";
+import { ProjectSwitcher } from "./components/ProjectSwitcher";
 import { RuntimeStatusStrip } from "./components/RuntimeStatusStrip";
 import { SidebarActionPanel } from "./components/SidebarActionPanel";
 import { TelemetryTape } from "./components/TelemetryTape";
 import { HttpTerminalSnapshotReader } from "./runtime/HttpTerminalSnapshotReader";
 import {
+  buildDeckTentacleSwarmUrl,
+  buildDeckTentaclesUrl,
   buildTerminalEventsSocketUrl,
   buildTerminalSnapshotsUrl,
+  buildTerminalsUrl,
 } from "./runtime/runtimeEndpoints";
 
 // Views that own the full canvas and never show the agents sidebar.
@@ -51,7 +55,12 @@ const SIDEBARLESS_NAV: ReadonlySet<number> = new Set([
   NAV_INDEX.settings,
 ]);
 
-export const App = () => {
+type AppProps = {
+  /** Set on a hub project page (`/p/<key>/`); absent when a single-project server serves the root. */
+  projectKey?: string;
+};
+
+export const App = ({ projectKey }: AppProps = {}) => {
   const [terminals, setTerminals] = useState<TerminalView>([]);
   // Bumped when the server says deck content changed, so a page that never
   // made the change (a tentacle created from the CLI) still refetches.
@@ -472,6 +481,7 @@ export const App = () => {
         <ConsolePrimaryNav
           activePrimaryNav={activePrimaryNav}
           onPrimaryNavChange={setActivePrimaryNav}
+          projectSwitcher={projectKey ? <ProjectSwitcher projectKey={projectKey} /> : undefined}
         />
 
         <section
@@ -575,7 +585,7 @@ export const App = () => {
                   runningWorkspaceSetupStepId,
                   onRunWorkspaceSetupStep: handleRunWorkspaceSetupStep,
                   onLaunchWorkspaceSetupPlanner: async () => {
-                    const response = await fetch("/api/terminals", {
+                    const response = await fetch(buildTerminalsUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -608,7 +618,7 @@ export const App = () => {
                     return await createTerminal("worktree", undefined, OCTOBOSS_ID);
                   },
                   onCreateTentacle: async () => {
-                    const response = await fetch("/api/deck/tentacles", {
+                    const response = await fetch(buildDeckTentaclesUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ name: "", description: "" }),
@@ -617,18 +627,15 @@ export const App = () => {
                     await refreshColumns();
                   },
                   onSpawnSwarm: async (tentacleId, workspaceMode) => {
-                    const response = await fetch(
-                      `/api/deck/tentacles/${encodeURIComponent(tentacleId)}/swarm`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ workspaceMode }),
-                      },
-                    );
+                    const response = await fetch(buildDeckTentacleSwarmUrl(tentacleId), {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ workspaceMode }),
+                    });
                     if (!response.ok) return;
                   },
                   onOctobossAction: async (action) => {
-                    const response = await fetch("/api/terminals", {
+                    const response = await fetch(buildTerminalsUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -645,7 +652,7 @@ export const App = () => {
                       : undefined;
                   },
                   onTentacleAction: async (tentacleId, action) => {
-                    const response = await fetch("/api/terminals", {
+                    const response = await fetch(buildTerminalsUrl(), {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({

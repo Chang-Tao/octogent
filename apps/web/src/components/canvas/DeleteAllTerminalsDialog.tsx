@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { GraphNode } from "../../app/canvas/types";
 import { useT } from "../../app/providers/LocaleProvider";
 import type { TerminalView } from "../../app/types";
+import { buildConversationSessionUrl, buildTerminalUrl } from "../../runtime/runtimeEndpoints";
 import { ActionButton } from "../ui/ActionButton";
 
 type DeleteAllTerminalsDialogProps = {
@@ -61,7 +62,7 @@ export const DeleteAllTerminalsDialog = ({
 
     for (const terminal of activeTargets) {
       try {
-        const response = await fetch(`/api/terminals/${encodeURIComponent(terminal.terminalId)}`, {
+        const response = await fetch(buildTerminalUrl(terminal.terminalId), {
           method: "DELETE",
           headers: { Accept: "application/json" },
         });
@@ -86,7 +87,7 @@ export const DeleteAllTerminalsDialog = ({
 
     for (const sessionId of inactiveSessionIds) {
       try {
-        const response = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}`, {
+        const response = await fetch(buildConversationSessionUrl(sessionId), {
           method: "DELETE",
           headers: { Accept: "application/json" },
         });
