@@ -1124,6 +1124,23 @@ export const createTerminalRuntime = ({
       };
     },
 
+    /** Newest sign of life across the project's terminals, for project listings. */
+    readLastActivityAt(): string | null {
+      let latest: string | null = null;
+      for (const terminal of terminals.values()) {
+        for (const stamp of [
+          terminal.lastActiveAt,
+          terminal.lifecycleUpdatedAt,
+          terminal.createdAt,
+        ]) {
+          if (stamp && (latest === null || stamp > latest)) {
+            latest = stamp;
+          }
+        }
+      }
+      return latest;
+    },
+
     listConversationSessions() {
       return listConversationSessions(transcriptDirectoryPath);
     },
