@@ -63,6 +63,7 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
 - `monitor-config.json`
 - `monitor-cache.json`
 - `code-intel.jsonl`
+- `runtime.json`
 
 `tentacles.json` 虽然沿用了历史名称，实际是终端注册表。它保存终端记录、生命周期状态、UI 状态、父子关联、工作区模式、工作树 ID 和显示名。
 
@@ -71,6 +72,29 @@ Deck 也会为触手写入 UI 元数据，但不会写进这些 markdown 文件�
 `transcripts/*.jsonl` 独立于 PTY 回滚缓冲保存对话转录事件。回滚缓冲在内存中且有上限；转录会持久化。
 
 `logs/server.log` 记录服务启动信息、运行时摘要和未捕获错误。文件达到 5 MB 时轮转并保留三代；可用 `OCTOGENT_SERVER_LOG` 覆盖或禁用此位置。
+
+`runtime.json` 在项目的单项目服务器运行期间记录它的地址和 pid。该进程存活且能响应时，项目里的 CLI 命令优先用它，而不是 hub。
+
+## 注册表与 hub 文件
+
+机器级文件与各项目目录并列：
+
+```text
+~/.octogent/
+  projects.json
+  hub.json
+  hub.lock
+  hub/
+    logs/
+      server.log
+      daemon-stderr.log
+  projects/<project-id>/
+```
+
+- `projects.json` 是项目注册表。每个条目有 `id`、`name`、`path`、`createdAt`、`lastOpenedAt`，以及两个供 hub 使用的字段：`slug`，项目在 hub 地址（`/p/<slug>/`）中的键，在整个注册表内唯一，旧文件加载时自动补齐；`aliases`，项目改名前用过的 slug，保留下来让旧链接继续可用，且永不分配给别的项目。该文件先写到临时文件名再改名替换，读取方不会读到写了一半的内容。
+- `hub.json` 描述运行中的 hub：`{ apiBaseUrl, host, port, pid, startedAt, version, commit?, builtAt? }`。`commit` 取自 `OCTOGENT_BUILD_COMMIT`，`builtAt` 是 `dist/api/cli.js` 的修改时间；CLI 用它们与自身构建对比，以提示构建不一致。hub 开始监听后写入该文件，关闭时删除。除非其中的 pid 存活且 `GET /api/hub/health` 以同一 pid 响应，CLI 都视其为过期。
+- `hub.lock` 只在某个 CLI 正在启动 hub 时存在，保证并发的 CLI 只启动一个 hub。它以独占方式创建，记录启动者的 pid，60 秒后或该 pid 退出后即视为过期。
+- `hub/logs/server.log` 是 hub 的服务日志：所有项目共用一个文件，每行带 `[<slug>]` 标记，轮转方式与项目日志相同。`daemon-stderr.log` 保存后台 hub 最近一次启动时的 stderr（日志开始前或服务日志之外打印的内容，例如加载时崩溃）。
 
 ## 提示词存储
 

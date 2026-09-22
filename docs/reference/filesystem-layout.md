@@ -63,6 +63,7 @@ Notable files under `state/`:
 - `monitor-config.json`
 - `monitor-cache.json`
 - `code-intel.jsonl`
+- `runtime.json`
 
 `tentacles.json` is the terminal registry despite the historical name. It stores terminal records, lifecycle state, UI state, parent-child links, workspace mode, worktree IDs, and display names.
 
@@ -71,6 +72,29 @@ Notable files under `state/`:
 `transcripts/*.jsonl` stores conversation transcript events separately from PTY scrollback. Scrollback is in memory and bounded; transcripts are persisted.
 
 `logs/server.log` records server startup facts, runtime summaries, and uncaught errors. It rotates at 5 MB and keeps three generations. `OCTOGENT_SERVER_LOG` can override or disable this location.
+
+`runtime.json` holds the address and pid of the project's single-project server while it runs. CLI commands in the project use it ahead of the hub when that process is alive and answers.
+
+## Registry and hub files
+
+Machine-wide files sit next to the per-project directories:
+
+```text
+~/.octogent/
+  projects.json
+  hub.json
+  hub.lock
+  hub/
+    logs/
+      server.log
+      daemon-stderr.log
+  projects/<project-id>/
+```
+
+- `projects.json` is the project registry. Each entry has `id`, `name`, `path`, `createdAt`, `lastOpenedAt`, and two fields for the hub: `slug`, the project's key in its hub address (`/p/<slug>/`), unique across the registry and backfilled on load for older files; and `aliases`, the slugs it answered to before a rename, kept so old links still resolve and never handed to another project. The file is written to a temporary name and renamed into place, so a reader never sees half of it.
+- `hub.json` describes the running hub: `{ apiBaseUrl, host, port, pid, startedAt, version, commit?, builtAt? }`. `commit` comes from `OCTOGENT_BUILD_COMMIT` and `builtAt` is the mtime of `dist/api/cli.js`; CLIs compare them with their own build to warn about drift. The hub writes the file once it listens and removes it on shutdown. A CLI treats it as stale unless its pid is alive and `GET /api/hub/health` answers with that pid.
+- `hub.lock` exists only while a CLI is starting the hub, so concurrent CLIs start one hub. It is created exclusively, holds the starter's pid, and counts as stale after 60 seconds or once that pid has exited.
+- `hub/logs/server.log` is the hub's server log: one file for every project, each line tagged `[<slug>]`, rotated like a project's log. `daemon-stderr.log` holds a detached hub's stderr from its latest start (whatever it printed before or outside the server log, such as a crash while loading).
 
 ## Prompt storage
 

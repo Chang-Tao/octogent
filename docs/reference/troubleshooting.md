@@ -6,6 +6,23 @@ Run `octogent logs` from the project directory to read the persistent server log
 
 Set `OCTOGENT_SERVER_LOG=<path>` before startup to use another location, or `OCTOGENT_SERVER_LOG=off` to disable it. Access tokens in LAN URLs are masked in the file, and hook request bodies are not recorded.
 
+The hub keeps one log for every project, `~/.octogent/hub/logs/server.log`, with each line tagged `[<slug>]`; `octogent hub status` prints its path.
+
+## Port 8787 is taken by an old single-project server
+
+`octogent hub start`, or any command that starts the hub, fails with `port 8787 is taken by pid <pid>, a single-project Octogent server for <path>, not a hub`. The hub uses one fixed port so every CLI can find it, and a server started by bare `octogent` got there first. Either:
+
+- stop that server (Ctrl-C in its terminal, or `kill <pid>`) and start the hub again. Stopping it ends its running terminals, so check `octogent terminal list` in that project first. Until it stops, CLI commands in that project keep using it; afterwards they move to the hub on their own.
+- or leave it running and give the hub another port: set `OCTOGENT_HUB_PORT` (for example `9787`) in your shell profile, so the hub and every CLI agree on it.
+
+When the message says the pid is unknown, the port belongs to something that is not Octogent; `lsof -i :8787` or `ss -ltnp 'sport = :8787'` shows what.
+
+## The hub is running an older build
+
+Commands print `` Warning: the hub is running an older build (hub …, CLI …); `octogent hub restart` when workers are idle. `` after Octogent was upgraded or rebuilt while the hub kept running: the hub still runs the code it loaded when it started. Most things work, but fixes and routes from the new build are missing until it restarts. Run `octogent hub restart` once `octogent hub status` shows no terminals running or awaiting review. Restart refuses while there are some, since they would die with the hub, and lists them; `--force` restarts anyway.
+
+"A different build" instead of "an older build" means the CLI and the hub come from different installs or commits, for example a global install next to a development checkout; check which `octogent` is first on your `PATH`. Workers never print this warning (their CLI goes straight to `OCTOGENT_API_BASE`), so it does not prompt an agent to restart the hub on its own.
+
 ## `pnpm test` fails because of browser APIs
 
 Make sure the workspace dependencies are installed from the repo root:

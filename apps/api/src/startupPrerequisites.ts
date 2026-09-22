@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
 
+import { logError, logWarn } from "./logging";
+
 export type StartupPrerequisiteSeverity = "error" | "warning";
 
 export type StartupPrerequisiteIssue = {
@@ -147,4 +149,24 @@ export const formatStartupPrerequisiteReport = (
   }
 
   return lines;
+};
+
+/** Logs the report the way every server start does; false when startup must stop. */
+export const logStartupPrerequisites = (
+  locale: Locale,
+  report: StartupPrerequisiteReport = collectStartupPrerequisiteReport(),
+): boolean => {
+  const lines = formatStartupPrerequisiteReport(report, locale);
+  if (lines.length === 0) {
+    return true;
+  }
+  const failed = report.errors.length > 0;
+  for (const line of lines) {
+    (failed ? logError : logWarn)(line);
+  }
+  if (failed) {
+    return false;
+  }
+  logWarn("");
+  return true;
 };

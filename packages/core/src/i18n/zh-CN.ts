@@ -99,6 +99,69 @@ export const zhCN: TranslationMap = {
   "cli.setupAgents.missingSource":
     "错误：在 {path} 找不到 skill 源文件。请在 Octogent 仓库里运行 `pnpm build`。",
   "cli.empty.projects": "尚未注册任何项目。在项目目录中运行 `octogent` 或 `octogent init`。",
+  // ── Hub ──────────────────────────────────────────────
+  "cli.hub.running": "Octogent hub 正在运行",
+  "cli.hub.alreadyRunning": "hub 已在 {url} 运行（pid {pid}）。",
+  "cli.hub.started": "hub 已在 {url} 运行（pid {pid}）。",
+  "cli.hub.autostarting": "没有运行中的 hub，正在端口 {port} 上启动…",
+  "cli.hub.waitingForStart": "另一个 octogent 命令正在启动 hub，等待中…",
+  "cli.hub.lockTimeout":
+    "错误：等待 hub 启动超时。如果没有 octogent 命令正在启动它，删除 {lock} 后重试。",
+  "cli.hub.startExited": "错误：hub 在启动过程中退出（退出码 {code}）。请查看 {log}。",
+  "cli.hub.startTimeout": "错误：hub 在 {seconds} 秒内没有响应，可能仍在启动。请查看 {log}。",
+  "cli.hub.startFailed": "错误：无法启动 hub。请查看 {log}。",
+  "cli.hub.prerequisitesFailed": "错误：缺少上面列出的工具，hub 无法启动。",
+  "cli.hub.bindFailed": "错误：hub 无法监听端口 {port}：{reason}",
+  "cli.hub.portTaken":
+    "错误：端口 {port} 被 pid {pid} 占用，它是 {workspace} 的单项目 Octogent 服务器，不是 hub。停止该服务器（或把 OCTOGENT_HUB_PORT 设为其他端口）后再启动 hub。",
+  "cli.hub.portTakenUnknown":
+    "错误：端口 {port} 被一个不是 Octogent hub 的进程占用（pid 未知，可用 lsof 或 ss 查看）。停止它，或把 OCTOGENT_HUB_PORT 设为其他端口。",
+  "cli.hub.portHeldByOrphanHub":
+    "错误：已有 hub（pid {pid}）在端口 {port} 上服务，但 ~/.octogent/hub.json 没有记录它。停止该进程后再启动 hub。",
+  "cli.hub.notRunning": "没有运行中的 hub。用 `octogent hub start` 启动。",
+  "cli.hub.staleRemoved": "hub 并未运行；已删除过期的 hub.json。",
+  "cli.hub.unknownProcess":
+    "错误：hub.json 中的 pid {pid} 仍存活，但不以 hub 身份响应，因此没有向它发信号。如果它是卡死的 hub，请手动结束它。",
+  "cli.hub.stopping": "正在停止 hub（pid {pid}）…",
+  "cli.hub.killed": "hub 在 {seconds} 秒内没有退出，已发送 SIGKILL。",
+  "cli.hub.stopped": "hub 已停止。",
+  "cli.hub.restartBusy": "拒绝重启：以下终端会被终止。等它们结束，或加 --force。",
+  "cli.hub.restartForced": "仍然重启（--force）；以下终端会被终止：",
+  "cli.hub.restartUnknownBusy": "错误：无法列出 hub 的终端来确认它们空闲。加 --force 可强制重启。",
+  "cli.hub.status.hub": "Hub：",
+  "cli.hub.status.answering": "正常响应",
+  "cli.hub.status.notAnswering": "无响应",
+  "cli.hub.status.pid": "PID：",
+  "cli.hub.status.started": "启动于：",
+  "cli.hub.status.build": "构建：",
+  "cli.hub.status.buildLine": "hub {hub} · CLI {cli}",
+  "cli.hub.status.log": "日志：",
+  "cli.hub.status.projects": "项目：",
+  "cli.hub.status.noProjects": "（尚未注册）",
+  "cli.hub.status.loaded": "已加载，{running} 个运行中，{review} 个待审阅",
+  "cli.hub.status.notLoaded": "未加载",
+  "cli.hub.unknownProject":
+    "错误：没有已注册的项目匹配 --project {key}。`octogent projects` 会列出它们。",
+  "cli.hub.projectFlagEmpty": "错误：--project 需要项目的 slug 或 id。",
+  "cli.hub.notAProject":
+    "错误：{path} 不在任何已注册项目或 git 仓库内。请在项目中运行命令、传入 --project <slug>，或先在此运行 `octogent init`。",
+  "cli.hub.autostartDisabled":
+    "错误：没有运行中的 hub，且 OCTOGENT_NO_AUTOSTART=1 阻止了自动启动。用 `octogent hub start` 启动它，或在项目中运行 `octogent` 使用单项目服务器。",
+  "cli.hub.registered": "已将 {path} 注册到 hub，slug 为 {slug}。",
+  "cli.hub.registerFailed": "错误：无法将 {path} 注册到 hub：{reason}",
+  "cli.hub.bareServing": "hub 已在服务这个项目：{url}",
+  "cli.hub.bareUseHub": "- 使用 hub：打开该地址；在这里运行的 octogent 命令已经会连到它。",
+  "cli.hub.bareStandalone": "- 或运行 `octogent --standalone`，像以前一样启动独立的单项目服务器。",
+  "cli.help.hub":
+    "octogent hub start [--foreground]    启动 hub：一个服务器服务所有已注册项目\n  octogent hub status                  显示 hub 的地址、构建和项目（无 hub 响应时退出码 1）\n  octogent hub stop                    停止 hub\n  octogent hub restart [--force]       重启 hub；有终端在运行时拒绝，除非加 --force",
+  "cli.help.standalone":
+    "octogent --standalone                即使 hub 在服务该项目，也启动单项目服务器",
+  "cli.help.project":
+    "--project <slug|id>                  用于以下命令：指定已注册的项目，而不是当前目录",
+  "cli.hub.driftOlder":
+    "警告：hub 运行的是较旧的构建（hub {hub}，CLI {cli}）；等 worker 空闲时执行 `octogent hub restart`。",
+  "cli.hub.driftDifferent":
+    "警告：hub 运行的构建与 CLI 不同（hub {hub}，CLI {cli}）；等 worker 空闲时执行 `octogent hub restart`。",
   "cli.usage": `用法：
   octogent                             在当前项目中启动仪表盘
   octogent init [项目名称]              显式初始化当前目录
