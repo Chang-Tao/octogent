@@ -602,6 +602,24 @@ describe("createApiServer", () => {
     await expect(response.json()).resolves.toEqual([]);
   });
 
+  it("writes Claude hooks against the unprefixed server base in single-project mode", async () => {
+    const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-hook-base-test-"));
+    temporaryDirectories.push(workspaceCwd);
+    const baseUrl = await startServer({ workspaceCwd });
+
+    const created = await fetch(`${baseUrl}/api/terminals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceMode: "shared" }),
+    });
+    expect(created.status).toBe(201);
+
+    const settings = readFileSync(join(workspaceCwd, ".claude", "settings.json"), "utf8");
+    expect(settings).toContain(`"${baseUrl}/api/hooks/session-start?octogent_session=`);
+    expect(settings).toContain(`"url": "${baseUrl}/api/hooks/pre-tool-use"`);
+    expect(settings).not.toContain("/api/p/");
+  });
+
   it("returns session summaries for GET /api/conversations", async () => {
     const workspaceCwd = mkdtempSync(join(tmpdir(), "octogent-api-test-"));
     temporaryDirectories.push(workspaceCwd);

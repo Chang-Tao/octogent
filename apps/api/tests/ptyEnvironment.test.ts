@@ -373,3 +373,40 @@ describe("ensureProjectEnvTemplate", () => {
     expect(readFileSync(envPath(workspace), "utf8")).toBe("MINE=1\n");
   });
 });
+
+describe("createShellEnvironment under the hub", () => {
+  it("tells the in-worker CLI which hub project and base it belongs to", () => {
+    const env = createShellEnvironment({
+      octogentSessionId: "terminal-1",
+      apiBaseUrl: "http://127.0.0.1:8787/api/p/project-a",
+      projectId: "project-a",
+      sourceEnv: SERVER_ENV,
+    });
+
+    expect(env.OCTOGENT_API_BASE).toBe("http://127.0.0.1:8787/api/p/project-a");
+    expect(env.OCTOGENT_PROJECT_ID).toBe("project-a");
+  });
+
+  it("never lets the server's own project id or API origin reach agents", () => {
+    // A server launched from inside a hub worker must not hand that worker's
+    // project to its own agents, and a dev shell's OCTOGENT_API_ORIGIN would
+    // send the worker's CLI to the hub root instead of its project.
+    const workspace = createWorkspace();
+    writeFileSync(join(workspace, ".octogent", "env"), "OCTOGENT_PROJECT_ID=from-file\n");
+
+    const env = createShellEnvironment({
+      apiBaseUrl: "http://127.0.0.1:8787/api/p/project-a",
+      workspaceCwd: workspace,
+      inheritedEnv: { OCTOGENT_API_ORIGIN: "http://127.0.0.1:8787" },
+      sourceEnv: {
+        ...SERVER_ENV,
+        OCTOGENT_PROJECT_ID: "outer-project",
+        OCTOGENT_API_ORIGIN: "http://127.0.0.1:8787",
+      },
+    });
+
+    expect(env.OCTOGENT_PROJECT_ID).toBeUndefined();
+    expect(env.OCTOGENT_API_ORIGIN).toBeUndefined();
+    expect(env.OCTOGENT_API_BASE).toBe("http://127.0.0.1:8787/api/p/project-a");
+  });
+});

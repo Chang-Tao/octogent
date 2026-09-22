@@ -56,6 +56,7 @@ import {
   type PersistedTerminal,
   type PersistedUiState,
   RuntimeInputError,
+  SessionLimitError,
   type TentacleWorkspaceMode,
   type TerminalAgentProvider,
   type TerminalLifecycleState,
@@ -75,7 +76,7 @@ export type {
   TentacleWorkspaceMode,
 } from "./terminalRuntime/types";
 export { isTerminalAgentProvider, isTerminalCompletionSoundId } from "./terminalRuntime/types";
-export { RuntimeInputError } from "./terminalRuntime/types";
+export { RuntimeInputError, SessionLimitError } from "./terminalRuntime/types";
 
 export const MAX_CHILDREN_PER_PARENT = 9;
 
@@ -85,6 +86,8 @@ export const createTerminalRuntime = ({
   gitClient = createDefaultGitClient(),
   getApiBaseUrl = () => process.env.OCTOGENT_API_ORIGIN ?? "http://127.0.0.1:8787",
   maxConcurrentSessions,
+  projectId,
+  checkSessionAdmission,
 }: CreateTerminalRuntimeOptions) => {
   const stateDir = projectStateDir ?? join(workspaceCwd, ".octogent");
   const sessions = new Map<string, TerminalSession>();
@@ -688,6 +691,8 @@ export const createTerminalRuntime = ({
     ptyLogDir,
     transcriptDirectoryPath,
     maxConcurrentSessions: configuredMaxConcurrentSessions,
+    ...(projectId ? { projectId } : {}),
+    ...(checkSessionAdmission ? { checkSessionAdmission } : {}),
     sessionIdleGraceMs: resolveSessionIdleGraceMs(process.env.OCTOGENT_TERMINAL_IDLE_GRACE_MS),
     onStateChange: broadcastTerminalStateChanged,
     onOutputActivity: (terminalId) => {
@@ -996,6 +1001,10 @@ export const createTerminalRuntime = ({
           `Terminal session limit reached (${capacity.max}). Close an existing terminal session or increase OCTOGENT_MAX_TERMINAL_SESSIONS.`,
         );
       }
+      const refusal = checkSessionAdmission?.();
+      if (refusal) {
+        throw new SessionLimitError(refusal);
+      }
     }
 
     // Allow explicit tentacleId so multiple terminals can share a tentacle context (e.g. swarm workers).
@@ -1134,6 +1143,23 @@ export const createTerminalRuntime = ({
         terminals: terminalCounts,
         terminalEventClients: terminalEventClients.size,
       };
+    },
+
+    /** Newest sign of life across the project's terminals, for project listings. */
+    readLastActivityAt(): string | null {
+      let latest: string | null = null;
+      for (const terminal of terminals.values()) {
+        for (const stamp of [
+          terminal.lastActiveAt,
+          terminal.lifecycleUpdatedAt,
+          terminal.createdAt,
+        ]) {
+          if (stamp && (latest === null || stamp > latest)) {
+            latest = stamp;
+          }
+        }
+      }
+      return latest;
     },
 
     listConversationSessions() {

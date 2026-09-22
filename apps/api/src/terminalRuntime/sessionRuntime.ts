@@ -82,6 +82,8 @@ type CreateSessionRuntimeOptions = {
   sessionIdleGraceMs?: number;
   scrollbackMaxBytes?: number;
   maxConcurrentSessions?: number;
+  projectId?: string;
+  checkSessionAdmission?: () => string | null;
   onStateChange?: (terminalId: string, state: AgentRuntimeState, toolName?: string) => void;
   /** PTY output heartbeat, throttled; the runtime uses it to keep lastActiveAt honest during long turns. */
   onOutputActivity?: (terminalId: string) => void;
@@ -113,6 +115,8 @@ export const createSessionRuntime = ({
   sessionIdleGraceMs = TERMINAL_SESSION_IDLE_GRACE_MS,
   scrollbackMaxBytes = TERMINAL_SCROLLBACK_MAX_BYTES,
   maxConcurrentSessions = TERMINAL_MAX_CONCURRENT_SESSIONS,
+  projectId,
+  checkSessionAdmission,
   onStateChange,
   onOutputActivity,
   onSessionStart,
@@ -768,6 +772,10 @@ export const createSessionRuntime = ({
         `Terminal session limit reached (${sessionLimit}). Close an existing terminal session or increase OCTOGENT_MAX_TERMINAL_SESSIONS.`,
       );
     }
+    const refusal = checkSessionAdmission?.();
+    if (refusal) {
+      throw new Error(refusal);
+    }
 
     const terminalRecord = terminals.get(sessionId);
 
@@ -794,6 +802,7 @@ export const createSessionRuntime = ({
         env: createShellEnvironment({
           octogentSessionId: sessionId,
           ...(getApiBaseUrl ? { apiBaseUrl: getApiBaseUrl() } : {}),
+          ...(projectId ? { projectId } : {}),
           ...(workspaceCwd ? { workspaceCwd } : {}),
           ...(inheritedEnv ? { inheritedEnv } : {}),
         }),

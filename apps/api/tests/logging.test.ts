@@ -10,6 +10,7 @@ import {
   isVerboseLoggingEnabled,
   log,
   logVerbose,
+  runWithLogPrefix,
 } from "../src/logging";
 
 describe("logging", () => {
@@ -152,6 +153,39 @@ describe("logging", () => {
     expect(() => logVerbose("first failure")).not.toThrow();
     expect(() => logVerbose("second failure")).not.toThrow();
     expect(warningSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts the hub log under the hub state dir instead of a project's", () => {
+    const hubStateDir = makeStateDir();
+
+    const logPath = configureServerLogging({ hubStateDir });
+    log("hub up");
+
+    expect(logPath).toBe(join(hubStateDir, "logs", "server.log"));
+    expect(readFileSync(logPath as string, "utf8")).toContain("hub up\n");
+  });
+
+  it("prefixes every line logged inside a project scope, across awaits", async () => {
+    const projectStateDir = makeStateDir();
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logPath = configureServerLogging({ projectStateDir });
+
+    await runWithLogPrefix("[alpha]", async () => {
+      log("before await");
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      logVerbose("after await\nsecond line");
+    });
+    log("outside");
+
+    const lines = readFileSync(logPath as string, "utf8")
+      .trimEnd()
+      .split("\n");
+    expect(lines[0]).toMatch(/Z \[alpha\] before await$/);
+    expect(lines[1]).toMatch(/Z \[alpha\] after await$/);
+    expect(lines[2]).toMatch(/Z \[alpha\] second line$/);
+    expect(lines[3]).toMatch(/Z outside$/);
+    expect(consoleSpy).toHaveBeenCalledWith("[alpha] before await");
+    expect(consoleSpy).toHaveBeenLastCalledWith("outside");
   });
 
   it("records uncaught errors through the process monitor", () => {

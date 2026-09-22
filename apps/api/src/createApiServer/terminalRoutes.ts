@@ -14,6 +14,7 @@ import { findExhaustedUsage } from "../usageExhaustion";
 import type { ApiRouteHandler } from "./routeHelpers";
 import {
   readJsonBodyOrWriteError,
+  runtimeInputErrorStatus,
   writeJson,
   writeMethodNotAllowed,
   writeNoContent,
@@ -297,7 +298,7 @@ export const handleTerminalsCollectionRoute: ApiRouteHandler = async (
     return true;
   } catch (error) {
     if (error instanceof RuntimeInputError) {
-      writeJson(response, 400, { error: error.message }, corsOrigin);
+      writeJson(response, runtimeInputErrorStatus(error), { error: error.message }, corsOrigin);
       return true;
     }
 

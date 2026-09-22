@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { format } from "node:util";
@@ -8,6 +9,15 @@ const SERVER_LOG_GENERATIONS = 3;
 let serverLogPath: string | null = null;
 let hasWarnedAboutFileLogging = false;
 let hasInstalledUncaughtErrorLogging = false;
+
+// The hub serves every project from one process and one log file. Carrying
+// the project's tag in async context (rather than threading a logger through
+// every runtime module) tags whatever a project's request, timer, or PTY
+// callback logs, without touching the modules that log.
+const logPrefixScope = new AsyncLocalStorage<string>();
+
+export const runWithLogPrefix = <T>(prefix: string, run: () => T): T =>
+  logPrefixScope.run(prefix, run);
 
 const isEnabled = (value: string | undefined): boolean => value === "1";
 
@@ -57,9 +67,11 @@ const appendToServerLog = (args: Parameters<typeof console.log>): void => {
     // 10:33?", and the console copy has no clock at all. Multi-line messages
     // (the startup banner) keep one stamp per line so grep by time works.
     const stamp = new Date().toISOString();
+    const prefix = logPrefixScope.getStore();
+    const lead = prefix ? `${stamp} ${prefix}` : stamp;
     const line = `${maskSecrets(format(...args))
       .split("\n")
-      .map((part) => `${stamp} ${part}`)
+      .map((part) => `${lead} ${part}`)
       .join("\n")}\n`;
     rotateIfNeeded(Buffer.byteLength(line));
     appendFileSync(serverLogPath, line, "utf8");
@@ -69,13 +81,15 @@ const appendToServerLog = (args: Parameters<typeof console.log>): void => {
   }
 };
 
-type ConfigureServerLoggingOptions = {
-  projectStateDir: string;
-  env?: NodeJS.ProcessEnv;
-};
+type ConfigureServerLoggingOptions = { env?: NodeJS.ProcessEnv } & (
+  | { projectStateDir: string; hubStateDir?: undefined }
+  // The hub has no single project to own its log, so it lives in the hub's own state dir.
+  | { hubStateDir: string; projectStateDir?: undefined }
+);
 
 export const configureServerLogging = ({
   projectStateDir,
+  hubStateDir,
   env = process.env,
 }: ConfigureServerLoggingOptions): string | null => {
   hasWarnedAboutFileLogging = false;
@@ -89,7 +103,7 @@ export const configureServerLogging = ({
     ? isAbsolute(configuredPath)
       ? configuredPath
       : resolve(configuredPath)
-    : join(projectStateDir, "logs", "server.log");
+    : join(hubStateDir ?? projectStateDir ?? "", "logs", "server.log");
 
   try {
     mkdirSync(dirname(serverLogPath), { recursive: true });
@@ -101,24 +115,31 @@ export const configureServerLogging = ({
   return serverLogPath;
 };
 
+// Prepending the prefix as a separate argument would demote a format string
+// to a plain value, so a scoped line is formatted first.
+const toConsoleArgs = (args: Parameters<typeof console.log>): Parameters<typeof console.log> => {
+  const prefix = logPrefixScope.getStore();
+  return prefix ? [`${prefix} ${format(...args)}`] : args;
+};
+
 export const log = (...args: Parameters<typeof console.log>): void => {
-  console.log(...args);
+  console.log(...toConsoleArgs(args));
   appendToServerLog(args);
 };
 
 export const logWarn = (...args: Parameters<typeof console.warn>): void => {
-  console.warn(...args);
+  console.warn(...toConsoleArgs(args));
   appendToServerLog(args);
 };
 
 export const logError = (...args: Parameters<typeof console.error>): void => {
-  console.error(...args);
+  console.error(...toConsoleArgs(args));
   appendToServerLog(args);
 };
 
 export const logVerbose = (...args: Parameters<typeof console.log>): void => {
   if (isVerboseLoggingEnabled()) {
-    console.log(...args);
+    console.log(...toConsoleArgs(args));
   }
   appendToServerLog(args);
 };

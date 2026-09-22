@@ -9,6 +9,10 @@ The API has two different kinds of state:
 
 Most HTTP routes either read/write persisted files or create runtime records. WebSocket routes attach clients to live PTY sessions owned by the API process.
 
+## Hub mode
+
+A hub is one API process serving every project registered in `~/.octogent/projects.json`; a single-project server is the same thing with its one project mounted at the root, so every path on this page works there unchanged. Under a hub each of those routes, HTTP and WebSocket alike, sits behind a project prefix, `/api/p/<key>/api/...`, where `<key>` is the project's id, its slug, or a former slug kept as an alias; a project loads on the first request that names it, and an unknown key answers `404`. Claude hook commands, the guard in the user-level Codex hooks, and `OCTOGENT_API_BASE` in each terminal use `<hub>/api/p/<projectId>` (the id, because slugs change on rename), and terminals also get `OCTOGENT_PROJECT_ID`. The hub's own routes are `GET /api/hub/health` (the health snapshot below with counts summed over loaded projects, plus `pid`, `maxTerminalSessions`, `projects: { registered, loaded }`, and `loadedProjects`), `GET /api/projects` (`{ "projects": [{ id, name, slug, path, loaded, summary? }] }`, where a loaded project's `summary` carries its session and terminal counts and `lastActivityAt`), and `POST /api/projects` with `{ "path": "/absolute/dir", "name": "optional" }`, which scaffolds `.octogent/` and registers the directory (`201` when new, `200` when already registered, `400` unless the path is an absolute existing directory; loopback or access token only). `GET /p/<key>/...` serves the web app. Each project may run 12 PTY sessions by default (`OCTOGENT_MAX_TERMINAL_SESSIONS` overrides it) and the hub 32 in total (`OCTOGENT_HUB_MAX_TERMINAL_SESSIONS`); creating a terminal past the hub cap returns `429`.
+
 ## Terminals
 
 - `GET /api/terminal-snapshots` - returns the current terminal list and snapshot state for the UI; archived records are excluded unless `?includeArchived=1` is passed

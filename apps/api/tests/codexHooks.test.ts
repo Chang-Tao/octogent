@@ -93,6 +93,30 @@ describe("installCodexHooks", () => {
     expect(mergedHooks.Stop, "re-install must not duplicate entries").toHaveLength(1);
   });
 
+  it("keeps one guarded handler set per hub project and does not grow on restart", () => {
+    // Under the hub every project has its own base; each set must fire only
+    // for sessions whose OCTOGENT_API_BASE names that project.
+    const projectA = "http://127.0.0.1:8787/api/p/project-a";
+    const projectB = "http://127.0.0.1:8787/api/p/project-b";
+    installCodexHooks(projectA, env);
+    installCodexHooks(projectB, env);
+    installCodexHooks(projectA, env);
+    installCodexHooks(projectB, env);
+
+    const hooks = readHooksFile().hooks as Record<
+      string,
+      Array<{ hooks: Array<{ command: string }> }>
+    >;
+    for (const eventName of CODEX_HOOK_EVENTS) {
+      const commands = (hooks[eventName] ?? []).map((entry) => entry.hooks[0]?.command ?? "");
+      expect(commands, eventName).toHaveLength(2);
+      expect(commands[0], eventName).toContain(`[ "$OCTOGENT_API_BASE" = "${projectA}" ]`);
+      expect(commands[0], eventName).toContain(`"${projectA}/api/hooks/`);
+      expect(commands[1], eventName).toContain(`[ "$OCTOGENT_API_BASE" = "${projectB}" ]`);
+      expect(commands[1], eventName).toContain(`"${projectB}/api/hooks/`);
+    }
+  });
+
   it("replaces an unparseable hooks.json instead of failing the install", () => {
     installCodexHooks(API_BASE_URL, env);
     writeFileSync(hooksPath(), "{not json", "utf8");

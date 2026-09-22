@@ -205,8 +205,11 @@ const readPreferredStartPort = () => {
 };
 
 const resolveRuntimeApiBase = () => {
+  // OCTOGENT_API_BASE first: the server sets it per worker and, under the hub,
+  // it already names the project; OCTOGENT_API_ORIGIN is the dev shell's
+  // server-wide setting.
   const explicitBase =
-    process.env.OCTOGENT_API_ORIGIN?.trim() || process.env.OCTOGENT_API_BASE?.trim();
+    process.env.OCTOGENT_API_BASE?.trim() || process.env.OCTOGENT_API_ORIGIN?.trim();
   if (explicitBase) {
     return explicitBase;
   }

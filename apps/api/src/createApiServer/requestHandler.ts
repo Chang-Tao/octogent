@@ -1,7 +1,5 @@
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { extname, join } from "node:path";
 
 import type { UsageChartResponse } from "../claudeSessionScanner";
 import type { ClaudeUsageSnapshot } from "../claudeUsage";
@@ -61,6 +59,7 @@ import {
   isAllowedOriginHeader,
   readHeaderValue,
 } from "./security";
+import { serveWebApp } from "./staticFiles";
 import {
   handleTerminalActionRoute,
   handleTerminalArchiveCompletedRoute,
@@ -79,21 +78,7 @@ import {
   handleUsageHeatmapRoute,
 } from "./usageRoutes";
 
-const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "application/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-  ".ttf": "font/ttf",
-  ".otf": "font/otf",
-};
-
-type CreateApiRequestHandlerOptions = {
+export type CreateApiRouteDispatcherOptions = {
   runtime: TerminalRuntime;
   workspaceCwd: string;
   projectStateDir: string;
@@ -113,6 +98,10 @@ type CreateApiRequestHandlerOptions = {
   invalidateClaudeUsageCache: () => void;
   codeIntelStore: CodeIntelStore;
   readHealthSnapshot: () => HealthSnapshot;
+  isRemoteBinding: () => boolean;
+};
+
+export type RequestGuardOptions = {
   isRemoteBinding: () => boolean;
   accessToken: string | null;
 };
@@ -184,35 +173,63 @@ const logRequest = (method: string, path: string, status: number, startTime: num
   logVerbose(`[API] ${method} ${path} ${status} ${Date.now() - startTime}ms`);
 };
 
-const serveStaticFile = async (
+/**
+ * Host, Origin, and access-token checks. Returns false once it has answered
+ * the request itself; a hub runs these once for every project it serves.
+ */
+export const guardApiRequest = (
+  request: IncomingMessage,
   response: ServerResponse,
-  webDistDir: string,
-  pathname: string,
-): Promise<boolean> => {
-  // Prevent path traversal.
-  const safePath = pathname.replace(/\.\./g, "").replace(/\/+/g, "/");
-  const filePath = join(webDistDir, safePath === "/" ? "index.html" : safePath);
+  { isRemoteBinding, accessToken }: RequestGuardOptions,
+): boolean => {
+  const startTime = Date.now();
+  const originHeader = readHeaderValue(request.headers.origin);
+  const hostHeader = readHeaderValue(request.headers.host);
+  const remoteBinding = isRemoteBinding();
+  const corsOrigin = getRequestCorsOrigin(originHeader, hostHeader, remoteBinding);
 
-  try {
-    const content = await readFile(filePath);
-    const ext = extname(filePath);
-    const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
-    response.writeHead(200, { "Content-Type": contentType });
-    response.end(content);
-    return true;
-  } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
-    if (code !== "ENOENT") {
-      console.error(
-        `[API] Static file error: ${filePath}`,
-        error instanceof Error ? error.message : error,
-      );
-    }
+  if (!isAllowedHostHeader(hostHeader, remoteBinding)) {
+    writeJson(response, 403, { error: "Host not allowed." }, null);
+    logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
     return false;
   }
+
+  if (!isAllowedOriginHeader(originHeader, hostHeader, remoteBinding)) {
+    writeJson(response, 403, { error: "Origin not allowed." }, null);
+    logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
+    return false;
+  }
+
+  const authDecision = evaluateRemoteAuth({
+    remoteAddress: request.socket.remoteAddress,
+    url: request.url ?? "/",
+    headers: {
+      "x-octogent-token": request.headers["x-octogent-token"],
+      cookie: request.headers.cookie,
+    },
+    accessToken,
+  });
+  if (authDecision.kind === "deny") {
+    writeJson(response, 401, { error: "Access token required." }, corsOrigin);
+    logRequest(request.method ?? "?", request.url ?? "/", 401, startTime);
+    return false;
+  }
+  if (authDecision.kind === "allow-set-cookie") {
+    response.setHeader("Set-Cookie", authDecision.cookie);
+  }
+  return true;
 };
 
-export const createApiRequestHandler = ({
+export type ApiRouteDispatcher = (
+  request: IncomingMessage,
+  response: ServerResponse,
+) => Promise<void>;
+
+/**
+ * Routes one project's API (and, when given a web dist, the SPA). It performs
+ * no Host/Origin/token checks of its own — see guardApiRequest.
+ */
+export const createApiRouteDispatcher = ({
   runtime,
   workspaceCwd,
   projectStateDir,
@@ -233,8 +250,7 @@ export const createApiRequestHandler = ({
   codeIntelStore,
   readHealthSnapshot,
   isRemoteBinding,
-  accessToken,
-}: CreateApiRequestHandlerOptions) => {
+}: CreateApiRouteDispatcherOptions): ApiRouteDispatcher => {
   const resolvedWebDistDir = webDistDir && existsSync(webDistDir) ? webDistDir : null;
 
   const routeDependencies: RouteHandlerDependencies = {
@@ -267,40 +283,11 @@ export const createApiRequestHandler = ({
       return originalWriteHead(...args);
     }) as typeof response.writeHead;
 
-    const originHeader = readHeaderValue(request.headers.origin);
-    const hostHeader = readHeaderValue(request.headers.host);
-    const remoteBinding = isRemoteBinding();
-    const corsOrigin = getRequestCorsOrigin(originHeader, hostHeader, remoteBinding);
-
-    if (!isAllowedHostHeader(hostHeader, remoteBinding)) {
-      writeJson(response, 403, { error: "Host not allowed." }, null);
-      logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
-      return;
-    }
-
-    if (!isAllowedOriginHeader(originHeader, hostHeader, remoteBinding)) {
-      writeJson(response, 403, { error: "Origin not allowed." }, null);
-      logRequest(request.method ?? "?", request.url ?? "/", 403, startTime);
-      return;
-    }
-
-    const authDecision = evaluateRemoteAuth({
-      remoteAddress: request.socket.remoteAddress,
-      url: request.url ?? "/",
-      headers: {
-        "x-octogent-token": request.headers["x-octogent-token"],
-        cookie: request.headers.cookie,
-      },
-      accessToken,
-    });
-    if (authDecision.kind === "deny") {
-      writeJson(response, 401, { error: "Access token required." }, corsOrigin);
-      logRequest(request.method ?? "?", request.url ?? "/", 401, startTime);
-      return;
-    }
-    if (authDecision.kind === "allow-set-cookie") {
-      response.setHeader("Set-Cookie", authDecision.cookie);
-    }
+    const corsOrigin = getRequestCorsOrigin(
+      readHeaderValue(request.headers.origin),
+      readHeaderValue(request.headers.host),
+      isRemoteBinding(),
+    );
 
     try {
       const requestUrl = new URL(request.url ?? "/", "http://localhost");
@@ -331,10 +318,7 @@ export const createApiRequestHandler = ({
 
       // Serve static web frontend if available.
       if (resolvedWebDistDir && request.method === "GET") {
-        const served =
-          (await serveStaticFile(response, resolvedWebDistDir, requestUrl.pathname)) ||
-          (await serveStaticFile(response, resolvedWebDistDir, "/"));
-        if (served) {
+        if (await serveWebApp(response, resolvedWebDistDir, requestUrl.pathname)) {
           logRequest(request.method, requestUrl.pathname, 200, startTime);
           return;
         }
@@ -359,3 +343,12 @@ export const createApiRequestHandler = ({
     }
   };
 };
+
+/** A single-project server's handler: the guard, then that project's routes. */
+export const withApiRequestGuard =
+  (guardOptions: RequestGuardOptions, dispatch: ApiRouteDispatcher) =>
+  async (request: IncomingMessage, response: ServerResponse) => {
+    if (guardApiRequest(request, response, guardOptions)) {
+      await dispatch(request, response);
+    }
+  };
