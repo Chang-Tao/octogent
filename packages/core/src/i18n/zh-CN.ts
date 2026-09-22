@@ -99,6 +99,11 @@ export const zhCN: TranslationMap = {
   "cli.setupAgents.missingSource":
     "错误：在 {path} 找不到 skill 源文件。请在 Octogent 仓库里运行 `pnpm build`。",
   "cli.empty.projects": "尚未注册任何项目。在项目目录中运行 `octogent` 或 `octogent init`。",
+  // ── Hub ──────────────────────────────────────────────
+  "cli.hub.driftOlder":
+    "警告：hub 运行的是较旧的构建（hub {hub}，CLI {cli}）；等 worker 空闲时执行 `octogent hub restart`。",
+  "cli.hub.driftDifferent":
+    "警告：hub 运行的构建与 CLI 不同（hub {hub}，CLI {cli}）；等 worker 空闲时执行 `octogent hub restart`。",
   "cli.usage": `用法：
   octogent                             在当前项目中启动仪表盘
   octogent init [项目名称]              显式初始化当前目录

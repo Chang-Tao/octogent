@@ -107,6 +107,11 @@ export const en: TranslationMap = {
     "Error: skill source not found at {path}. Run `pnpm build` in the Octogent checkout.",
   "cli.empty.projects":
     "No projects registered yet. Run `octogent` or `octogent init` in a project directory.",
+  // ── Hub ──────────────────────────────────────────────
+  "cli.hub.driftOlder":
+    "Warning: the hub is running an older build (hub {hub}, CLI {cli}); `octogent hub restart` when workers are idle.",
+  "cli.hub.driftDifferent":
+    "Warning: the hub is running a different build (hub {hub}, CLI {cli}); `octogent hub restart` when workers are idle.",
   "cli.usage": `Usage:
   octogent                             Start the dashboard in the current project
   octogent init [project-name]         Initialize the current directory explicitly
