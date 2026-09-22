@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -242,6 +250,21 @@ describe("createHubServer", () => {
       expect((await post({ path })).status, String(path)).toBe(400);
     }
     expect(loadProjectsRegistry().projects).toHaveLength(2);
+
+    // A directory the hub cannot scaffold is refused with the reason, not a
+    // bare 500. Root ignores the mode bits, so there is nothing to refuse there.
+    if (process.getuid?.() === 0) {
+      return;
+    }
+    const readOnly = makeDirectory();
+    chmodSync(readOnly, 0o500);
+    try {
+      const refused = await post({ path: readOnly });
+      expect(refused.status).toBe(400);
+      expect(((await refused.json()) as { error: string }).error).toContain(readOnly);
+    } finally {
+      chmodSync(readOnly, 0o700);
+    }
   });
 
   it("delivers a hook to the addressed project's runtime only", async () => {

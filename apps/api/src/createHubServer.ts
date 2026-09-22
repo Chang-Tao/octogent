@@ -247,10 +247,18 @@ export const createHubServer = ({
         ? payload.name.trim()
         : undefined;
 
-    const wasRegistered = registry.load().projects.some((project) => project.path === workspaceCwd);
-    const entry = registry.register(workspaceCwd, name);
+    const knownIds = new Set(registry.load().projects.map((project) => project.id));
+    let entry: ProjectRegistryEntry;
+    try {
+      entry = registry.register(workspaceCwd, name);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      writeJson(response, 400, { error: `Cannot register ${workspaceCwd}: ${reason}` }, corsOrigin);
+      return;
+    }
     log(`[Hub] Registered project ${entry.slug ?? entry.name} (${entry.id}) at ${workspaceCwd}`);
-    writeJson(response, wasRegistered ? 200 : 201, toProjectListing(entry), corsOrigin);
+    // By id, not path: a moved workspace keeps its project.json and so its entry.
+    writeJson(response, knownIds.has(entry.id) ? 200 : 201, toProjectListing(entry), corsOrigin);
   };
 
   const handleHubRoute = async (
@@ -355,9 +363,8 @@ export const createHubServer = ({
       if (resolvedWebDistDir && method === "GET" && !pathname.startsWith("/api/")) {
         // /p/<key>/… is a client-side route of the one SPA; built assets are
         // referenced absolutely, but a relative one resolves here too.
-        const webPath = PROJECT_WEB_MOUNT.test(pathname)
-          ? (PROJECT_WEB_MOUNT.exec(pathname)?.[1] ?? "/")
-          : pathname;
+        const webMount = PROJECT_WEB_MOUNT.exec(pathname);
+        const webPath = webMount ? (webMount[1] ?? "/") : pathname;
         if (await serveWebApp(response, resolvedWebDistDir, webPath)) {
           return;
         }
