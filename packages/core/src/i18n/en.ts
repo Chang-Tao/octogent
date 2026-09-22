@@ -108,6 +108,69 @@ export const en: TranslationMap = {
   "cli.empty.projects":
     "No projects registered yet. Run `octogent` or `octogent init` in a project directory.",
   // ── Hub ──────────────────────────────────────────────
+  "cli.hub.running": "Octogent hub is running",
+  "cli.hub.alreadyRunning": "The hub is already running at {url} (pid {pid}).",
+  "cli.hub.started": "Hub running at {url} (pid {pid}).",
+  "cli.hub.autostarting": "No hub is running; starting one on port {port}…",
+  "cli.hub.waitingForStart": "Another octogent command is starting the hub; waiting for it…",
+  "cli.hub.lockTimeout":
+    "Error: timed out waiting for the hub to start. If no octogent command is starting it, remove {lock} and try again.",
+  "cli.hub.startExited": "Error: the hub exited during startup (code {code}). See {log}.",
+  "cli.hub.startTimeout":
+    "Error: the hub did not answer within {seconds} s; it may still be starting. See {log}.",
+  "cli.hub.startFailed": "Error: could not start the hub. See {log}.",
+  "cli.hub.prerequisitesFailed": "Error: the hub cannot start without the tools listed above.",
+  "cli.hub.bindFailed": "Error: the hub could not listen on port {port}: {reason}",
+  "cli.hub.portTaken":
+    "Error: port {port} is taken by pid {pid}, a single-project Octogent server for {workspace}, not a hub. Stop that server (or set OCTOGENT_HUB_PORT to another port) and start the hub again.",
+  "cli.hub.portTakenUnknown":
+    "Error: port {port} is taken by a process that is not an Octogent hub (pid unknown; lsof or ss shows it). Stop it or set OCTOGENT_HUB_PORT to another port.",
+  "cli.hub.portHeldByOrphanHub":
+    "Error: a hub (pid {pid}) already serves port {port} but ~/.octogent/hub.json does not describe it. Stop that process and start the hub again.",
+  "cli.hub.notRunning": "No hub is running. Start one with `octogent hub start`.",
+  "cli.hub.staleRemoved": "The hub was not running; removed its stale hub.json.",
+  "cli.hub.unknownProcess":
+    "Error: pid {pid} from hub.json is alive but does not answer as the hub, so it was not signalled. If it is a hung hub, kill it yourself.",
+  "cli.hub.stopping": "Stopping the hub (pid {pid})…",
+  "cli.hub.killed": "The hub did not exit within {seconds} s; sent SIGKILL.",
+  "cli.hub.stopped": "Hub stopped.",
+  "cli.hub.restartBusy":
+    "Refusing to restart: these terminals would be killed. Wait for them, or pass --force.",
+  "cli.hub.restartForced": "Restarting anyway (--force); these terminals will be killed:",
+  "cli.hub.restartUnknownBusy":
+    "Error: could not list the hub's terminals to check they are idle. Pass --force to restart anyway.",
+  "cli.hub.status.hub": "Hub:",
+  "cli.hub.status.answering": "answering",
+  "cli.hub.status.notAnswering": "not answering",
+  "cli.hub.status.pid": "PID:",
+  "cli.hub.status.started": "Started:",
+  "cli.hub.status.build": "Build:",
+  "cli.hub.status.buildLine": "hub {hub} · CLI {cli}",
+  "cli.hub.status.log": "Log:",
+  "cli.hub.status.projects": "Projects:",
+  "cli.hub.status.noProjects": "(none registered)",
+  "cli.hub.status.loaded": "loaded, {running} running, {review} awaiting review",
+  "cli.hub.status.notLoaded": "not loaded",
+  "cli.hub.unknownProject":
+    "Error: no registered project matches --project {key}. `octogent projects` lists them.",
+  "cli.hub.projectFlagEmpty": "Error: --project needs a project slug or id.",
+  "cli.hub.notAProject":
+    "Error: {path} is not inside a registered project or a git repository. Run the command in a project, pass --project <slug>, or run `octogent init` here first.",
+  "cli.hub.autostartDisabled":
+    "Error: no hub is running and OCTOGENT_NO_AUTOSTART=1 keeps it from starting. Start it with `octogent hub start`, or run `octogent` in the project for a single-project server.",
+  "cli.hub.registered": "Registered {path} with the hub as {slug}.",
+  "cli.hub.registerFailed": "Error: could not register {path} with the hub: {reason}",
+  "cli.hub.bareServing": "The hub already serves this project: {url}",
+  "cli.hub.bareUseHub":
+    "- Use the hub: open that address; octogent commands here already reach it.",
+  "cli.hub.bareStandalone":
+    "- Or run `octogent --standalone` to start a separate single-project server as before.",
+  "cli.help.hub":
+    "octogent hub start [--foreground]    Start the hub: one server for every registered project\n  octogent hub status                  Show the hub's address, build, and projects (exit 1 if none answers)\n  octogent hub stop                    Stop the hub\n  octogent hub restart [--force]       Restart the hub; refuses while terminals run unless --force",
+  "cli.help.standalone":
+    "octogent --standalone                Start a single-project server even when a hub serves the project",
+  "cli.help.project":
+    "--project <slug|id>                  For the commands below: target a registered project, not the current directory",
   "cli.hub.driftOlder":
     "Warning: the hub is running an older build (hub {hub}, CLI {cli}); `octogent hub restart` when workers are idle.",
   "cli.hub.driftDifferent":

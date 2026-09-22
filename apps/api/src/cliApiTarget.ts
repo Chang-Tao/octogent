@@ -65,6 +65,10 @@ export const findCurrentProject = (
   return containing ?? null;
 };
 
+/** OCTOGENT_API_BASE (set per worker; project-scoped under the hub) before the server-wide origin. */
+export const readExplicitApiBase = (env: Record<string, string | undefined>): string | null =>
+  env.OCTOGENT_API_BASE?.trim() || env.OCTOGENT_API_ORIGIN?.trim() || null;
+
 const toProjectApiBase = (hubBaseUrl: string, project: ProjectRegistryEntry) =>
   // By id, never the slug: a base that outlives a rename must keep working.
   `${hubBaseUrl}/api/p/${encodeURIComponent(project.id)}`;
@@ -85,7 +89,7 @@ export const resolveApiTarget = ({
   cwdProject = null,
   gitRoot = null,
 }: ApiTargetInput): ApiTarget => {
-  const explicitBase = env.OCTOGENT_API_BASE?.trim() || env.OCTOGENT_API_ORIGIN?.trim();
+  const explicitBase = readExplicitApiBase(env);
   if (explicitBase) {
     return { kind: "explicit", apiBase: explicitBase };
   }

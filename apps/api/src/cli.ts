@@ -4,8 +4,20 @@ import { networkInterfaces } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { DEFAULT_LOCALE, type Locale, t } from "@octogent/core";
+import { createCliApiBaseResolver } from "./cliApiBase";
+import { extractGlobalFlags, findCurrentProject, findProjectConfigRoot } from "./cliApiTarget";
 import { formatChannelMessageLine } from "./cliChannel";
 import { renderGuide, resolveAgentSkillTargets, setupAgentSkills } from "./cliGuide";
+import {
+  type HubCliContext,
+  announceHubForCurrentProject,
+  exitOnHubCliError,
+  runHubForeground,
+  runHubRestart,
+  runHubStart,
+  runHubStatus,
+  runHubStop,
+} from "./cliHub";
 import { formatUsageWarning, parseTerminalCreateArgs } from "./cliTerminalCreate";
 import {
   type TerminalResult,
@@ -24,6 +36,7 @@ import {
 } from "./cliTerminalScreen";
 import { generateAccessToken, resolveAccessToken } from "./createApiServer/remoteAuth";
 import { resolveRootVersion } from "./healthSnapshot";
+import { resolveBuildIdentity } from "./hubVersionDrift";
 import {
   canListenOnPort,
   isRemoteAccessEnabled,
@@ -43,7 +56,8 @@ import {
   resolveEphemeralProjectStateDir,
   resolveProjectStateDir,
 } from "./projectPersistence";
-import { clearRuntimeMetadata, readRuntimeMetadata, writeRuntimeMetadata } from "./runtimeMetadata";
+import { toProjectSlug } from "./projectSlug";
+import { clearRuntimeMetadata, writeRuntimeMetadata } from "./runtimeMetadata";
 import {
   followServerLog,
   parseServerLogsArgs,
@@ -55,7 +69,9 @@ import { ensureProjectEnvTemplate } from "./terminalRuntime/ptyEnvironment";
 
 const locale: Locale = (process.env.OCTOGENT_LOCALE as Locale) ?? DEFAULT_LOCALE;
 
-const args = process.argv.slice(2);
+// --project and --standalone apply to every command, so no per-command parser
+// (or a channel message's free text) ever sees them.
+const { args, projectFlag, standalone } = extractGlobalFlags(process.argv.slice(2));
 const command = args[0];
 
 const resolvePackageRoot = () => {
@@ -90,6 +106,13 @@ const resolveRuntimeAssetPath = (...relativePathCandidates: [string[], ...string
   }
 
   return join(PACKAGE_ROOT, ...relativePathCandidates[0]);
+};
+
+const hubContext: HubCliContext = {
+  locale,
+  build: resolveBuildIdentity(PACKAGE_ROOT),
+  webDistDir: resolveRuntimeAssetPath(["dist", "web"], ["apps", "web", "dist"]),
+  promptsDir: resolveRuntimeAssetPath(["dist", "prompts"], ["prompts"]),
 };
 
 const DEFAULT_START_PORT = 8787;
@@ -185,30 +208,15 @@ const readPreferredStartPort = () => {
   return parsed;
 };
 
-const resolveRuntimeApiBase = () => {
-  // OCTOGENT_API_BASE first: the server sets it per worker and, under the hub,
-  // it already names the project; OCTOGENT_API_ORIGIN is the dev shell's
-  // server-wide setting.
-  const explicitBase =
-    process.env.OCTOGENT_API_BASE?.trim() || process.env.OCTOGENT_API_ORIGIN?.trim();
-  if (explicitBase) {
-    return explicitBase;
-  }
+const apiBaseResolver = createCliApiBaseResolver(hubContext, projectFlag);
 
-  const projectConfig = loadProjectConfig(process.cwd());
-  if (projectConfig) {
-    const projectStateDir = resolveProjectStateDir(process.cwd(), projectConfig.displayName);
-    const runtimeMetadata = readRuntimeMetadata(projectStateDir);
-    if (runtimeMetadata) {
-      return runtimeMetadata.apiBaseUrl;
-    }
-  }
-
-  return `http://127.0.0.1:${readPreferredStartPort()}`;
-};
+const resolveApiBase = (): Promise<string> =>
+  apiBaseResolver.resolveApiBase().catch(exitOnHubCliError);
 
 const apiError = () => {
-  console.error(t(locale, "cli.error.apiUnreachable", { url: resolveRuntimeApiBase() }));
+  console.error(
+    t(locale, "cli.error.apiUnreachable", { url: apiBaseResolver.lastApiBase() ?? "?" }),
+  );
   process.exit(1);
 };
 
@@ -247,8 +255,7 @@ const startServer = async () => {
     process.exit(1);
   }
 
-  const promptsDir = resolveRuntimeAssetPath(["dist", "prompts"], ["prompts"]);
-  const webDistDir = resolveRuntimeAssetPath(["dist", "web"], ["apps", "web", "dist"]);
+  const { promptsDir, webDistDir } = hubContext;
   const listenHost = resolveListenHost(process.env);
   // Remote access without a token would leave every agent and the codebase
   // open to the whole LAN; generate one for the session when none is set.
@@ -391,7 +398,7 @@ const tentacleCreate = async () => {
 
   const description = parseFlag("--description") ?? parseFlag("-d") ?? "";
   const { color, octopus } = randomAppearance();
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     const response = await fetch(`${apiBase}/api/deck/tentacles`, {
@@ -411,7 +418,7 @@ const tentacleCreate = async () => {
 };
 
 const tentacleList = async () => {
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     const response = await fetch(`${apiBase}/api/deck/tentacles`);
@@ -443,7 +450,7 @@ const terminalCreate = async () => {
   }
   const { body } = parsed;
   const tentacleId = typeof body.tentacleId === "string" ? body.tentacleId : undefined;
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     const response = await fetch(`${apiBase}/api/terminals`, {
@@ -478,7 +485,7 @@ const terminalCreate = async () => {
 
 const terminalList = async () => {
   const isArchivedOnly = args.includes("--archived");
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     const query = isArchivedOnly ? "?includeArchived=1" : "";
@@ -596,7 +603,7 @@ const terminalResult = async () => {
     process.exit(1);
   }
   const json = args.includes("--json");
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
   try {
     const snapshots = await fetchTerminalSnapshots(apiBase);
     if (!snapshots) {
@@ -626,7 +633,7 @@ const terminalWait = async () => {
     process.exit(1);
   }
   const { terminalIds, timeoutMs, attentionAfterMs, intervalMs, json } = parsed;
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
   const startedAt = Date.now();
   const lastSeen = new Map<string, string>();
   try {
@@ -694,7 +701,7 @@ const terminalAction = async (action: "stop" | "kill") => {
     process.exit(1);
   }
 
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
   try {
     const response = await fetch(
       `${apiBase}/api/terminals/${encodeURIComponent(terminalId)}/${action}`,
@@ -719,7 +726,7 @@ const terminalAction = async (action: "stop" | "kill") => {
 };
 
 const terminalArchive = async () => {
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   if (args.includes("--all-completed")) {
     try {
@@ -778,7 +785,7 @@ const terminalDelete = async () => {
   }
   const withWorktree = args.includes("--with-worktree");
   const force = args.includes("--force");
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     if (withWorktree) {
@@ -835,7 +842,7 @@ const terminalDelete = async () => {
 };
 
 const terminalPrune = async () => {
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     const response = await fetch(`${apiBase}/api/terminals/prune`, {
@@ -861,7 +868,7 @@ const terminalPrune = async () => {
 
 const worktreeGc = async () => {
   const isDryRun = args.includes("--dry-run");
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
 
   try {
     const response = await fetch(`${apiBase}/api/worktrees/gc${isDryRun ? "?dryRun=1" : ""}`, {
@@ -941,7 +948,7 @@ const channelSend = async () => {
     process.exit(1);
   }
 
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
   try {
     const response = await fetch(
       `${apiBase}/api/channels/${encodeURIComponent(terminalId)}/messages`,
@@ -974,7 +981,7 @@ const channelList = async () => {
     process.exit(1);
   }
 
-  const apiBase = resolveRuntimeApiBase();
+  const apiBase = await resolveApiBase();
   try {
     const response = await fetch(
       `${apiBase}/api/channels/${encodeURIComponent(terminalId)}/messages`,
@@ -999,9 +1006,64 @@ const channelList = async () => {
   }
 };
 
+const runHubCommand = async (subcommand: string | undefined): Promise<boolean> => {
+  try {
+    if (subcommand === "start") {
+      if (args.includes("--foreground")) {
+        await runHubForeground(hubContext);
+        return true;
+      }
+      process.exit(await runHubStart(hubContext));
+    }
+    if (subcommand === "status") {
+      process.exit(await runHubStatus(hubContext));
+    }
+    if (subcommand === "stop") {
+      process.exit(await runHubStop(hubContext));
+    }
+    if (subcommand === "restart") {
+      process.exit(await runHubRestart(hubContext, args.includes("--force")));
+    }
+  } catch (error) {
+    exitOnHubCliError(error);
+  }
+  return false;
+};
+
+const listProjects = () => {
+  const registry = loadProjectsRegistry();
+  const { projects } = registry;
+  if (projects.length === 0) {
+    console.log(t(locale, "cli.empty.projects"));
+    return;
+  }
+
+  const cwd = process.cwd();
+  const current = findCurrentProject(registry, cwd, findProjectConfigRoot(cwd));
+  const slugOf = (project: (typeof projects)[number]) =>
+    project.slug ?? toProjectSlug(project.name);
+  const slugWidth = Math.max(...projects.map((project) => slugOf(project).length));
+  const nameWidth = Math.max(...projects.map((project) => project.name.length));
+  for (const project of projects) {
+    const marker = project.id === current?.id ? "*" : " ";
+    console.log(
+      `${marker} ${slugOf(project).padEnd(slugWidth)}  ${project.name.padEnd(nameWidth)}  ${project.id}  ${project.path}`,
+    );
+  }
+};
+
 const main = async () => {
   if (!command || command === "start") {
+    // A second server over a project the hub already serves would share its
+    // state files with it; point at the hub unless asked for a lone server.
+    if (!standalone && (await announceHubForCurrentProject(hubContext))) {
+      return;
+    }
     return startServer();
+  }
+
+  if (command === "hub" && (await runHubCommand(args[1]))) {
+    return;
   }
 
   if (command === "init") {
@@ -1035,16 +1097,7 @@ const main = async () => {
   }
 
   if (command === "projects" || command === "project") {
-    const projects = loadProjectsRegistry().projects;
-    if (projects.length === 0) {
-      console.log(t(locale, "cli.empty.projects"));
-      return;
-    }
-
-    for (const project of projects) {
-      console.log(`  ${project.name}  ${project.id}  ${project.path}`);
-    }
-    return;
+    return listProjects();
   }
 
   if (command === "logs") {
@@ -1089,7 +1142,7 @@ const main = async () => {
       try {
         await (args[1] === "screen" ? runTerminalScreen : runTerminalInput)(
           args.slice(2),
-          resolveRuntimeApiBase(),
+          await resolveApiBase(),
           locale,
         );
       } catch (error) {
@@ -1120,12 +1173,15 @@ const main = async () => {
 
   console.log(`Usage:
   octogent                             Start the dashboard in the current project
+  ${t(locale, "cli.help.standalone")}
   octogent init [project-name]         Initialize the current directory explicitly
-  octogent projects                    List registered projects
+  octogent projects                    List registered projects (* marks the current one)
+  ${t(locale, "cli.help.hub")}
   octogent logs [--lines N] [--follow] Tail the current project's server log
   octogent guide                       Print the coordinator's routine and the current command surface
   octogent setup-agents [--remove]     Install the Octogent skill for Claude Code and Codex (user level)
 
+  ${t(locale, "cli.help.project")}
   octogent tentacle create <name>      Create a tentacle (Octogent must be running)
   octogent tentacle list               List tentacles
   octogent terminal create [options]   Create a terminal
