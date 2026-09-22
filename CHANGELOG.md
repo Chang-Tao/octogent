@@ -103,6 +103,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Hub, phase 1: the hub CLI (2026-09-22)
+
+- `octogent hub start [--foreground]`, `hub status`, `hub stop`, `hub restart
+  [--force]`. The hub runs on a fixed port (`OCTOGENT_HUB_PORT`, default
+  8787) and never moves: when something else holds it — typically an old
+  single-project server — `start` fails naming that pid and project. A
+  detached hub writes `~/.octogent/hub.json` (address, pid, start time,
+  version, commit, build time; live only while the pid is alive and
+  `/api/hub/health` answers with it), logs to `~/.octogent/hub/logs/server.log`
+  (its own stderr to `daemon-stderr.log`), and `restart` refuses while any
+  project has running or awaiting-review terminals unless `--force`.
+- Every server-bound command now resolves its target in order: an explicit
+  `OCTOGENT_API_BASE` / `OCTOGENT_API_ORIGIN`; the current project's own live
+  single-project server; the hub, scoped to `--project <slug|id>` or the
+  project the current directory belongs to; and, with no hub answering,
+  starting one (`~/.octogent/hub.lock` makes concurrent commands start a
+  single hub; `OCTOGENT_NO_AUTOSTART=1` turns that into an error). An
+  unregistered git repository is registered on the spot.
+- Hub-bound commands warn once per command when the hub runs another build
+  than the CLI (version, `OCTOGENT_BUILD_COMMIT`, or the bundle's build
+  time). `octogent projects` shows slugs and marks the current project. Bare
+  `octogent` while a hub already serves the project prints
+  `<hub>/p/<slug>/` instead of starting a second server; `octogent
+  --standalone` always starts a single-project server.
+
 ### Hub, phase 2: the web side (2026-09-22)
 
 - The web app is hub-aware. A page at `/p/<slug-or-id>/…` sends every HTTP

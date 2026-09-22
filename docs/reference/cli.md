@@ -10,7 +10,7 @@ Starts the local API for the current project and opens the UI when bundled web a
 
 If the current directory has not been initialized yet, the dashboard still starts, but it runs against a temporary state root and shows a setup card asking you to run `octogent init`. The local `.octogent/` scaffold is created by `octogent init` (or the setup card's **Initialize workspace** action), not by the dashboard itself. Anything created before that point is migrated into the project on initialization.
 
-When a [hub](#run-the-hub) is already running and serves the current project, bare `octogent` does not start a second server over the same project: it prints the project's address under the hub, `<hub>/p/<slug>/`, and the two ways on — keep using the hub (CLI commands in the project already reach it), or run `octogent --standalone`, which always starts a single-project server as before (on the next free port while the hub holds `8787`). The web UI does not follow the `/p/<slug>/` prefix yet, so the dashboard itself is still used from a single-project server for now.
+When a [hub](#run-the-hub) is already running and serves the current project, bare `octogent` does not start a second server over the same project: it prints the project's address under the hub, `<hub>/p/<slug>/`, and the two ways on — keep using the hub (CLI commands in the project already reach it), or run `octogent --standalone`, which always starts a single-project server as before (on the next free port while the hub holds `8787`). The dashboard under the hub is that same `/p/<slug>/` address, and `<hub>/` lists every project.
 
 ### Environment Variables
 
