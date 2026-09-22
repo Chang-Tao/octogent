@@ -103,6 +103,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Hub, phase 2: the web side (2026-09-22)
+
+- The web app is hub-aware. A page at `/p/<slug-or-id>/…` sends every HTTP
+  and WebSocket request to that project's mount (`/api/p/<key>/api/…`); any
+  other page keeps `/api/…`, and `VITE_OCTOGENT_API_ORIGIN` still applies
+  first. The twelve call sites that bypassed the endpoint builders with
+  literal `/api/` strings now go through them (`buildTerminalUrl`,
+  `buildDeckTentacleSwarmUrl`, `buildCodeIntelEventsUrl`, `buildHubProjectsUrl`
+  are new).
+- `/` asks `GET /api/projects` once: a 404 means a single-project server and
+  the app renders as before; a listing renders the project overview — one
+  card per project with slug, path, running / awaiting-review counts and
+  last activity (unloaded projects show "not loaded"), refreshed every 15 s,
+  a click opening `/p/<slug>/`. An add-project form (absolute path) appears
+  only when the hub would accept the registration; otherwise the page points
+  at `octogent init` / `octogent projects`.
+- Inside a project page the top bar gains a project switcher listing every
+  registered project plus "All projects"; it is hidden on a single-project
+  server. `?token=` sign-in links keep working on both pages.
+
 ### Hub, phase 1: the hub server (2026-09-22)
 
 - One process can now serve every registered project: `createHubServer`
