@@ -304,6 +304,11 @@ describe("runtimeEndpoints on a hub project page", () => {
     );
   });
 
+  it("ignores the ?token= a LAN sign-in link appends", async () => {
+    const endpoints = await loadEndpointsAt("/p/keycluster/?token=secret-token");
+    expect(endpoints.buildTerminalsUrl()).toBe("/api/p/keycluster/api/terminals");
+  });
+
   it("leaves root-page URLs unprefixed", async () => {
     const endpoints = await loadEndpointsAt("/");
     expect(endpoints.buildTerminalsUrl()).toBe("/api/terminals");
