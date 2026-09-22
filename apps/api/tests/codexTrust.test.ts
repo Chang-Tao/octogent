@@ -197,6 +197,24 @@ describe("ensureCodexDirectoryTrusted", () => {
     }
   });
 
+  it("recognizes handlers installed for a hub project's prefixed base", () => {
+    const root = makeRoot();
+    const configPath = join(root, "codex", "config.toml");
+    const workspace = makeWorkspace(root);
+    mkdirSync(dirname(configPath), { recursive: true });
+    const env = { OCTOGENT_CODEX_CONFIG: configPath };
+    installCodexHooks("http://127.0.0.1:8787/api/p/project-a", env);
+    const installedHandlers = installCodexHooks("http://127.0.0.1:8787/api/p/project-b", env);
+
+    expect(ensureCodexDirectoryTrusted(workspace, installedHandlers, configPath)).toBe(true);
+
+    // Project B's handlers sit second in each event's list, and only they are trusted here.
+    const config = readFileSync(configPath, "utf-8");
+    const hooksJsonPath = join(dirname(configPath), "hooks.json");
+    expect(config).toContain(`[hooks.state."${hooksJsonPath}:stop:1:0"]\ntrusted_hash = "sha256:`);
+    expect(config).not.toContain(`[hooks.state."${hooksJsonPath}:stop:0:0"]`);
+  });
+
   it("hashes a definition identically regardless of which hooks.json holds it", () => {
     const root = makeRoot();
     const configA = join(root, "a", "config.toml");
