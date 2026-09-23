@@ -131,11 +131,11 @@ The deck manages tentacle files and todos; see [Mental Model](../concepts/mental
 ### Choose an agent, model, and tier
 
 - Select an agent with `--agent-provider claude-code` or `--agent-provider codex`; omission uses the server default.
-- Default `--effort` mappings (updated 2026-09-08; `@` precedes the Codex reasoning level):
-  - `light`: `haiku` (Haiku 4.5) / `gpt-5.6-luna@low`.
-  - `standard`: `sonnet` (Sonnet 5) / `gpt-5.6-sol@medium`, fallback `gpt-5.6-terra@medium`.
-  - `heavy`: `opus` (Opus 5) / `gpt-6-astra@medium`, fallback `gpt-5.6-sol@high`.
-  - `max`: `fable` (Fable 5.1) / `gpt-6-astra@xhigh`, fallback `gpt-5.6-sol@xhigh`.
+- Default `--effort` mappings (updated 2026-09-23; `@` precedes the Codex reasoning level; `octogent guide` prints the installed version's table):
+  - `light`: `haiku` (Haiku 4.5) / `gpt-6-luna@medium`, fallback `gpt-5.6-luna@medium`.
+  - `standard`: `sonnet` (Sonnet 5) / `gpt-6-sol@high`, fallbacks `gpt-5.6-sol@medium`, `gpt-5.6-terra@medium`.
+  - `heavy`: `opus` (Opus 5.5) / `gpt-6-astra@high`, fallbacks `gpt-6-sol@xhigh`, `gpt-5.6-sol@high`.
+  - `max`: `fable` (Fable 5.1) / `gpt-6-astra@xhigh`, fallbacks `gpt-6-sol@xhigh`, `gpt-5.6-sol@xhigh`.
 - GPT-6 availability varies by account; candidates are selected using `$CODEX_HOME/models_cache.json` (default `~/.codex/models_cache.json`). An unreadable cache or no listed candidate means trying the first choice.
 - `--model sonnet` or `--model gpt-5.6-sol` overrides tiers and uses the agent's default reasoning level, even alongside `--effort`. Identifiers start with a letter or digit and contain only letters, digits, `.`, `_`, and `-`.
 - Before startup, override mappings with `OCTOGENT_EFFORT_MODELS`; Codex supports `model@reasoning` and candidate arrays. See the [CLI reference](../reference/cli.md).

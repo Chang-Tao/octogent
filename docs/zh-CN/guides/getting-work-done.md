@@ -131,11 +131,11 @@ deck 管理触手文件和待办，详见[心智模型](../concepts/mental-model
 ### 选择代理、模型和档位
 
 - `--agent-provider claude-code` 或 `--agent-provider codex` 选代理，省略则用服务端默认值。
-- `--effort` 默认映射（2026-09-08 更新，`@` 后为 Codex 推理等级）：
-  - `light`：`haiku`（Haiku 4.5）/ `gpt-5.6-luna@low`。
-  - `standard`：`sonnet`（Sonnet 5）/ `gpt-5.6-sol@medium`，回退 `gpt-5.6-terra@medium`。
-  - `heavy`：`opus`（Opus 5）/ `gpt-6-astra@medium`，回退 `gpt-5.6-sol@high`。
-  - `max`：`fable`（Fable 5.1）/ `gpt-6-astra@xhigh`，回退 `gpt-5.6-sol@xhigh`。
+- `--effort` 默认映射（2026-09-23 更新，`@` 后为 Codex 推理等级；`octogent guide` 会打印当前安装版本的表）：
+  - `light`：`haiku`（Haiku 4.5）/ `gpt-6-luna@medium`，回退 `gpt-5.6-luna@medium`。
+  - `standard`：`sonnet`（Sonnet 5）/ `gpt-6-sol@high`，回退 `gpt-5.6-sol@medium`、`gpt-5.6-terra@medium`。
+  - `heavy`：`opus`（Opus 5.5）/ `gpt-6-astra@high`，回退 `gpt-6-sol@xhigh`、`gpt-5.6-sol@high`。
+  - `max`：`fable`（Fable 5.1）/ `gpt-6-astra@xhigh`，回退 `gpt-6-sol@xhigh`、`gpt-5.6-sol@xhigh`。
 - GPT-6 按账号开放；按 `$CODEX_HOME/models_cache.json`（默认 `~/.codex/models_cache.json`）选择候选，缓存不可读或无候选时尝试首选。
 - `--model sonnet` 或 `--model gpt-5.6-sol` 优先于档位，使用代理默认推理等级，同时传 `--effort` 也不改变这一点。模型标识以字母或数字开头，仅含字母、数字、`.`、`_`、`-`。
 - 启动前用 `OCTOGENT_EFFORT_MODELS` 覆盖映射，Codex 支持 `model@reasoning` 和候选数组，见 [CLI 参考](../reference/cli.md)。
