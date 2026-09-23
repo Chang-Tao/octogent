@@ -4,9 +4,17 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { isEffortTier, resolveAgentModelSelection } from "../src/terminalRuntime/modelSelection";
+import {
+  describeEffortTierDefaults,
+  isEffortTier,
+  resolveAgentModelSelection,
+} from "../src/terminalRuntime/modelSelection";
 
 describe("resolveAgentModelSelection", () => {
+  // No Codex models cache: the first candidate of each tier is taken, so the
+  // expectations below do not depend on which models this machine's account sees.
+  const noCache = { OCTOGENT_CODEX_CONFIG: "/nonexistent/codex/config.toml" };
+
   it("maps effort tiers to per-provider defaults", () => {
     expect(resolveAgentModelSelection({ provider: "claude-code", effort: "light" }, {})).toEqual({
       model: "haiku",
@@ -16,19 +24,24 @@ describe("resolveAgentModelSelection", () => {
       model: "fable",
       effortTier: "max",
     });
-    expect(resolveAgentModelSelection({ provider: "codex", effort: "standard" }, {})).toEqual({
-      model: "gpt-5.6-sol",
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "light" }, noCache)).toEqual({
+      model: "gpt-6-luna",
       codexReasoningEffort: "medium",
+      effortTier: "light",
+    });
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "standard" }, noCache)).toEqual({
+      model: "gpt-6-sol",
+      codexReasoningEffort: "high",
       effortTier: "standard",
     });
     // Top two Codex tiers share the strongest current model (GPT-6 Astra);
     // reasoning level separates them.
-    expect(resolveAgentModelSelection({ provider: "codex", effort: "heavy" }, {})).toEqual({
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "heavy" }, noCache)).toEqual({
       model: "gpt-6-astra",
-      codexReasoningEffort: "medium",
+      codexReasoningEffort: "high",
       effortTier: "heavy",
     });
-    expect(resolveAgentModelSelection({ provider: "codex", effort: "max" }, {})).toEqual({
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "max" }, noCache)).toEqual({
       model: "gpt-6-astra",
       codexReasoningEffort: "xhigh",
       effortTier: "max",
@@ -107,11 +120,18 @@ describe("codex tier fallback by account model list", () => {
     return { OCTOGENT_CODEX_CONFIG: join(home, "config.toml") };
   };
 
-  it("uses GPT-6 Astra when the account lists it", () => {
-    const env = codexHomeListing(["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-luna"]);
+  it("uses the GPT-6 generation when the account lists it", () => {
+    const env = codexHomeListing(["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol"]);
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "light" }, env)).toMatchObject({
+      model: "gpt-6-luna",
+      codexReasoningEffort: "medium",
+    });
+    expect(
+      resolveAgentModelSelection({ provider: "codex", effort: "standard" }, env),
+    ).toMatchObject({ model: "gpt-6-sol", codexReasoningEffort: "high" });
     expect(resolveAgentModelSelection({ provider: "codex", effort: "heavy" }, env)).toMatchObject({
       model: "gpt-6-astra",
-      codexReasoningEffort: "medium",
+      codexReasoningEffort: "high",
     });
     expect(resolveAgentModelSelection({ provider: "codex", effort: "max" }, env)).toMatchObject({
       model: "gpt-6-astra",
@@ -119,9 +139,25 @@ describe("codex tier fallback by account model list", () => {
     });
   });
 
+  it("steps down to Sol on an account that has GPT-6 Sol but not Astra", () => {
+    const env = codexHomeListing(["gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol"]);
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "heavy" }, env)).toMatchObject({
+      model: "gpt-6-sol",
+      codexReasoningEffort: "xhigh",
+    });
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "max" }, env)).toMatchObject({
+      model: "gpt-6-sol",
+      codexReasoningEffort: "xhigh",
+    });
+  });
+
   it("falls back to the 5.6 generation on an account that cannot see GPT-6 yet", () => {
-    // Our second machine's cache on 2026-09-08 had no gpt-6-astra entry.
+    // Our second machine's cache on 2026-09-08 had no gpt-6 entries.
     const env = codexHomeListing(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"]);
+    expect(resolveAgentModelSelection({ provider: "codex", effort: "light" }, env)).toMatchObject({
+      model: "gpt-5.6-luna",
+      codexReasoningEffort: "medium",
+    });
     expect(resolveAgentModelSelection({ provider: "codex", effort: "heavy" }, env)).toMatchObject({
       model: "gpt-5.6-sol",
       codexReasoningEffort: "high",
@@ -153,6 +189,17 @@ describe("codex tier fallback by account model list", () => {
       model: "gpt-5.6-luna",
       codexReasoningEffort: "high",
     });
+  });
+});
+
+describe("describeEffortTierDefaults", () => {
+  it("prints one line per tier with the Codex fallbacks", () => {
+    const lines = describeEffortTierDefaults();
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toBe("light = haiku / gpt-6-luna@medium (fallback gpt-5.6-luna@medium)");
+    expect(lines[3]).toBe(
+      "max = fable / gpt-6-astra@xhigh (fallback gpt-6-sol@xhigh, gpt-5.6-sol@xhigh)",
+    );
   });
 });
 

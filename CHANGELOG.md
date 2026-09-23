@@ -103,6 +103,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the local Codex models cache does not list the first choice, and
   `OCTOGENT_EFFORT_MODELS` accepts candidate arrays.
 
+### Model list follow-up (2026-09-23)
+
+- Codex effort tiers moved to the GPT-6 generation now that Sol and Luna sit
+  beside Astra: `light` = gpt-6-luna@medium, `standard` = gpt-6-sol@high,
+  `heavy` = gpt-6-astra@high, `max` = gpt-6-astra@xhigh, each with 5.6-era
+  fallbacks for accounts the rollout has not reached (and Sol as the step-down
+  from Astra). Small models run at their default reasoning level or above
+  rather than `low`. The Claude aliases already resolve to the new Opus 5.5
+  (`opus`), so the Claude side is unchanged apart from the docs.
+- `octogent guide` now derives its tier line from the same table
+  `terminal create` uses, and mentions the hub (`--project`, `hub status`,
+  `/p/<slug>/`).
+- The agent skill (`octogent setup-agents`) grew from a one-page routine into
+  a routine plus three references — every command with its output and exit
+  codes, a brief template with a real example and checklist, and a
+  troubleshooting guide for each stuck state (permission dialogs, provider
+  errors, stalls, the survey, unacknowledged briefs, channel failures) — with
+  the mental model (octoboss, tentacles, workers, worktree vs shared, the hub,
+  the clean worker environment) and the mistakes seen in real coordinator
+  sessions. Run `octogent setup-agents` again to refresh the installed copy.
+
 ### Hub, phase 3: the hub is the default (2026-09-22)
 
 - Bare `octogent` now opens the current project on the hub: it starts the

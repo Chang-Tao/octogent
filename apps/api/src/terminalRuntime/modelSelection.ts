@@ -29,24 +29,52 @@ type EffortModelMap = Partial<
 >;
 
 // Claude entries are family aliases so they track each new generation without
-// a code change (as of 2026-09: haiku → Haiku 4.5, sonnet → Sonnet 5,
-// opus → Opus 5, fable → Fable 5.1). Codex has no aliases, so these follow
-// the models_cache of 2026-09-08: gpt-6-astra is the new top model (GPT-6,
-// "most capable"), so the two heavy tiers sit on it and differ by reasoning
-// level; gpt-5.6-sol is now billed as the everyday workhorse and takes the
-// standard tier; luna stays the cheap one. gpt-5.5 (previous-generation) and
-// the hidden gpt-reserve are not used. Codex's `max` / `ultra` levels are left
+// a code change (as of 2026-09-23: haiku → Haiku 4.5, sonnet → Sonnet 5,
+// opus → Opus 5.5, fable → Fable 5.1). Anthropic now positions Opus 5.5 as the
+// everyday execution model and Fable as the one for planning and for work whose
+// result matters more than its price, which is how the heavy / max tiers were
+// already split. Codex has no aliases, so its entries follow the models_cache
+// of 2026-09-23, when the GPT-6 generation filled in below Astra: Luna is the
+// cheap tier (run at its default reasoning level — at `low` the small models
+// start making factual mistakes), Sol is the execution workhorse (OpenAI's own
+// guidance: execute on Sol xhigh or Astra high, plan on Astra), Astra stays the
+// strongest and the most quota-hungry, so only the two upper tiers touch it.
+// The 5.6 generation remains as fallback for accounts the rollout has not
+// reached yet: each Codex tier is a preference list and the first slug the
+// account's models cache lists wins. gpt-5.5 (previous generation) and the
+// hidden gpt-reserve are not used. Codex's `max` / `ultra` levels are left
 // out of the defaults — `ultra` spawns its own sub-agents, which fights
 // Octogent's orchestration; both remain reachable via OCTOGENT_EFFORT_MODELS.
-// GPT-6 is rolling out per account (one of our two machines sees it, the
-// other does not yet), so each Codex tier lists a fallback that resolves when
-// the account's models cache lacks the first choice.
 const DEFAULT_EFFORT_MODELS: EffortModelMap = {
-  light: { "claude-code": "haiku", codex: "gpt-5.6-luna@low" },
-  standard: { "claude-code": "sonnet", codex: ["gpt-5.6-sol@medium", "gpt-5.6-terra@medium"] },
-  heavy: { "claude-code": "opus", codex: ["gpt-6-astra@medium", "gpt-5.6-sol@high"] },
-  max: { "claude-code": "fable", codex: ["gpt-6-astra@xhigh", "gpt-5.6-sol@xhigh"] },
+  light: { "claude-code": "haiku", codex: ["gpt-6-luna@medium", "gpt-5.6-luna@medium"] },
+  standard: {
+    "claude-code": "sonnet",
+    codex: ["gpt-6-sol@high", "gpt-5.6-sol@medium", "gpt-5.6-terra@medium"],
+  },
+  heavy: {
+    "claude-code": "opus",
+    codex: ["gpt-6-astra@high", "gpt-6-sol@xhigh", "gpt-5.6-sol@high"],
+  },
+  max: {
+    "claude-code": "fable",
+    codex: ["gpt-6-astra@xhigh", "gpt-6-sol@xhigh", "gpt-5.6-sol@xhigh"],
+  },
 };
+
+/**
+ * The default mapping as one line per tier (`light = haiku / gpt-6-luna@medium
+ * (fallback gpt-5.6-luna@medium)`), for `octogent guide` and the docs, so the
+ * text people read never drifts from what terminal create does.
+ */
+export const describeEffortTierDefaults = (): string[] =>
+  EFFORT_TIERS.map((tier) => {
+    const claude = DEFAULT_EFFORT_MODELS[tier]?.["claude-code"];
+    const codex = DEFAULT_EFFORT_MODELS[tier]?.codex;
+    const codexList = typeof codex === "string" ? [codex] : (codex ?? []);
+    const [first, ...rest] = codexList;
+    const codexText = rest.length > 0 ? `${first} (fallback ${rest.join(", ")})` : (first ?? "-");
+    return `${tier} = ${typeof claude === "string" ? claude : "-"} / ${codexText}`;
+  });
 
 // These strings end up inside the PTY bootstrap command line, so only accept
 // plain identifier-shaped values.

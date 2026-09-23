@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import type { Locale } from "@octogent/core";
 
+import { describeEffortTierDefaults } from "./terminalRuntime/modelSelection";
+
 /**
  * `octogent guide` and `octogent setup-agents`.
  *
@@ -15,7 +17,7 @@ import type { Locale } from "@octogent/core";
  * so the skill itself never goes stale.
  */
 
-const GUIDE_EN = `Octogent — how a coordinator gets work done (installed version)
+const GUIDE_EN = (tiers: string) => `Octogent — how a coordinator gets work done (installed version)
 
 Run everything from the project directory. No browser or API calls needed.
 
@@ -28,8 +30,8 @@ Run everything from the project directory. No browser or API calls needed.
    Always pass --tentacle-id; without it the terminal reports directly to the octoboss.
    Workers start from a clean environment: put a project's venv/PATH in <workspace>/.octogent/env,
    or pass --inherit-env PATH,VIRTUAL_ENV to copy named variables from your shell for one worker.
-   Effort tiers today: light = haiku / gpt-5.6-luna@low, standard = sonnet / gpt-5.6-sol@medium,
-   heavy = opus / gpt-6-astra@medium, max = fable / gpt-6-astra@xhigh (Codex falls back per account).
+   Effort tiers today (Codex falls back per account to the first slug its models cache lists):
+${tiers}
 
 2. Wait
    octogent terminal wait <id> [<id>...] [--timeout <s>] [--attention-after <s>] [--json]
@@ -55,11 +57,13 @@ Run everything from the project directory. No browser or API calls needed.
    octogent terminal delete <id> --with-worktree              # after merging (live merge check)
    octogent terminal stop <id>                                # otherwise
 
+Hub: commands run in a project directory reach that project; elsewhere add --project <slug|id>.
+   octogent hub status   octogent projects   (dashboard: <hub>/p/<slug>/, overview at <hub>/)
 Other: octogent logs [--lines N] [--follow]   octogent worktree gc [--dry-run]   octogent terminal archive|prune
 Full reference: docs/reference/cli.md in the Octogent repository; docs/guides/getting-work-done.md for the guide.
 `;
 
-const GUIDE_ZH = `Octogent — 协调者工作法（当前安装版本）
+const GUIDE_ZH = (tiers: string) => `Octogent — 协调者工作法（当前安装版本）
 
 所有命令在项目目录里运行，不需要浏览器，也不需要直接调 API。
 
@@ -72,8 +76,8 @@ const GUIDE_ZH = `Octogent — 协调者工作法（当前安装版本）
    一定要带 --tentacle-id，不带就直属 octoboss。
    工人从干净环境启动：项目的 venv/PATH 写在 <工作区>/.octogent/env，
    或用 --inherit-env PATH,VIRTUAL_ENV 把你 shell 里指定的变量复制给这一个工人。
-   当前档位：light = haiku / gpt-5.6-luna@low，standard = sonnet / gpt-5.6-sol@medium，
-   heavy = opus / gpt-6-astra@medium，max = fable / gpt-6-astra@xhigh（Codex 按账号回退）。
+   当前档位（Codex 按账号回退：取其模型缓存里列出的第一个候选）：
+${tiers}
 
 2. 等待
    octogent terminal wait <ID> [<ID>...] [--timeout 秒] [--attention-after 秒] [--json]
@@ -99,11 +103,20 @@ const GUIDE_ZH = `Octogent — 协调者工作法（当前安装版本）
    octogent terminal delete <ID> --with-worktree              # 合并后（现场核对已合并）
    octogent terminal stop <ID>                                # 其他情况
 
+Hub：在项目目录里运行的命令自动连到该项目；在别处加 --project <slug|id>。
+   octogent hub status   octogent projects   （面板：<hub>/p/<slug>/，总览：<hub>/）
 其他：octogent logs [--lines N] [--follow]   octogent worktree gc [--dry-run]   octogent terminal archive|prune
 完整参考：仓库里的 docs/zh-CN/reference/cli.md；入门看 docs/zh-CN/guides/getting-work-done.md。
 `;
 
-export const renderGuide = (locale: Locale): string => (locale === "zh-CN" ? GUIDE_ZH : GUIDE_EN);
+// The tier line is generated from the same table terminal create uses, so the
+// guide can never describe a mapping the server no longer applies.
+export const renderGuide = (locale: Locale): string => {
+  const tiers = describeEffortTierDefaults()
+    .map((line) => `     ${line}`)
+    .join("\n");
+  return locale === "zh-CN" ? GUIDE_ZH(tiers) : GUIDE_EN(tiers);
+};
 
 export type AgentSkillTarget = { name: "claude-code" | "codex"; directory: string };
 
