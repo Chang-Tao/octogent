@@ -6,7 +6,7 @@ Octogent 是一个本地 Node.js 项目，包含本地 API 和 Web UI。
 
 - Node.js `22+`（用 [nvm](https://github.com/nvm-sh/nvm) 装的也可以；安装时所在的 shell 要先 `nvm use`）
 - `pnpm` `10+`——仓库是 pnpm workspace。先装一次：`npm install -g pnpm`（或 `corepack enable`）。**不要**在仓库里跑 `npm install`：它解析不了 workspace 里的包，还会留下一个多余的 `package-lock.json`
-- Linux 上编译 `node-pty` 原生模块需要 C++ 工具链：`python3`、`make`、`g++`（Debian/Ubuntu：`sudo apt install build-essential python3`）。macOS 和 Windows 自带预编译二进制
+- Linux 上编译 `node-pty` 原生模块需要 C++ 工具链：`python3`、`make`、`g++`（Debian/Ubuntu：`sudo apt install build-essential python3`）。macOS 自带预编译二进制。Windows 请装在 WSL 里，见[Windows：装在 WSL 里](#windows装在-wsl-里)
 - 至少一个已安装并登录的代理 CLI：`claude`（`npm install -g @anthropic-ai/claude-code`，然后运行一次 `claude` 完成登录）和/或 `codex`
 - `git`（用于工作树终端）
 - `curl`（用于 Claude 钩子回调流程）
@@ -50,6 +50,36 @@ octogent --help
 ```bash
 rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json
 ```
+
+## Windows：装在 WSL 里
+
+Octogent 的代理都跑在 POSIX shell 里（钩子回调、代理启动命令、工人环境都是按 bash 写的），所以在 Windows 上要装进 WSL 2，而不是原生安装。面板照样在 Windows 浏览器里打开：WSL 2 会把 `127.0.0.1` 转发到 Windows。
+
+1. 如果 WSL 还没有发行版：以管理员身份打开 PowerShell，`wsl --install -d Ubuntu`，重启后按提示创建 Linux 用户。
+2. 进入发行版（`wsl`），**在 Linux 里**安装全部依赖——WSL 的 `PATH` 里能看到的 Windows 版 `node`、`pnpm`、`claude`（位于 `/mnt/c/...` 或 `/mnt/d/...`）不能用，它们的原生模块和路径都是 Windows 的：
+
+   ```bash
+   sudo apt update && sudo apt install -y build-essential python3 git curl
+   curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+   source ~/.nvm/nvm.sh && nvm install 22
+   npm install -g pnpm@10 @anthropic-ai/claude-code      # 以及/或者：npm install -g @openai/codex
+   which node pnpm claude                                 # 三个都必须在 ~/.nvm 下，而不是 /mnt/
+   ```
+
+3. 按[从克隆仓库进行本地全局 CLI 安装](#从克隆仓库进行本地全局-cli-安装)克隆并构建，放在 Linux 家目录（`~/octogent`），不要放在 `/mnt/c` 下——从 WSL 访问 Windows 文件系统很慢，文件监听也不可靠。
+4. 在 **WSL 里**把代理 CLI 登录一次（`claude`、`codex login`）；Windows 上的登录是分开的，不会被用到。
+5. 项目也放在 Linux 文件系统里（`~/code/...`），在那里运行 `octogent`，把它打印的 `http://127.0.0.1:8787/p/<slug>/` 在 Windows 浏览器里打开。
+
+如果 WSL 的 `PATH` 先找到了 Windows 的工具，要么让 nvm 排在前面（登录 shell 下默认如此），要么在 `/etc/wsl.conf` 里关掉追加 Windows `PATH`：
+
+```ini
+[interop]
+appendWindowsPath = false
+```
+
+然后在 PowerShell 里 `wsl --shutdown`。
+
+让 hub 保持运行。最后一个 `wsl` 会话关闭后不久，Windows 会停掉该 WSL 发行版，hub（以及所有工人）也随之停止。给 hub 留一个会话——开一个终端标签页运行 `wsl -- bash -c '. ~/.nvm/nvm.sh && octogent hub start --foreground'`——或者用"任务计划程序"在开机时运行同一条命令。
 
 ## npm 注册表安装
 

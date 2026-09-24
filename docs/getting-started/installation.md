@@ -6,7 +6,7 @@ Octogent is a local Node.js project with a local API and web UI.
 
 - Node.js `22+` (an [nvm](https://github.com/nvm-sh/nvm) install is fine; run `nvm use` in the shell you install from)
 - `pnpm` `10+` — the repository is a pnpm workspace. Install it once with `npm install -g pnpm` (or `corepack enable`). Do **not** run `npm install` inside the clone: it cannot resolve the workspace packages and leaves a stray `package-lock.json` behind
-- A C++ toolchain for `node-pty`'s native module on Linux: `python3`, `make`, `g++` (`sudo apt install build-essential python3` on Debian/Ubuntu). macOS and Windows ship prebuilt binaries
+- A C++ toolchain for `node-pty`'s native module on Linux: `python3`, `make`, `g++` (`sudo apt install build-essential python3` on Debian/Ubuntu). macOS ships prebuilt binaries. On Windows, install inside WSL — see [Windows: install inside WSL](#windows-install-inside-wsl)
 - At least one agent CLI, installed and logged in: `claude` (`npm install -g @anthropic-ai/claude-code`, then run `claude` once to sign in) and/or `codex`
 - `git` for worktree terminals
 - `curl` for the Claude hook callback flow
@@ -50,6 +50,36 @@ If an earlier attempt used `npm install` in the clone, clean up first:
 ```bash
 rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json
 ```
+
+## Windows: install inside WSL
+
+Octogent runs its agents in POSIX shells (the hook callbacks, the agent launch command and the worker environment are all written for bash), so on Windows it is installed inside WSL 2, not natively. The dashboard still opens in the Windows browser: WSL 2 forwards `127.0.0.1` to Windows.
+
+1. In PowerShell as administrator, if WSL has no distribution yet: `wsl --install -d Ubuntu`, then reboot and create the Linux user it asks for.
+2. Open the distribution (`wsl`) and install everything **inside Linux** — a Windows `node`, `pnpm` or `claude` visible on the WSL `PATH` (under `/mnt/c/...` or `/mnt/d/...`) must not be the one used, because its native modules and paths are Windows ones:
+
+   ```bash
+   sudo apt update && sudo apt install -y build-essential python3 git curl
+   curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+   source ~/.nvm/nvm.sh && nvm install 22
+   npm install -g pnpm@10 @anthropic-ai/claude-code      # and/or: npm install -g @openai/codex
+   which node pnpm claude                                 # all three must be under ~/.nvm, not /mnt/
+   ```
+
+3. Clone and build as in [Local global CLI install from a clone](#local-global-cli-install-from-a-clone), in the Linux home (`~/octogent`), not under `/mnt/c` — the Windows filesystem is slow from WSL and breaks file watching.
+4. Sign the agent CLIs in **inside WSL** once (`claude`, `codex login`); the Windows logins are separate and are not used.
+5. Keep your projects in the Linux filesystem too (`~/code/...`), and run `octogent` from there. Open the printed `http://127.0.0.1:8787/p/<slug>/` in the Windows browser.
+
+If WSL's `PATH` picks Windows tools first, either put nvm first (it does so in a login shell) or stop WSL from appending the Windows `PATH` by adding to `/etc/wsl.conf`:
+
+```ini
+[interop]
+appendWindowsPath = false
+```
+
+then `wsl --shutdown` from PowerShell.
+
+Keep the hub alive. Windows stops a WSL distribution shortly after its last `wsl` session closes, and the hub (with every worker) stops with it. Keep one session open for the hub — a terminal tab running `wsl -- bash -c '. ~/.nvm/nvm.sh && octogent hub start --foreground'` — or have Windows run that same command at startup with a Task Scheduler task.
 
 ## npm registry install
 
